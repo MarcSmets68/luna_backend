@@ -1,0 +1,24 @@
+meta {
+  name: Delete
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/web/artikel/ZTEST-CRUD-001
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq deleted
+}
+
+docs {
+  Deletes an artikel by artnr. 404 if it doesn't exist.
+}

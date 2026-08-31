@@ -1,0 +1,57 @@
+meta {
+  name: Artlog
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/web/artikel/123.11352/artlog?pageSize=3
+  body: none
+  auth: none
+}
+
+params:query {
+  pageSize: 3
+  ~page:
+  ~datumVan:
+  ~datumTot:
+  ~beweging:
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.page: eq 1
+  res.body.pageSize: eq 3
+}
+
+script:post-response {
+  // Regressie-check voor de sorteervolgorde-bug (nieuwste-eerst, zie
+  // ArtlogBE.cls ttArtlog-index / ontwerp §1.5/§2.3): met >=2 rijen moet
+  // items[0].lijnnr strikt groter zijn dan items[1].lijnnr (DESCENDING).
+  const items = res.body.items;
+  if (items && items.length >= 2) {
+    if (!(items[0].lijnnr > items[1].lijnnr)) {
+      throw new Error(
+        "Artlog-sorteervolgorde fout: verwacht items[0].lijnnr > items[1].lijnnr (DESCENDING), " +
+        "gekregen lijnnr=" + items[0].lijnnr + " gevolgd door lijnnr=" + items[1].lijnnr
+      );
+    }
+  }
+}
+
+docs {
+  FR-5: gepagineerde artlog-bewegingshistoriek voor `artnr` (indexed op
+  artlog-x1: artnr, lijnnr). Sortering op artnr+lijnnr DESCENDING (OD-2,
+  NIET geverifieerd tegen productiedata - zie class header
+  Luna/BusinessLogic/ArtlogBE.cls). `beweging` wordt ongewijzigd/ruw
+  teruggegeven (BR-3), geen vertaling. Optionele filters: `datumVan`,
+  `datumTot` (YYYY-MM-DD), `beweging` (exacte code). Een bestaand artnr
+  zonder artlog-rijen geeft gewoon een lege `items`-array (zie
+  Beschikbaarheid/List voor het niet-composiet-equivalent), geen 404.
+  Backed by Backend/src/Luna/Web/ArtikelHandler.cls +
+  Luna/BusinessLogic/ArtlogBE.cls.
+}

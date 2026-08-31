@@ -1,0 +1,34 @@
+meta {
+  name: CreateMissingFields
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/web/klant/999999/adres
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "naam": "Missing required fields"
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq adres, postnr and stad are required
+  res.body.error.code: eq 400
+}
+
+docs {
+  400 when adres/postnr/stad are missing or blank. Standalone request - no
+  setup/cleanup needed (nothing gets created). Requires klnr 999999 to
+  exist - run "Klant - Create" first.
+}

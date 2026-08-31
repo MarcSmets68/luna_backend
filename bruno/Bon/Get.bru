@@ -1,0 +1,26 @@
+meta {
+  name: Get
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/web/bon/{{bonnr}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Gets a single bon by bonnr. 404 if it doesn't exist. {{bonnr}} is set by
+  the "Create" request's post-response script - run Create first (or set it
+  manually to an existing bonnr).
+}
+

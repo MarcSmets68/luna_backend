@@ -1,0 +1,31 @@
+meta {
+  name: ListGeparkeerd
+  type: http
+  seq: 30
+}
+ 
+get {
+  url: {{baseUrl}}/web/bon?geparkeerd=true&pageSize=10
+  body: none
+  auth: none
+}
+
+params:query {
+  pageSize: 10
+  geparkeerd: true
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists bon rows filtered by geparkeerd=true. geparkeerd is an optional
+  query filter alongside klnr/type/bonnr/naam/page/pageSize - valid values
+  are "true"/"false", absent/empty means no filter. See
+  Luna.BusinessLogic.BonBE:GetBonnen.
+}

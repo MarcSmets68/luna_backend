@@ -1,0 +1,34 @@
+meta {
+  name: Reorder - move up (happy path)
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/web/offerte/999999/1/lijn/20/reorder
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "direction": "up"
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Moves lijnnr 20 up - swaps lijnnr with its neighbor at lijnnr 10 (both
+  non-subtotaal, so allowed). Response is the full refreshed line list for
+  this offerte, ordered by lijnnr - after this call the line that used to
+  be lijnnr 20 is now lijnnr 10 and vice versa. See
+  `OfflijnBE:ReorderOfflijn`.
+}

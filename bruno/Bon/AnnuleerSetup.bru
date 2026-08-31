@@ -1,0 +1,45 @@
+meta {
+  name: AnnuleerSetup
+  type: http
+  seq: 20
+}
+
+post {
+  url: {{baseUrl}}/web/bon
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "type": "TEST",
+    "stempel": "V",
+    "klnr": 7629,
+    "naam": "ZTEST-ANNULEER",
+    "munt": "EUR",
+    "recupelBedrag": 12.5,
+    "aBedrag": 30
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.stempel: eq V
+}
+
+script:post-response {
+  bru.setVar("annuleerBonnr", res.body.bonnr);
+}
+
+docs {
+  Creates a dedicated bon with stempel "V" to exercise the cancel
+  (annuleer) workflow below, without disturbing the {{bonnr}}/{{lijnnr}}
+  variables used by the plain CRUD requests above. Also sets
+  recupelBedrag/aBedrag to non-zero so AnnuleerHappyPath can assert they
+  get zeroed. Stores the new bonnr into {{annuleerBonnr}}.
+}

@@ -1,0 +1,28 @@
+meta {
+  name: GetLijnInvalidLijnnr
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/web/bon/123/lijn/abc
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq Invalid lijnnr abc
+  res.body.error.code: eq 400
+}
+
+docs {
+  Regression test for a bug fixed in ParseLijnnr: a non-numeric {lijnnr}
+  path segment (e.g. "abc") must return 400 "Invalid lijnnr abc" before any
+  bon/bonlijn lookup happens - regardless of whether bonnr 123 exists.
+  Standalone request - no setup needed.
+}

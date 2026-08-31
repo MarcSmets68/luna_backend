@@ -1,0 +1,24 @@
+meta {
+  name: List
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/web/klant/999999/korting
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists korting rows (swGroep = FALSE only) for a klnr, ordered by artnr,
+  unpaged. Requires "Create" to have run first.
+}

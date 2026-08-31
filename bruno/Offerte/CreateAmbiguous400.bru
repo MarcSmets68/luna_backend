@@ -1,0 +1,32 @@
+meta {
+  name: Create (ambiguous 400)
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/web/offerte
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "offnr": 123456
+  }
+}
+
+assert {
+  res.status: eq 400
+}
+
+docs {
+  Provides only `offnr`, omitting `versie` - must be `400` (exactly one of
+  offnr/versie provided is ambiguous, not auto-allocate mode). Same check
+  applies symmetrically if only `versie` were provided instead.
+}

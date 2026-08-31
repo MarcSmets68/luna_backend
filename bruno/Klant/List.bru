@@ -1,0 +1,35 @@
+meta {
+  name: List
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/klant?pageSize=10
+  body: none
+  auth: none
+}
+
+params:query {
+  pageSize: 10
+  ~naam:
+  ~page:
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists klant rows (paged). Query params: naam (space-separated words,
+  case-insensitive - every word must occur somewhere across naam/naam1
+  combined, in any order, e.g. "Smets Marc" matches naam "Smets" / naam1
+  "Marc"), page (default 1), pageSize (default 25, max 200). Response
+  includes hasMore instead of an exact totalCount - see Backend/README.md
+  for why. Backed by Backend/src/Luna/Web/KlantHandler.cls +
+  Luna/BusinessLogic/KlantBE.cls.
+}

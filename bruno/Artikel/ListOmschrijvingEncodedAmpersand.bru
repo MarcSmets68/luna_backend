@@ -1,0 +1,49 @@
+meta {
+  name: ListOmschrijvingEncodedAmpersand
+  type: http
+  seq: 19
+}
+
+get {
+  url: {{baseUrl}}/web/artikel?omschrijving=A%26B&pageSize=5
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.pageSize: eq 5
+}
+
+tests {
+  test("responds in well under the 11.8-19.8s latency previously reproduced for this exact input", function() {
+    expect(res.getResponseTime()).to.be.below(5000);
+  });
+}
+
+docs {
+  Regression test for a percent-encoded "&" INSIDE a filter value:
+  omschrijving=A%26B decodes (once, by the framework) to the literal
+  value "A&B" by the time Luna.Web.Util.QueryParamHelper reads it off
+  URI:QueryString. The old blind-split-on-"&" implementation mis-split
+  this into "omschrijving=A" plus a dangling "B" piece, silently
+  truncating the filter to "A" - functionally wrong (matched far more
+  rows than the real "A&B" value would) though not slow, since "A" is a
+  common substring. Fixed by anchoring pair-splitting on the known
+  query-param name set (see the QueryParamHelper class header) instead
+  of blindly splitting on every "&".
+
+  This does not by itself reproduce the 11.8-19.8s latency bug reported
+  against ?omschrijving=A%3DB&pageSize=5 (see
+  ListOmschrijvingEncodedEquals.bru) - that lives in
+  Luna.BusinessLogic.ArtikelBE's full-table substring scan, not in this
+  parsing layer, and is now capped independently (iMaxRowsScanned in
+  ArtikelBE:GetArtikelen). The timing assertion here is a generous
+  regression guard against either bug reappearing, not a tight
+  performance benchmark - see ListOmschrijvingEncodedEquals.bru for the
+  scenario that actually reproduced the multi-second latency.
+}

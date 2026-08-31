@@ -1,0 +1,44 @@
+meta {
+  name: Create (auto-allocate)
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/web/offerte
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "klnr": 100,
+    "naam": "Test offerte auto-allocate",
+    "offgroep": "TEST",
+    "opm": "Aangemaakt door Bruno CRUD test (auto-allocate)"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.versie: eq 1
+}
+
+script:post-response {
+  bru.setVar("autoOffnr", res.body.offnr);
+}
+
+docs {
+  Creates an offerte with both `offnr` and `versie` omitted from the body -
+  the server auto-allocates `offnr` = (last offerte.offnr) + 1 and
+  `versie` = 1, under the same EXCLUSIVE-LOCK/transaction as the CREATE
+  (mirrors Luna.BusinessLogic.BonBE:CreateBon's `bonnr` allocation). The
+  post-response script stores the server-assigned `offnr` into the
+  `{{autoOffnr}}` runtime variable so "Delete (auto-allocate cleanup)" can
+  use it - run this request first.
+}

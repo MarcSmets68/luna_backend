@@ -1,0 +1,50 @@
+meta {
+  name: Create
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/web/bon
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "bonnr": 99999999,
+    "bedrag": 123.45,
+    "btw": 11.11,
+    "type": "ORDERBEVESTIGING",
+    "klnr": 7629,
+    "naam": "ZTEST-CRUD Klant",
+    "adres": "Teststraat 1",
+    "postnr": "9000",
+    "stad": "Gent",
+    "munt": "EUR",
+    "uRef": "ZTEST-CRUD-001",
+    "opm": "Bruno CRUD test order"
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  bru.setVar("bonnr", res.body.bonnr);
+}
+
+docs {
+  Creates a bon. `bonnr` is server-generated (last bonnr + 1) - the
+  `bonnr`/`bedrag`/`btw` values in this request body are intentionally
+  ignored by the API (they are shown here to prove that). The
+  post-response script stores the server-assigned `bonnr` into the
+  `{{bonnr}}` runtime variable so Get/Update/Delete below can use it - run
+  this request first. Run "Bon - Delete" afterwards to clean up test data.
+}

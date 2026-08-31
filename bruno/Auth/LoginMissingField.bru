@@ -1,0 +1,32 @@
+meta {
+  name: LoginMissingField
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/web/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "kode": "ABNA"
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.code: eq 400
+}
+
+docs {
+  Missing password field - 400, checked before any DB lookup (ontwerp
+  paragraaf 1.2.1, step 1). Same result for an empty-string password/kode.
+}

@@ -1,0 +1,34 @@
+meta {
+  name: Verloren - explicit wins
+  type: http
+  seq: 11
+}
+
+put {
+  url: {{baseUrl}}/web/offerte/999999/1
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "verloren": true,
+    "opm": "Explicit verloren should win over auto-clear"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.verloren: eq true
+}
+
+docs {
+  When the body explicitly includes `verloren`, that value always wins -
+  the auto-clear rule only applies when `verloren` is absent from the
+  body. Run after "Verloren - auto-clear".
+}

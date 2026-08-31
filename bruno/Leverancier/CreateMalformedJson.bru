@@ -1,0 +1,40 @@
+meta {
+  name: CreateMalformedJson
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/web/leverancier
+  body: text
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:text {
+﻿{"levnr": 999999, "naam": "irrelevant"}
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.code: eq 400
+}
+
+docs {
+  Regression test for a bug fixed in LeverancierHandler (and, identically,
+  every other write-capable WebHandler - Artikel/Bon/Factuur/Klant/
+  Lakproductie/Offerte): a malformed JSON body - here a leading UTF-8
+  byte-order-mark (BOM) before the "{" - used to make the framework's own
+  lazy request-body-to-JsonObject parse throw a plain (non-AppError) ABL
+  error that HandlePost only ever caught as Progress.Lang.AppError, so it
+  escaped uncaught into PASOE's generic error handler and came back as a
+  raw 500 (HTML, or a JSON envelope with empty exception fields) instead
+  of a documented error response. Must now return a clean 400
+  {"error": {"message": "Malformed JSON request body: ...", "code": 400}}.
+  Standalone request - no setup/cleanup needed (the body never reaches
+  LeverancierBE).
+}

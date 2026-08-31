@@ -1,0 +1,32 @@
+meta {
+  name: ListLijnen
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/web/bestelorder/1/lijn
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists every ordlijn (purchase order line) row for this ordnr, ordered by
+  lijnnr. Curated core subset - see Luna.BusinessLogic.OrdlijnBE for the
+  field map. Does NOT 404 if {ordnr} doesn't exist - it just returns
+  {"items": []} (same "no separate existence check" reasoning as the
+  parent's non-numeric-input handling); callers that need a 404 for a
+  missing order should call "Get" (this folder) first. The path segment
+  above is a placeholder - replace it with a real ordnr (e.g. one returned
+  by "List"). Read-only. Backed by
+  Backend/src/Luna/Web/BestelorderHandler.cls +
+  Luna/BusinessLogic/OrdlijnBE.cls.
+}

@@ -1,0 +1,28 @@
+meta {
+  name: GetInvalidBonnr
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/web/bon/abc
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq Invalid bonnr abc
+  res.body.error.code: eq 400
+}
+
+docs {
+  Regression test for a bug fixed in ParseBonnr: a non-numeric {bonnr} path
+  segment (e.g. "abc") must return 400 "Invalid bonnr abc", not fall through
+  to a 404 "Bon 0 not found" lookup. Standalone request - no setup needed.
+}
+

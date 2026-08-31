@@ -1,0 +1,42 @@
+meta {
+  name: Create (explicit offnr/versie)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/web/offerte
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "offnr": 999999,
+    "versie": 1,
+    "klnr": 100,
+    "naam": "Test offerte voor CRUD",
+    "offgroep": "TEST",
+    "opm": "Aangemaakt door Bruno CRUD test"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.offnr: eq 999999
+  res.body.versie: eq 1
+}
+
+docs {
+  Creates an offerte with `offnr`/`versie` explicitly provided (both
+  positive integers) - their combination must not already exist (409 if it
+  does). This is the explicit-mode regression test; see "Create (auto-
+  allocate)" for the mode where both are omitted and the server assigns
+  them. Run "Offerte - Delete" afterwards to clean up test data (this also
+  cascades to any offlijn test rows created under it).
+}

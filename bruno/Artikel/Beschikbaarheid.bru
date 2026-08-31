@@ -1,0 +1,38 @@
+meta {
+  name: Beschikbaarheid
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/web/artikel/ALV.Bamboo/beschikbaarheid
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.artnr: eq ALV.Bamboo
+  res.body.isSamengesteld: eq true
+  res.body.siktaUitzonderingToegepast: eq false
+}
+
+docs {
+  FR-4: composiet-beschikbaarheid ("hoeveel kan ik nog bouwen?") voor een
+  samengesteld artikel. `ALV.Bamboo` heeft artlijn-componenten op de
+  LunaNew-testdata en is gekozen als voorbeeld met een niet-triviale
+  bottleneck-component. Response bevat `bouwbareEenheden` (MIN over alle
+  componenten) en een `componenten`-array met per component
+  `bouwbaarUitDitComponent`/`isBottleneck`. Voor een niet-samengesteld
+  artikel (geen artlijn-rijen) geeft dit 200 met `isSamengesteld: false`,
+  `bouwbareEenheden: null` en een lege `componenten`-array - geen 404 (zie
+  BeschikbaarheidNietSamengesteld). 404 alleen als het artnr zelf niet
+  bestaat (zie BeschikbaarheidNotFound). SIKTA-uitzondering (OV-4) niet
+  geimplementeerd in Fase 1 - `siktaUitzonderingToegepast` staat altijd op
+  false. Backed by Backend/src/Luna/Web/ArtikelHandler.cls +
+  Luna/BusinessLogic/StockAvailabilityBE.cls.
+}

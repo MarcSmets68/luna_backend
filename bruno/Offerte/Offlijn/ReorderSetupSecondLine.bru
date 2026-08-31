@@ -1,0 +1,33 @@
+meta {
+  name: Reorder setup - create second line
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/web/offerte/999999/1/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "TESTAUTO2",
+    "omschrijving": "Second line"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.lijnnr: eq 20
+}
+
+docs {
+  Auto-allocates lijnnr 20 (plain line, no flags) - setup for the reorder
+  tests below.
+}

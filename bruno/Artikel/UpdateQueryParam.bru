@@ -1,0 +1,36 @@
+meta {
+  name: UpdateQueryParam
+  type: http
+  seq: 13
+}
+
+put {
+  url: {{baseUrl}}/web/artikel?artnr=ZTEST-CRUD-001
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "gewicht": 1.5
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.gewicht: eq 1.5
+}
+
+docs {
+  Same update as Update.bru, but with artnr passed as the artnr query
+  param (?artnr=...) instead of a URL path segment. This is the fallback
+  form for artnr values that contain characters (e.g. a percent sign)
+  that PASOE/Tomcat mis-routes when used in the path form
+  (/web/artikel/{artnr}). The path segment is tried first; this fallback
+  only kicks in when the path segment is empty/absent.
+}

@@ -1,0 +1,38 @@
+meta {
+  name: DeleteBestingSetup
+  type: http
+  seq: 33
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{bestingBonnr}}/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "TESTART",
+    "omschrijving": "Test regel besteld",
+    "besteld": 5
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.besteld: eq 5
+}
+
+script:post-response {
+  bru.setVar("bestingLijnnr", res.body.lijnnr);
+}
+
+docs {
+  Creates a bonlijn with besteld=5 under {{bestingBonnr}}. Requires
+  {{bestingBonnr}} to be set (run "DeleteBestingCreateBon" first).
+}

@@ -1,0 +1,33 @@
+meta {
+  name: Verloren - set true
+  type: http
+  seq: 9
+}
+
+put {
+  url: {{baseUrl}}/web/offerte/999999/1
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "verloren": true
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.verloren: eq true
+}
+
+docs {
+  Sets `verloren`=true on offerte 999999/1 (created by "Create (explicit
+  offnr/versie)"). Setup step for "Verloren - auto-clear" below - run after
+  Create and before that request.
+}

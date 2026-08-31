@@ -1,0 +1,33 @@
+meta {
+  name: Create subtotaal with nothing to sum (400)
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/web/offerte/999999/1/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "lijnnr": 1,
+    "subtotaal": true
+  }
+}
+
+assert {
+  res.status: eq 400
+}
+
+docs {
+  Relies on offerte 999999/1 having no lines at this point (Delete at seq 5
+  removed lijnnr 10). Creating a subtotaal line with no preceding plain
+  line to sum must be 400.
+}

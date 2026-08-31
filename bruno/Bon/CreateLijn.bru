@@ -1,0 +1,48 @@
+meta {
+  name: CreateLijn
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{bonnr}}/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "bonnr": 1,
+    "lijnnr": 999,
+    "artnr": "TESTART",
+    "omschrijving": "Test regel voor CRUD",
+    "aantal": 2,
+    "vprijs": 50.0,
+    "bedrag": 100.0
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.bonnr: eq {{bonnr}}
+}
+
+script:post-response {
+  bru.setVar("lijnnr", res.body.lijnnr);
+}
+
+docs {
+  Creates a bonlijn under bon {{bonnr}}. `lijnnr` is server-generated
+  (last lijnnr for this bonnr + 1) - the `bonnr`/`lijnnr` values in this
+  request body are intentionally ignored by the API (they are shown here
+  to prove that). The post-response script stores the server-assigned
+  `lijnnr` into the `{{lijnnr}}` runtime variable so ListLijnen/GetLijn/
+  UpdateLijn/DeleteLijn below can use it. 404 if the parent bonnr doesn't
+  exist - run "Create" (bon) first. Backed by
+  Backend/src/Luna/Web/BonHandler.cls + Luna.BusinessLogic.BonLijnBE.cls.
+}

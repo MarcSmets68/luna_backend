@@ -1,0 +1,28 @@
+meta {
+  name: DeletePercentArtnrQueryParam
+  type: http
+  seq: 18
+}
+
+delete {
+  url: {{baseUrl}}/web/artikel?artnr=ZTEST-CRUD%25002
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq deleted
+  res.body.artnr: eq ZTEST-CRUD%002
+}
+
+docs {
+  Cleans up the ZTEST-CRUD%002 record created by CreatePercentArtnr.bru,
+  using the DELETE ?artnr=... query-param fallback (added alongside PUT's)
+  with the same standard single percent-encoding as
+  UpdatePercentArtnrQueryParam.bru/GetPercentArtnrQueryParam.bru.
+}

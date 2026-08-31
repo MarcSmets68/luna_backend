@@ -1,0 +1,39 @@
+meta {
+  name: ListOnderMinimum
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/web/artikel?artnr=A&onderMinimum=beide&pageSize=3
+  body: none
+  auth: none
+}
+
+params:query {
+  artnr: A
+  onderMinimum: beide
+  pageSize: 3
+  ~externInBewerking:
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  FR-2: "onder minimum"-filter (intern/extern/beide, zie design §1.2.1).
+  Altijd gecombineerd met `stock = TRUE` (BR-1). Gecombineerd met een
+  `artnr`-prefix hier om de scan te beperken - `onderMinimum` zonder enige
+  andere filter is een volledige (met stock=TRUE gefilterde)
+  1.8M-rij-scan en kan traag zijn (expliciet aanvaard binnen scope van FR-2,
+  zie design §1.2.1 performance-paragraaf) - vermijd dat in normaal
+  testgebruik door altijd artnr/groep mee te geven. `externInBewerking=true`
+  (x-gereserveerd > 0) is een apart, los te combineren filter - zie
+  ontwerp §1.2. Invalid `onderMinimum`-waarden (buiten intern/extern/beide)
+  geven 400.
+}

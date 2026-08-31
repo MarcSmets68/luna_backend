@@ -1,0 +1,36 @@
+meta {
+  name: GetInvalidKlnr
+  type: http
+  seq: 37
+}
+
+get {
+  url: {{baseUrl}}/web/bon?klnr=abc
+  body: none
+  auth: none
+}
+
+params:query {
+  klnr: abc
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq Invalid klnr abc
+  res.body.error.code: eq 400
+}
+
+docs {
+  Regression test: GET /web/bon?klnr=abc must return 400 "Invalid klnr abc",
+  not silently fall back to "no filter" and 200 with the full unfiltered
+  list. Root cause was BonHandler:HandleGet checking "IF iKlnr EQ ? THEN"
+  after "INTEGER(cKlnr) NO-ERROR" - a failed INTEGER() conversion leaves
+  the target INTEGER at its default initial value (0), not the unknown
+  value (?), so that check never triggered. Fixed to check
+  ERROR-STATUS:ERROR instead (same pattern as ParseBonnr/ParseLijnnr).
+  Standalone request - no setup needed.
+}

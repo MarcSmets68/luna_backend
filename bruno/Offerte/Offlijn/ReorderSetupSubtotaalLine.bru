@@ -1,0 +1,36 @@
+meta {
+  name: Reorder setup - create subtotaal line
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/web/offerte/999999/1/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "subtotaal": true,
+    "omschrijving": "Subtotal line"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.lijnnr: eq 30
+  res.body.subtotaal: eq true
+}
+
+docs {
+  Auto-allocates lijnnr 30 as a subtotaal line - valid because lijnnr 20 is
+  a preceding plain line. lijnnr 10 is not plain any more (kolomtitel=true
+  from "Update - set kolomtitel"), so this proves the guard checks for ANY
+  preceding plain line, not just the immediately-preceding one.
+}

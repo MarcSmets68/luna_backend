@@ -1,0 +1,36 @@
+meta {
+  name: LoginPassief
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/web/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "kode": "AB",
+    "password": "Welkom123"
+  }
+}
+
+assert {
+  res.status: eq 403
+  res.body.error.code: eq 403
+}
+
+docs {
+  Correct kode/password, but gebruiker.passief = yes for this test
+  account - 403, checked AFTER the password check (see ontwerp
+  paragraaf 1.2.1, step 4). If this account passief flag ever changes
+  in the shared LunaNew test DB, pick another passief=yes gebruiker
+  (check via GET /web/dev-users).
+}

@@ -1,0 +1,25 @@
+meta {
+  name: List
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/web/klant/999999/contact
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists klant-contact rows for a klnr, ordered by lijnnr, unpaged (a
+  customer typically has a bounded number of contacts). Requires "Create"
+  to have run first.
+}

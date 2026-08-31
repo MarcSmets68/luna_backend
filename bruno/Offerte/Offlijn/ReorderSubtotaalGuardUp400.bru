@@ -1,0 +1,32 @@
+meta {
+  name: Reorder - subtotaal guard on up (400)
+  type: http
+  seq: 15
+}
+
+post {
+  url: {{baseUrl}}/web/offerte/999999/1/lijn/30/reorder
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "direction": "up"
+  }
+}
+
+assert {
+  res.status: eq 400
+}
+
+docs {
+  lijnnr 30 is the subtotaal line. Moving it up would decrease its lijnnr
+  (move it above the lines it sums) - must be 400. Moving a subtotaal line
+  down is allowed - see "Reorder - move subtotaal down" below.
+}

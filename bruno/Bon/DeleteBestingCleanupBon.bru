@@ -1,0 +1,25 @@
+meta {
+  name: DeleteBestingCleanupBon
+  type: http
+  seq: 36
+}
+
+delete {
+  url: {{baseUrl}}/web/bon/{{bestingBonnr}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq deleted
+}
+
+docs {
+  Deletes the test bon created by DeleteBestingCreateBon, cleaning up
+  after the besteld<>0 delete-guard test sequence above.
+}

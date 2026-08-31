@@ -1,0 +1,9 @@
+# Compiled r-code - regenerate with scripts/compile.ps1
+build/
+compile_output.log
+
+# Runtime cache + refresh logs for the Lakproduktie overview (see
+# Luna.BusinessLogic.LakproductieCacheService / scripts/RefreshLakproductieCache.ps1)
+# - generated at runtime, not source of truth.
+cache/
+scripts/RefreshLakproductieCache.log

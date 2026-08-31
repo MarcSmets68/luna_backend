@@ -1,0 +1,34 @@
+meta {
+  name: Update conflicting flags (merged state, 400)
+  type: http
+  seq: 10
+}
+
+put {
+  url: {{baseUrl}}/web/offerte/999999/1/lijn/10
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "infolijn": true
+  }
+}
+
+assert {
+  res.status: eq 400
+}
+
+docs {
+  lijnnr 10 already has kolomtitel=true (set by "Update - set kolomtitel"
+  above). Setting infolijn=true without explicitly clearing kolomtitel
+  produces a merged state with two flags true - must be 400. The update is
+  rolled back (kolomtitel stays true, infolijn stays false) - see
+  `OfflijnBE:UpdateOfflijn`.
+}

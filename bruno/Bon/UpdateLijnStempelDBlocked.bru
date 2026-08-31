@@ -1,0 +1,33 @@
+meta {
+  name: UpdateLijnStempelDBlocked
+  type: http
+  seq: 27
+}
+
+put {
+  url: {{baseUrl}}/web/bon/{{stempelDBonnr}}/lijn/{{stempelDLijnnr}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "aantal": 3
+  }
+}
+
+assert {
+  res.status: eq 409
+  res.body.error.code: eq 409
+}
+
+docs {
+  Attempts to update a bonlijn with stempel "D" (geleverd) - must 409.
+  Requires {{stempelDBonnr}}/{{stempelDLijnnr}} to be set (run
+  "UpdateLijnStempelDCreateBon" and "UpdateLijnStempelDSetup" first).
+}

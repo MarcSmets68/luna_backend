@@ -1,0 +1,26 @@
+meta {
+  name: ListLijnen
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/web/bon/{{bonnr}}/lijn
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists every bonlijn row for bon {{bonnr}}, ordered by lijnnr. Not paged
+  - a bon typically has a bounded number of lines. 404 if the parent
+  bonnr doesn't exist - run "Create" (bon) first. Backed by
+  Backend/src/Luna/Web/BonHandler.cls + Luna.BusinessLogic.BonLijnBE.cls.
+}

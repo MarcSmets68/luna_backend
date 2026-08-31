@@ -1,0 +1,25 @@
+meta {
+  name: Get
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/web/klant/999999
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.klnr: eq 999999
+}
+
+docs {
+  Gets a single klant by klnr. 404 if it doesn't exist. Requires klnr
+  999999 to exist - run "Create" first.
+}

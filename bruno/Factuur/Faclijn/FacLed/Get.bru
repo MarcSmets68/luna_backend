@@ -1,0 +1,24 @@
+meta {
+  name: Get
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/web/factuur/9999999/lijn/1/led/1/1
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Gets a single fac_led by facnr+lijnnr+groepnr+ledLijn. 404 if not found.
+  Run "Fac_led - Create" first.
+}

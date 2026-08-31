@@ -1,0 +1,26 @@
+meta {
+  name: List
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/factuur/9999999/lijn
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists every faclijn row for factuur 9999999, ordered by lijnnr. Not
+  paged. 404 if the parent facnr doesn't exist - run "Factuur - Create"
+  first. Backed by Backend/src/Luna/Web/FactuurHandler.cls +
+  Luna/BusinessLogic/FacLijnBE.cls.
+}

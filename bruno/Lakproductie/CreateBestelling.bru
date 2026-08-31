@@ -1,0 +1,71 @@
+meta {
+  name: CreateBestelling
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/web/lakproduktie/bestelling
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "levnr": 1,
+    "lines": [
+      {
+        "artnr": "TESTART",
+        "omschrijving": "Test regel vanuit lakproduktie-preview (klantorder)",
+        "aantal": 6,
+        "bonnr": 1,
+        "blijnnr": 1
+      },
+      {
+        "artnr": "TESTART2",
+        "omschrijving": "Test regel vanuit lakproduktie-preview (productielijn)",
+        "aantal": 3,
+        "bonnr": 1,
+        "blijnnr": 2,
+        "volgnr": 1
+      },
+      {
+        "artnr": "TESTART3",
+        "omschrijving": "Test regel vanuit lakproduktie-preview (min-max voorraad, geen klantlink)",
+        "aantal": 25
+      }
+    ]
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.levnr: eq 1
+}
+
+script:post-response {
+  bru.setVar("bestellingOrdnr", res.body.ordnr);
+}
+
+docs {
+  Creates a new purchase order ("order" + "ordlijn") from a confirmed
+  Lakproduktie bestelling-preview. `ordnr` and each line's `lijnnr` are
+  server-generated - never read from the request body.
+
+  Per line, `bonnr`+`blijnnr` (no `volgnr`) links back to a customer order
+  line (bonlijn) and bumps its `besteld` counter; adding `volgnr` on top of
+  that links to a production line (bonlijn_productie) instead and bumps
+  its `besteld` counter. Omitting `bonnr`/`blijnnr`/`volgnr` entirely
+  creates a pure stock-replenishment line (min-max-voorraad source, no
+  customer link, no besteld bump).
+
+  400 if `levnr`/`lines` is missing, `lines` is empty, or any line has no
+  `artnr`/non-positive `aantal`. 404 if `levnr` or a line's `artnr`
+  doesn't exist. Backed by Backend/src/Luna/Web/LakproductieHandler.cls +
+  Luna/BusinessLogic/LakproductieBestellingBE.cls.
+}

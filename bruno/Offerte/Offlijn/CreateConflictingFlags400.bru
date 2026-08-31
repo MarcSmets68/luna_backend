@@ -1,0 +1,34 @@
+meta {
+  name: Create conflicting flags (400)
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/web/offerte/999999/1/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "lijnnr": 500,
+    "subtotaal": true,
+    "kolomtitel": true
+  }
+}
+
+assert {
+  res.status: eq 400
+}
+
+docs {
+  A line can be at most one of subtotaal/kolomtitel/infolijn - setting two
+  of them true must be 400. Run after "Offlijn - Delete" (seq 5) so lijnnr
+  500 is free.
+}

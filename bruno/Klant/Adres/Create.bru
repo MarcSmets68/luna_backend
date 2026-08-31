@@ -1,0 +1,42 @@
+meta {
+  name: Create
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/web/klant/999999/adres
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "lijnnr": 1,
+    "adres": "Teststraat 1",
+    "postnr": "9999",
+    "stad": "Testdorp",
+    "standaard": true
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.klnr: eq 999999
+  res.body.lijnnr: eq 1
+  res.body.adres: eq Teststraat 1
+}
+
+docs {
+  Creates a klant-adr row with an explicit `lijnnr` (deterministic for the
+  Get/Update/Delete requests below - `lijnnr` is auto-allocated as
+  MAX(lijnnr) + 10 when omitted instead). `adres`/`postnr`/`stad` are
+  required. Setting `standaard: true` clears standaard on every other adres
+  row for this klnr. Requires klnr 999999 to exist - run "Klant - Create"
+  first.
+}

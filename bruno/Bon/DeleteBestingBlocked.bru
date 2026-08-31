@@ -1,0 +1,34 @@
+meta {
+  name: DeleteBestingBlocked
+  type: http
+  seq: 34
+}
+
+delete {
+  url: {{baseUrl}}/web/bon/{{bestingBonnr}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 409
+  res.body.error.code: eq 409
+}
+
+docs {
+  Attempts to delete a bon that has a bonlijn with besteld <> 0 - must
+  409. Note: in this iteration, the existing "has related order
+  lines/records" (HasChildRows) check fires first since the bonlijn row
+  itself already blocks deletion, so this currently surfaces the generic
+  child-rows message rather than the newer, more specific
+  "has order lines with besteld <> 0" message
+  (Luna.BusinessLogic.BonBE:HasOutstandingBestelling) - that guard is
+  unreachable today by construction but kept per the approved design for
+  when/if HasChildRows' bonlijn check changes independently. Either way
+  the result is 409. Requires {{bestingBonnr}} to be set (run
+  "DeleteBestingCreateBon" and "DeleteBestingSetup" first).
+}

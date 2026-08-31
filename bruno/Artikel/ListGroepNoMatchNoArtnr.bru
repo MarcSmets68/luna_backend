@@ -1,0 +1,53 @@
+meta {
+  name: ListGroepNoMatchNoArtnr
+  type: http
+  seq: 21
+}
+
+get {
+  url: {{baseUrl}}/web/artikel?groep=ZZZ_NONEXISTENT_GROEP
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("responds in under 5s - was reproduced at 13.08-13.09s live before the fix", function() {
+    expect(res.getResponseTime()).to.be.below(5000);
+  });
+}
+
+docs {
+  Regression test for a backend-tester-confirmed latency bug:
+  GET /web/artikel?groep=<value> with NO artnr filter took 13+s live
+  (measured twice: 13084ms and 13094ms), because "artikel.groep EQ
+  pcGroep" still lived directly in the FOR EACH ... WHERE clause in
+  Luna.BusinessLogic.ArtikelBE:GetArtikelen(). When pcArtnr is blank
+  (no index-range narrowing), a WHERE-clause condition on groep is
+  evaluated by the query engine BEFORE a row ever reaches the loop
+  body, so non-matching rows never incremented iRowsScanned and the
+  15,000-row scan-depth cap (added earlier for the analogous
+  omschrijving bug, see ListOmschrijvingEncodedEquals.bru) never
+  triggered - the engine silently ground through the full ~1.8M-row
+  table underneath it.
+
+  Fixed the same way as omschrijving: "groep EQ pcGroep" moved out of
+  the WHERE clause into a per-row "IF pcGroep NE '' AND artikel.groep
+  NE pcGroep THEN NEXT." check inside the loop body, so every
+  physically-visited row counts towards the cap regardless of match.
+  The artnr BEGINS condition is untouched and still drives the index
+  range when artnr is supplied. Measured live afterwards at
+  ~0.6-0.7s for this exact request.
+
+  See ListOmschrijvingEncodedEquals.bru for the original, analogous
+  fix this one mirrors, and List.bru / the ArtikelBE class header for
+  the groep+artnr combined-filter behaviour (artnr still narrows the
+  index range; groep is evaluated per-row on top of that range).
+}

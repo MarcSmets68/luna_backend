@@ -1,0 +1,33 @@
+meta {
+  name: Update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/web/klant/999999
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "stad": "Antwerpen",
+    "geblokkeerd": true
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.stad: eq Antwerpen
+}
+
+docs {
+  Partial update - only fields present in the body are changed. `klnr` is
+  immutable. 404 if the klnr doesn't exist.
+}

@@ -1,0 +1,57 @@
+meta {
+  name: ListOmschrijvingEncodedEquals
+  type: http
+  seq: 20
+}
+
+get {
+  url: {{baseUrl}}/web/artikel?omschrijving=A%3DB&pageSize=5
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.pageSize: eq 5
+}
+
+tests {
+  test("responds in under 5s - was reproduced at 11.8-19.8s live before the fix", function() {
+    expect(res.getResponseTime()).to.be.below(5000);
+  });
+}
+
+docs {
+  Regression test for the reported 11.8-19.8s latency / DoS-shaped bug:
+  GET /web/artikel?omschrijving=A%3DB&pageSize=5.
+
+  Root cause (confirmed empirically against the live PASOE instance, see
+  Backend/docs or the QueryParamHelper/ArtikelBE class headers):
+  Luna.Web.Util.QueryParamHelper was NOT actually the culprit for this
+  specific input - "%3D" decodes (once) to a literal "=" in the value,
+  and GetQueryValue() already only ever splits a pair on its FIRST "="
+  (a param name can never contain "="), so pageSize=5 was always parsed
+  correctly and omschrijving was always correctly read as the full "A=B"
+  - confirmed via a live debug probe before any fix was applied.
+
+  The actual latency lived one layer down, in
+  Luna.BusinessLogic.ArtikelBE:GetArtikelen(): with no artnr/groep filter
+  to narrow the scan via an index, and an omschrijving value ("A=B")
+  that (correctly) matches zero real rows, the loop scanned the ENTIRE
+  artikel table (measured live at ~12.9s for this exact request) looking
+  for pageSize+1 matches that never arrived - reachable by any end user
+  typing an obscure term into a free-text description filter, not just
+  crafted %3D/%26 input. Fixed with a scan-depth cap
+  (iMaxRowsScanned, ArtikelBE:GetArtikelen) that gives up and reports
+  hasMore=true after a bounded number of rows examined, regardless of
+  match count - measured live afterwards at ~0.7-0.8s for this request.
+
+  See ListOmschrijvingEncodedAmpersand.bru for the OTHER reported bug
+  against this endpoint (a real QueryParamHelper parsing bug, for
+  %26 rather than %3D) - that one is a correctness bug, not a latency
+  one.
+}

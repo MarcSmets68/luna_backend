@@ -1,0 +1,33 @@
+meta {
+  name: Update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/web/artikel/ZTEST-CRUD-001
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "verkoopprijs": 25.5,
+    "geblokkeerd": true
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.verkoopprijs: eq 25.5
+}
+
+docs {
+  Partial update - only fields present in the body are changed. `artnr` is
+  immutable. 404 if the artnr doesn't exist.
+}

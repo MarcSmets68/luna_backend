@@ -1,0 +1,25 @@
+meta {
+  name: UpdateLijnStempelDCleanupBon
+  type: http
+  seq: 29
+}
+
+delete {
+  url: {{baseUrl}}/web/bon/{{stempelDBonnr}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq deleted
+}
+
+docs {
+  Deletes the test bon created by UpdateLijnStempelDCreateBon, cleaning up
+  after the stempel="D" test sequence above.
+}

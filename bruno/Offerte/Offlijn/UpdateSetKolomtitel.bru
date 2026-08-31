@@ -1,0 +1,32 @@
+meta {
+  name: Update - set kolomtitel
+  type: http
+  seq: 9
+}
+
+put {
+  url: {{baseUrl}}/web/offerte/999999/1/lijn/10
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "kolomtitel": true
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.kolomtitel: eq true
+}
+
+docs {
+  Setup step for "Update conflicting flags" below - sets kolomtitel=true
+  on lijnnr 10 (created by "Create (auto-allocate lijnnr)").
+}

@@ -1,0 +1,29 @@
+meta {
+  name: GetPercentArtnrQueryParam
+  type: http
+  seq: 17
+}
+
+get {
+  url: {{baseUrl}}/web/artikel?artnr=ZTEST-CRUD%25002
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.items[0].artnr: eq ZTEST-CRUD%002
+}
+
+docs {
+  Regression test for the GET list ?artnr=... filter with a standard
+  single-percent-encoded "%" in the value (see
+  UpdatePercentArtnrQueryParam.bru for the double-decode bug this guards
+  against). Before the fix this returned an empty items list instead of
+  the ZTEST-CRUD%002 record created by CreatePercentArtnr.bru. Requires
+  CreatePercentArtnr.bru to have run first.
+}

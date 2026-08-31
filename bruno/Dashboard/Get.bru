@@ -1,0 +1,54 @@
+meta {
+  name: Get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/dashboard
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Dashboard summary shown on the Luna homepage: stat cards, recent activity
+  and open orders due this week ("productie deze week"). Aggregates
+  offerte/bon/factuur/artikel - there is no dedicated activity-log or
+  production-stage table in the schema. Read-only - backed by
+  Backend/src/Luna/Web/DashboardHandler.cls + Luna/BusinessLogic/DashboardBE.cls.
+
+  Response shape:
+  {
+    "statCards": {
+      "openOffertesCount": n,
+      "openOffertesBedragPotentieel": n,
+      "ordersInProductieCount": n,
+      "ordersInProductieLeverenDezeWeek": n,
+      "omzetDezeMaand": n,
+      "omzetVsVorigeMaandPct": n | null,
+      "lageVoorraadCount": n
+    },
+    "recentActivity": [ { "text": "...", "datum": "YYYY-MM-DD", "type": "offerte" | "bon" | "factuur" } ],
+    "productionThisWeek": [ { "bonnr": n, "klant": "...", "leverdatum": "YYYY-MM-DD", "bedrag": n, "geparkeerd": bool } ]
+  }
+
+  Notes:
+  - "openOffertesCount"/"openOffertesBedragPotentieel" are latest versie per
+    offnr, not passief/verkocht/verloren, AND datum within the last 90 days
+    (see DashboardBE class header - older offerte rows are not consistently
+    marked closed in production data, so the status flags alone massively
+    overcount).
+  - "lageVoorraadCount" requires a full scan of ~1.8M artikel rows (no index
+    on stock/aantal/minv) and can take 45-70s on a cold cache. The frontend
+    caches this endpoint for 60s (Next.js `revalidate`) to avoid paying that
+    cost on every dashboard page load - expect the same latency here on a
+    cold call from Bruno.
+}

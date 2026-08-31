@@ -1,0 +1,33 @@
+meta {
+  name: UpdateMissingArtnr
+  type: http
+  seq: 14
+}
+
+put {
+  url: {{baseUrl}}/web/artikel
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "gewicht": 1.5
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.code: eq 400
+}
+
+docs {
+  No artnr path segment (/web/artikel, not /web/artikel/{artnr}) and no
+  ?artnr= query param either - 400 with "artnr is required, either as a
+  path segment (/artikel/[artnr]) or a query param (?artnr=...)".
+}

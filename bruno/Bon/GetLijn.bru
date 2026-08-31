@@ -1,0 +1,25 @@
+meta {
+  name: GetLijn
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/web/bon/{{bonnr}}/lijn/{{lijnnr}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Gets a single bonlijn by bonnr+lijnnr. 404 if not found. Requires
+  `{{bonnr}}`/`{{lijnnr}}` to be set (run "Create" (bon) and "CreateLijn"
+  first).
+}

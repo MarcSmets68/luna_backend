@@ -1,0 +1,31 @@
+meta {
+  name: Logout
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/web/logout
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  X-Auth-Token: {{authToken}}
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Logs out using the token captured by "Login" into the {{authToken}}
+  runtime variable - run "Login" first. Token transport is a custom
+  X-Auth-Token header, not Authorization: Bearer - see ontwerp paragraaf
+  1.4 for why (PASOE/Tomcat intercepts the standard Authorization header
+  before it reaches the WebHandler layer in this configuration).
+  Deletes the authenticationToken row - running this request twice in a
+  row (without a fresh Login in between) should 401 the second time, see
+  "LogoutInvalidToken".
+}

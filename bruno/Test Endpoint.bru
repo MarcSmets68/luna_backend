@@ -1,0 +1,26 @@
+meta {
+  name: Test Endpoint
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/web/test
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq ok
+}
+
+docs {
+  Smoke-test endpoint for the Luna PASOE backend (MarcTest instance).
+  Confirms the WEB transport is reachable and that the LunaNew database
+  connection is up. Backed by Backend/src/Luna/Web/TestHandler.cls.
+}

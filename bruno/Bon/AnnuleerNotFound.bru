@@ -1,0 +1,31 @@
+meta {
+  name: AnnuleerNotFound
+  type: http
+  seq: 23
+}
+
+post {
+  url: {{baseUrl}}/web/bon/999999999/annuleer
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {}
+}
+
+assert {
+  res.status: eq 404
+  res.body.error.code: eq 404
+}
+
+docs {
+  Calls annuleer on a bonnr that doesn't exist - must 404. Uses a fixed,
+  very unlikely-to-exist bonnr rather than a variable, so this can run
+  independently of the other Annuleer requests.
+}

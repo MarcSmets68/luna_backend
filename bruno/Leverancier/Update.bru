@@ -1,0 +1,38 @@
+meta {
+  name: Update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/web/leverancier/{{createdLevnr}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "stad": "Antwerpen",
+    "controle": true,
+    "tekst": "Interne notitie na update",
+    "btwRegime": 0
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.stad: eq Antwerpen
+  res.body.tekst: eq Interne notitie na update
+}
+
+docs {
+  Partial update - only fields present in the body are changed. `levnr`
+  is immutable. 404 if the levnr doesn't exist. Uses `{{createdLevnr}}`
+  set by "Leverancier - Create" - run Create first.
+}
+

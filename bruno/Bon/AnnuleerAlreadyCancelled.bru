@@ -1,0 +1,32 @@
+meta {
+  name: AnnuleerAlreadyCancelled
+  type: http
+  seq: 22
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{annuleerBonnr}}/annuleer
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {}
+}
+
+assert {
+  res.status: eq 409
+  res.body.error.code: eq 409
+}
+
+docs {
+  Calls annuleer again on the same bon, now stempel "O" (set by
+  AnnuleerHappyPath) - must 409 since only stempel "V"/"B" can be
+  cancelled. Requires {{annuleerBonnr}} to be set (run "AnnuleerSetup"
+  and "AnnuleerHappyPath" first).
+}

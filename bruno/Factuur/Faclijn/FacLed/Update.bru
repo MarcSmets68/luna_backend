@@ -1,0 +1,33 @@
+meta {
+  name: Update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/web/factuur/9999999/lijn/1/led/1/1
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "aantal": 6
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.aantal: eq 6
+}
+
+docs {
+  Partial update - only fields present in the body are changed.
+  `facnr`/`lijnnr`/`groepnr`/`ledLijn` are immutable. 404 if the fac_led
+  doesn't exist.
+}

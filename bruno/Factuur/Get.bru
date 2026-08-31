@@ -1,0 +1,25 @@
+meta {
+  name: Get
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/web/factuur/2280102
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Gets a single factuur by facnr. 404 if it doesn't exist, or if it exists
+  but is a credit note (factuur.type EQ FALSE) - both cases are treated
+  identically as "not found".
+}

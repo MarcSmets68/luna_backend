@@ -1,0 +1,24 @@
+meta {
+  name: GetNotFound
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/web/klant/9999999/uitgebreid
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 404
+  res.body.error.code: eq 404
+}
+
+docs {
+  404 when the klnr doesn't exist. Standalone request - no setup needed.
+}

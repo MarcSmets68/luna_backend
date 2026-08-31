@@ -1,0 +1,61 @@
+meta {
+  name: Get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/lakproduktie
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Reworked 2026-08-17: 1:1 port of the legacy 4GL export tool
+  N:\LunaV12\ExportLakProductie.w. Returns one flat list combining 3
+  sources, discriminated by the `bron` field:
+  - "lopende-orders": open klantorder-lijnen (bonlijn) with an
+    outstanding te-leveren quantity, for artikels that have a led-alu.
+  - "lopende-productielijnen": production-line detail records
+    (bonlijn_productie) for those same orders.
+  - "min-max-voorraad": stock-managed artikels whose projected stock
+    (on-hand + external + already-ordered) has dropped below their
+    minimum voorraad - a re-order advice row (bestelAdvies), independent
+    of any specific order.
+
+  Fields that don't apply to a row's `bron` serialize as JSON null
+  (except a few that always have a concrete value regardless of source:
+  kleursoort/kleurkode/afwerking/techniek/groepeerKleur default to "",
+  voorbewerkingNodig/kleurOnbepaald default to false).
+
+  Full field list - see Luna.BusinessLogic.LakproductieBE for the
+  authoritative definitions and business rules:
+  bron, artnr, omschrijving, ledAlu, behandeling, kleursoort, kleurkode,
+  afwerking, techniek, groepeerKleur, typeAfwerking, ledType, ledKenmerk,
+  lakLevnr, lakNaam, voorraad, gereserveerdVoorraad, extVoorraad,
+  extGereserveerd, voorbewerkingNodig, premontageDatum, verkoop1Maand,
+  verkoop3Maand, verkoop6Maand, verkoop9Maand, verkoop12Maand (rolling
+  ordered-quantity totals per artnr, computed once up front and shared by
+  all 3 sources - see LakproductieVerkoopService), bonnr, klant, lijnnr,
+  prodLijnnr, groepnr, subgroepnr, aantal, lijnGereserveerd, lijnBesteld,
+  status, deadline, ordnr, orderLevnr, orderNaam, orderDatum,
+  maatBevestigd, kleurOnbepaald, bestelAdvies.
+
+  Read-only - backed by Backend/src/Luna/Web/LakproductieHandler.cls +
+  Luna/BusinessLogic/LakproductieBE.cls +
+  Luna/BusinessLogic/LakproductieVerkoopService.cls.
+
+  Note: this scans large tables (bonlijn/bonlijn_productie/artikel)
+  without narrowing index hints on several of the WHERE clauses (ported
+  as-is from the legacy offline batch tool) - expect a slow first
+  response against a full-size database; increase the client timeout
+  accordingly when testing.
+}

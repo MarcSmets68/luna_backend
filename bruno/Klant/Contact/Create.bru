@@ -1,0 +1,41 @@
+meta {
+  name: Create
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/web/klant/999999/contact
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "lijnnr": 1,
+    "naam": "Test Contact",
+    "email": "test@example.com",
+    "standaard": true
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.klnr: eq 999999
+  res.body.lijnnr: eq 1
+  res.body.naam: eq Test Contact
+}
+
+docs {
+  Creates a klant-contact row with an explicit `lijnnr` (deterministic for
+  the Get/Update/Delete requests below - `lijnnr` is auto-allocated as
+  MAX(lijnnr) + 10 when omitted instead). `naam` is required. Setting
+  `standaard: true` clears standaard on every other contact row for this
+  klnr (independent of klant-adr's own standaard flag). Requires klnr
+  999999 to exist - run "Klant - Create" first.
+}

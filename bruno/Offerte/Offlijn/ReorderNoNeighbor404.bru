@@ -1,0 +1,32 @@
+meta {
+  name: Reorder - no neighbor (404)
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/web/offerte/999999/1/lijn/10/reorder
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "direction": "up"
+  }
+}
+
+assert {
+  res.status: eq 404
+}
+
+docs {
+  lijnnr 10 is the first line at this point (after "Reorder - move up"
+  swapped it to the front) - moving it up must be 404, no neighbor in that
+  direction.
+}

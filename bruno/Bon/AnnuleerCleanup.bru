@@ -1,0 +1,25 @@
+meta {
+  name: AnnuleerCleanup
+  type: http
+  seq: 24
+}
+
+delete {
+  url: {{baseUrl}}/web/bon/{{annuleerBonnr}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq deleted
+}
+
+docs {
+  Deletes the test bon created by AnnuleerSetup, cleaning up after the
+  annuleer test sequence above.
+}

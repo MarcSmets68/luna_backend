@@ -1,0 +1,34 @@
+meta {
+  name: Update
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/web/klant/999999/uitgebreid
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "klassementmap": "TESTMAP",
+    "aanmaning": "30d"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.klassementmap: eq TESTMAP
+}
+
+docs {
+  Partial update of the extended scalar fields - only fields present in the
+  body are changed. `klnr` is immutable. 404 if the klnr doesn't exist.
+  Requires klnr 999999 to exist - run "Klant - Create" first.
+}

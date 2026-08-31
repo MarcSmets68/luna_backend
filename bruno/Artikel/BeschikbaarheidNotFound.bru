@@ -1,0 +1,25 @@
+meta {
+  name: BeschikbaarheidNotFound
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/web/artikel/DOES-NOT-EXIST-XYZ/beschikbaarheid
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 404
+  res.body.error.code: eq 404
+}
+
+docs {
+  404 when the artnr itself doesn't exist in `artikel` - consistent with
+  the existing ArtikelBE 404 pattern.
+}

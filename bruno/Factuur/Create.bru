@@ -1,0 +1,39 @@
+meta {
+  name: Create
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/web/factuur
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "facnr": 9999999,
+    "klnr": 100,
+    "naam": "Test factuur voor CRUD",
+    "opm": "Aangemaakt door Bruno CRUD test"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.facnr: eq 9999999
+  res.body.type: eq true
+}
+
+docs {
+  Creates a factuur. `facnr` is required (positive integer) and must not
+  already exist (409 if it does, as either an invoice or a credit note).
+  `type` in the body is ignored - always created as an invoice (type:
+  true). Run "Factuur - Delete" afterwards to clean up test data (this
+  also cascades to any faclijn/fac_led test rows created under it).
+}

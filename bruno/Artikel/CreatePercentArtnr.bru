@@ -1,0 +1,41 @@
+meta {
+  name: CreatePercentArtnr
+  type: http
+  seq: 15
+}
+
+post {
+  url: {{baseUrl}}/web/artikel
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "ZTEST-CRUD%002",
+    "omschrijvingNl": "Test artikel met % in artnr",
+    "groep": "50",
+    "aankoopprijs": 10.5,
+    "verkoopprijs": 21.0,
+    "stock": true
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.artnr: eq ZTEST-CRUD%002
+}
+
+docs {
+  Creates an artikel whose artnr contains a literal "%" character
+  (ZTEST-CRUD%002), to set up UpdatePercentArtnrQueryParam /
+  GetPercentArtnrQueryParam / DeletePercentArtnrQueryParam below. Run
+  "Artikel - DeletePercentArtnrQueryParam" afterwards to clean up test data
+  (it's the cleanup step in this sequence, same role as Delete.bru for
+  ZTEST-CRUD-001).
+}

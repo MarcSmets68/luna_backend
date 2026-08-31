@@ -1,0 +1,26 @@
+meta {
+  name: List
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/offerte/999999/1/lijn
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists every offlijn row for offerte 999999/1, ordered by lijnnr. Not
+  paged. 404 if the parent offnr+versie doesn't exist - run "Offerte -
+  Create" first. Backed by Backend/src/Luna/Web/OfferteHandler.cls +
+  Luna/BusinessLogic/OfflijnBE.cls.
+}

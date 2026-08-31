@@ -1,0 +1,37 @@
+meta {
+  name: Create
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/web/artikel
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "ZTEST-CRUD-001",
+    "omschrijvingNl": "Test artikel voor CRUD",
+    "groep": "50",
+    "aankoopprijs": 10.5,
+    "verkoopprijs": 21.0,
+    "stock": true
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.artnr: eq ZTEST-CRUD-001
+}
+
+docs {
+  Creates an artikel. `artnr` is required and must not already exist (409 if
+  it does). Run "Artikel - Delete" afterwards to clean up test data.
+}

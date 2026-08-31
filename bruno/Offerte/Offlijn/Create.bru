@@ -1,0 +1,38 @@
+meta {
+  name: Create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/web/offerte/999999/1/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "lijnnr": 10,
+    "artnr": "TESTART",
+    "omschrijving": "Test offertelijn voor CRUD",
+    "aantal": 2,
+    "verkoopprijs": 49.95,
+    "bedrag": 99.90
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.lijnnr: eq 10
+}
+
+docs {
+  Creates an offlijn under offerte 999999/1. `lijnnr` is required (positive
+  integer) and must not already exist for this offerte. 404 if the parent
+  offnr+versie doesn't exist - run "Offerte - Create" first.
+}

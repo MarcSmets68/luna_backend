@@ -1,0 +1,35 @@
+meta {
+  name: Get
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/web/artikel/ZTEST-CRUD-001
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.artnr: eq ZTEST-CRUD-001
+  res.body.magazijn: isString
+  res.body.voorraadMinExtern: isNumber
+  res.body.voorraadMaxExtern: isNumber
+  res.body.swExtern: isBoolean
+  res.body.swExProductie: isBoolean
+  res.body.isSamengesteld: isBoolean
+}
+
+docs {
+  Gets a single artikel by artnr. 404 if it doesn't exist. Fase 1
+  voorraad-verrijking (voorraad-fase1-ontwerp.md §1.3) adds
+  magazijn/voorraadMinExtern/voorraadMaxExtern/swExtern/swExProductie/
+  isSamengesteld on top of the list fields already present (see List.bru) -
+  isSamengesteld is computed via EXISTS(FIRST artlijn WHERE artlijn.artnr =
+  artikel.artnr), not artikel.swMaster (OD-3).
+}

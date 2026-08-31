@@ -1,0 +1,33 @@
+meta {
+  name: Update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/web/offerte/999999/1
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "naam": "Test offerte (bijgewerkt)",
+    "passief": true
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.naam: eq Test offerte (bijgewerkt)
+}
+
+docs {
+  Partial update - only fields present in the body are changed. `offnr`/
+  `versie` are immutable. 404 if the offnr+versie doesn't exist.
+}

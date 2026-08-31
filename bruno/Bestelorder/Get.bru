@@ -1,0 +1,26 @@
+meta {
+  name: Get
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/web/bestelorder/1
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Gets a single bestelorder by ordnr. 404 if it doesn't exist. Read-only -
+  no POST/PUT/DELETE. The path segment above is a placeholder - replace it
+  with a real ordnr (e.g. one returned by "List") since there's no Create
+  request to seed one (BestelorderBE has no write methods at all).
+}

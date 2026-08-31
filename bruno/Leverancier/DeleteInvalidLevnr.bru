@@ -1,0 +1,27 @@
+meta {
+  name: DeleteInvalidLevnr
+  type: http
+  seq: 8
+}
+
+delete {
+  url: {{baseUrl}}/web/leverancier/abc
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq Invalid levnr abc
+  res.body.error.code: eq 400
+}
+
+docs {
+  Regression test for a bug fixed in LeverancierHandler: a non-numeric
+  {levnr} path segment (e.g. "abc") must return 400 "Invalid levnr abc",
+  not fall through to a 404 lookup. Standalone request - no setup needed.
+}

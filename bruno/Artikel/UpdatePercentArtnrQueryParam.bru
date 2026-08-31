@@ -1,0 +1,42 @@
+meta {
+  name: UpdatePercentArtnrQueryParam
+  type: http
+  seq: 16
+}
+
+put {
+  url: {{baseUrl}}/web/artikel?artnr=ZTEST-CRUD%25002
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "gewicht": 4.4
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.artnr: eq ZTEST-CRUD%002
+  res.body.gewicht: eq 4.4
+}
+
+docs {
+  Regression test for the double percent-decode bug: unlike
+  UpdateQueryParam.bru (which uses a plain artnr with no "%"), this hits
+  the ?artnr=... fallback with the artnr's literal "%" encoded using
+  standard single percent-encoding (a literal "%" becomes "%25" - so
+  "ZTEST-CRUD%002" is sent as "?artnr=ZTEST-CRUD%25002"). Before the
+  Luna.Web.Util.QueryParamHelper fix, poRequest:URI:GetQueryValue()
+  percent-decoded this twice (framework decode when building the query
+  string turns "%25002" into "%002", then GetQueryValue() decodes again
+  and turns the leftover "%00" into a NUL byte) - this request would come
+  back 404 (artnr not found) instead of 200. Requires CreatePercentArtnr.bru
+  to have run first.
+}

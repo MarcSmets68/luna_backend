@@ -1,0 +1,33 @@
+meta {
+  name: Reorder setup - create fourth line
+  type: http
+  seq: 16
+}
+
+post {
+  url: {{baseUrl}}/web/offerte/999999/1/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "TESTAUTO3",
+    "omschrijving": "Fourth line"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.lijnnr: eq 40
+}
+
+docs {
+  Auto-allocates lijnnr 40 (plain) - gives the subtotaal line (lijnnr 30) a
+  line to swap with when moving down.
+}

@@ -1,0 +1,26 @@
+meta {
+  name: ArtlogNotFound
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/web/artikel/DOES-NOT-EXIST-XYZ/artlog
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 404
+  res.body.error.code: eq 404
+}
+
+docs {
+  404 when the artnr itself doesn't exist - checked inside ArtlogBE:GetArtlog
+  itself (not the WebHandler), per "Business Entity = alle logica" even
+  though this BE reads from `artlog`, not `artikel`.
+}

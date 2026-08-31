@@ -1,0 +1,43 @@
+meta {
+  name: ArtlogPaginated
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/web/artikel/123.11352/artlog?page=1&pageSize=1
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.pageSize: eq 1
+}
+
+script:post-response {
+  // Regressie-check voor de sorteervolgorde-bug (zie Artlog.bru): met
+  // pageSize=1 is er hier maar 1 item per call, maar we bewaren lijnnr
+  // zodat een vervolgcall (page=2) kan controleren dat de volgorde
+  // over paginagrenzen heen consistent DESCENDING blijft.
+  const items = res.body.items;
+  if (items && items.length >= 2) {
+    if (!(items[0].lijnnr > items[1].lijnnr)) {
+      throw new Error(
+        "Artlog-sorteervolgorde fout binnen pagina: verwacht items[0].lijnnr > items[1].lijnnr (DESCENDING)"
+      );
+    }
+  }
+  if (items && items.length >= 1) {
+    bru.setVar("artlogPage1Lijnnr", items[0].lijnnr);
+  }
+}
+
+docs {
+  Paginatie-smoke-test met een kleine pageSize - dezelfde "stop na page+1
+  rows, geen exacte telling" hasMore-aanpak als ArtikelBE:GetArtikelen.
+}

@@ -1,0 +1,27 @@
+meta {
+  name: Get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/klant/999999/uitgebreid
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.klnr: eq 999999
+}
+
+docs {
+  Gets the extended ("uitgebreid") scalar fields for a klant, plus the
+  nested adressen/contacten/kortingen lists merged into the same object.
+  Every extended field is always present, even when blank/0/false. Requires
+  klnr 999999 to exist - run "Klant - Create" first.
+}

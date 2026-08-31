@@ -1,0 +1,39 @@
+meta {
+  name: UpdateLijnStempelDCreateBon
+  type: http
+  seq: 25
+}
+
+post {
+  url: {{baseUrl}}/web/bon
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "type": "TEST",
+    "klnr": 7629,
+    "naam": "ZTEST-STEMPELD",
+    "munt": "EUR"
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  bru.setVar("stempelDBonnr", res.body.bonnr);
+}
+
+docs {
+  Creates a dedicated bon for the "PUT bonlijn blocked when stempel='D'"
+  test sequence below, independent of the {{bonnr}} used by the plain
+  CRUD requests above. Stores the new bonnr into {{stempelDBonnr}}.
+}

@@ -1,0 +1,48 @@
+meta {
+  name: List
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/bestelorder?pageSize=10
+  body: none
+  auth: none
+}
+
+params:query {
+  pageSize: 10
+  ~levnr:
+  ~ordnr:
+  ~naam:
+  ~sortField:
+  ~sortDir:
+  ~page:
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists bestelorder (purchase order to supplier/leverancier - the `order`
+  table) rows, paged, newest ordnr first by default. Query params: levnr
+  (exact match, 0/absent = no filter), ordnr (prefix match on the string
+  form, absent = no filter), naam (substring match on the leverancier
+  name, case-insensitive, absent = no filter), sortField (one of "ordnr",
+  "datum", "naam", "stempel"; absent/unrecognized falls back to "ordnr"),
+  sortDir ("asc" or "desc"; absent/unrecognized falls back to "desc"),
+  page (default 1), pageSize (default 25, max 200). Unlike /web/bon,
+  invalid/non-numeric levnr/page/pageSize are NOT rejected with 400 - they
+  silently fall back to "no filter"/default (same approach as /web/klant
+  and /web/offerte). Response includes hasMore instead of an exact
+  totalCount - see Backend/README.md for why - plus the effective
+  sortField/sortDir that were applied. Read-only - no POST/PUT/DELETE,
+  BestelorderBE has no write methods at all. Backed by
+  Backend/src/Luna/Web/BestelorderHandler.cls +
+  Luna/BusinessLogic/BestelorderBE.cls.
+}

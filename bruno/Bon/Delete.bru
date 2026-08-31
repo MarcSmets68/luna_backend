@@ -1,0 +1,30 @@
+meta {
+  name: Delete
+  type: http
+  seq: 10
+}
+
+delete {
+  url: {{baseUrl}}/web/bon/{{bonnr}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq deleted
+}
+
+docs {
+  Deletes a bon by bonnr. 404 if it doesn't exist. 409 if related order
+  lines/records still exist (bonlijn, bonlijn_productie, bonlijn_variabel,
+  bon_herstel, bon_led, bon_led_qc) - no cascade, so run "DeleteLijn" (or
+  otherwise clear out any bonlijn rows) first. This request's `seq` is
+  intentionally higher than the Lijn requests below so a full-folder run
+  deletes bonlijn rows before attempting to delete their parent bon.
+  Requires `{{bonnr}}` to be set (run "Create" first).
+}

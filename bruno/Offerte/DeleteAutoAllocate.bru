@@ -1,0 +1,25 @@
+meta {
+  name: Delete (auto-allocate cleanup)
+  type: http
+  seq: 12
+}
+
+delete {
+  url: {{baseUrl}}/web/offerte/{{autoOffnr}}/1
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq deleted
+}
+
+docs {
+  Cleans up the offerte created by "Create (auto-allocate)" using the
+  `{{autoOffnr}}` runtime variable it stored. Run after that request.
+}

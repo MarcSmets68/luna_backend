@@ -1,0 +1,25 @@
+meta {
+  name: DeleteNonAscii
+  type: http
+  seq: 11
+}
+
+delete {
+  url: {{baseUrl}}/web/leverancier/{{codepageLevnr}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq deleted
+}
+
+docs {
+  Cleans up the disposable test row created by "CreateNonAscii". Run after
+  "CreateNonAscii"/"GetNonAscii".
+}

@@ -1,0 +1,33 @@
+meta {
+  name: LoginUnknownKode
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/web/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "kode": "ZZZZZ",
+    "password": "Welkom123"
+  }
+}
+
+assert {
+  res.status: eq 401
+  res.body.error.code: eq 401
+}
+
+docs {
+  Unknown kode - same generic 401 as a wrong password, no user
+  enumeration.
+}

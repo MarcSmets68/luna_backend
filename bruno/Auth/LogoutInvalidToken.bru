@@ -1,0 +1,26 @@
+meta {
+  name: LogoutInvalidToken
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/web/logout
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  X-Auth-Token: this-token-does-not-exist
+}
+
+assert {
+  res.status: eq 401
+  res.body.error.code: eq 401
+}
+
+docs {
+  Logout with an unknown token - 401. Same result for a missing
+  X-Auth-Token header entirely, or an already-used/expired token.
+}

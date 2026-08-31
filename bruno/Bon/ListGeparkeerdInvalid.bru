@@ -1,0 +1,30 @@
+meta {
+  name: ListGeparkeerdInvalid
+  type: http
+  seq: 31
+}
+ 
+get {
+  url: {{baseUrl}}/web/bon?geparkeerd=foo
+  body: none
+  auth: none
+}
+
+params:query {
+  geparkeerd: foo
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.code: eq 400
+}
+
+docs {
+  geparkeerd must be "true"/"false" (or absent/empty) - any other value
+  is a 400, same style as the existing "Invalid klnr"/"Invalid bonnr"
+  messages.
+}

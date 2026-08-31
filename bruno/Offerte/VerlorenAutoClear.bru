@@ -1,0 +1,33 @@
+meta {
+  name: Verloren - auto-clear
+  type: http
+  seq: 10
+}
+
+put {
+  url: {{baseUrl}}/web/offerte/999999/1
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "opm": "Touching a field without verloren"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.verloren: eq false
+}
+
+docs {
+  Business rule: a non-empty PUT body that does NOT include `verloren`
+  auto-clears `verloren` to `false` when it was previously `true`. Run
+  after "Verloren - set true". See `OfferteBE:UpdateOfferte`.
+}

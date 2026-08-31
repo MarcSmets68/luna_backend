@@ -1,0 +1,32 @@
+meta {
+  name: Delete
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/web/klant/999999
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq deleted
+}
+
+docs {
+  Deletes a klant by klnr. 404 if it doesn't exist.
+
+  Cascade delete: also deletes every klant-adr, klant-contact and korting
+  (both swGroep = FALSE and swGroep = TRUE) row for this klnr, in the same
+  transaction as the klant delete (all-or-nothing) - see
+  Luna.BusinessLogic.KlantBE.DeleteKlant. Run Adres/Create, Contact/Create
+  and Korting/Create for klnr 999999 first, then this, then GET
+  /web/klant/999999/adres, /contact and /korting to confirm they come back
+  empty (not 404-masked leftovers).
+}

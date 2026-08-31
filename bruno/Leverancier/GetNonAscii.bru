@@ -1,0 +1,27 @@
+meta {
+  name: GetNonAscii
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/web/leverancier/{{codepageLevnr}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.tekst: eq café münchen
+  res.body.opm: eq commentaire spécial
+}
+
+docs {
+  Confirms the non-ASCII characters written by "CreateNonAscii" read back
+  unchanged (catches silent write-time corruption, not just a write-time
+  crash). Run "CreateNonAscii" first.
+}

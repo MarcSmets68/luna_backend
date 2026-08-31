@@ -1,0 +1,34 @@
+meta {
+  name: Update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/web/offerte/999999/1/lijn/10
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "aantal": 3,
+    "opm": "Bijgewerkt via Bruno CRUD test"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.aantal: eq 3
+}
+
+docs {
+  Partial update - only fields present in the body are changed. `offnr`/
+  `versie`/`lijnnr` are immutable. 404 if the parent offerte or the line
+  doesn't exist.
+}

@@ -1,0 +1,34 @@
+meta {
+  name: PutInvalidLevnr
+  type: http
+  seq: 7
+}
+
+put {
+  url: {{baseUrl}}/web/leverancier/abc
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "naam": "irrelevant"
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq Invalid levnr abc
+  res.body.error.code: eq 400
+}
+
+docs {
+  Regression test for a bug fixed in LeverancierHandler: a non-numeric
+  {levnr} path segment (e.g. "abc") must return 400 "Invalid levnr abc",
+  not fall through to a 404 lookup. Standalone request - no setup needed.
+}

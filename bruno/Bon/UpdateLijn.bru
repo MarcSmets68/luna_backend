@@ -1,0 +1,36 @@
+meta {
+  name: UpdateLijn
+  type: http
+  seq: 8
+}
+
+put {
+  url: {{baseUrl}}/web/bon/{{bonnr}}/lijn/{{lijnnr}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "aantal": 3,
+    "bonnr": 1,
+    "lijnnr": 999
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.aantal: eq 3
+}
+
+docs {
+  Partial update - only fields present in the body are changed. `bonnr`/
+  `lijnnr` (present above to prove it) are immutable/ignored. 404 if the
+  bonlijn doesn't exist. Requires `{{bonnr}}`/`{{lijnnr}}` to be set (run
+  "Create" (bon) and "CreateLijn" first).
+}

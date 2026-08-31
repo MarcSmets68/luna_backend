@@ -1,0 +1,28 @@
+meta {
+  name: BeschikbaarheidNietSamengesteld
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/web/artikel/#CEILINGBOX or ROSETTE/beschikbaarheid
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.isSamengesteld: eq false
+  res.body.bouwbareEenheden: eq null
+  res.body.componenten: length 0
+}
+
+docs {
+  Randgeval (requirements-doc): een bestaand artikel zonder artlijn-rijen
+  (niet samengesteld) geeft een geldige 200-lege-staat - geen 404, geen
+  "0 bouwbaar". `bouwbareEenheden` is expliciet `null` in dat geval.
+}

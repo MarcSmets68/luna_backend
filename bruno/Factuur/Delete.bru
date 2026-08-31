@@ -1,0 +1,27 @@
+meta {
+  name: Delete
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/web/factuur/9999999
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq deleted
+}
+
+docs {
+  Deletes a factuur by facnr, cascading to every faclijn row under it and,
+  for each of those, every fac_led row. 404 if it doesn't exist or is a
+  credit note. Run the "Faclijn"/"Fac_led" requests first if you want to
+  exercise the cascade with actual line/LED-detail rows.
+}

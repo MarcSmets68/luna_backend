@@ -1,0 +1,40 @@
+meta {
+  name: Login
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/web/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "kode": "ABNA",
+    "password": "Welkom123"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.kode: eq ABNA
+}
+
+script:post-response {
+  bru.setVar("authToken", res.body.token);
+}
+
+docs {
+  Logs in with a seeded test account (see Backend/scripts/SeedTestPasswords.ps1
+  and docs/handleidingen/login.md for the shared test password). Returns
+  {token, kode, naam, niveau, everyoneAdminActive, expiresAt}. The
+  post-response script stores the token into the {{authToken}} runtime
+  variable so "Logout" can use it - run this request first.
+}

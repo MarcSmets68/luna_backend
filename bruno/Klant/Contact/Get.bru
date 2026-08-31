@@ -1,0 +1,25 @@
+meta {
+  name: Get
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/web/klant/999999/contact/1
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.lijnnr: eq 1
+}
+
+docs {
+  Gets a single klant-contact row by klnr+lijnnr. 404 if it doesn't exist.
+  Requires "Create" to have run first.
+}

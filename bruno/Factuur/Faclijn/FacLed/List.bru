@@ -1,0 +1,26 @@
+meta {
+  name: List
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/factuur/9999999/lijn/1/led
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists every fac_led row for faclijn 9999999/1, ordered by groepnr then
+  ledLijn. Not paged. 404 if the parent facnr+lijnnr doesn't exist - run
+  "Faclijn - Create" first. Backed by Backend/src/Luna/Web/FactuurHandler.cls +
+  Luna/BusinessLogic/FacLedBE.cls.
+}

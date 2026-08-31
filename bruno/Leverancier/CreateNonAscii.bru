@@ -1,0 +1,48 @@
+meta {
+  name: CreateNonAscii
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/web/leverancier
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "naam": "Test Lev Codepage",
+    "tekst": "café münchen",
+    "opm": "commentaire spécial"
+  }
+}
+
+script:post-response {
+  bru.setVar("codepageLevnr", res.body.levnr);
+}
+
+assert {
+  res.status: eq 201
+  res.body.levnr: isNumber
+  res.body.tekst: eq café münchen
+  res.body.opm: eq commentaire spécial
+}
+
+docs {
+  Regression test for the PASOE agent session codepage fix
+  (`-cpinternal UTF-8 -cpstream UTF-8` on `[AppServer.SessMgr.MarcTest]
+  agentStartupParam`, see `Backend/README.md` -> "PASOE instance" ->
+  "Session codepage"). Before that fix, any non-ASCII character in the
+  request body crashed the request with a raw HTML 500 instead of JSON.
+  Uses only characters that exist in the `LunaNew` database's own
+  `iso8859-1` codepage (e -acute, u -umlaut) - the Euro sign is a known,
+  separate, DB-codepage-level limitation and deliberately not covered by
+  this happy-path test (see docs/backend/leverancier.md). Captures
+  `codepageLevnr` for "GetNonAscii"/"DeleteNonAscii" cleanup.
+}

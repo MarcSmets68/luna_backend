@@ -1,0 +1,37 @@
+meta {
+  name: GetInvalidPageSize
+  type: http
+  seq: 39
+}
+
+get {
+  url: {{baseUrl}}/web/bon?pageSize=abc
+  body: none
+  auth: none
+}
+
+params:query {
+  pageSize: abc
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq Invalid pageSize abc
+  res.body.error.code: eq 400
+}
+
+docs {
+  Regression test: GET /web/bon?pageSize=abc must return 400 "Invalid
+  pageSize abc", not silently fall back to pageSize 1 (200). Same root
+  cause/fix as GetInvalidKlnr.bru/GetInvalidPage.bru - BonHandler:HandleGet
+  used "IF iPageSize EQ ? THEN" after "INTEGER(cPageSize) NO-ERROR", which
+  never triggers because a failed INTEGER() conversion leaves the target
+  at its default initial value (0), not the unknown value (?); the
+  "IF iPageSize LT 1 THEN iPageSize = 1" clamp then silently turned the
+  bad value into pageSize 1. Fixed to check ERROR-STATUS:ERROR instead.
+  Standalone request - no setup needed.
+}

@@ -1,0 +1,30 @@
+meta {
+  name: Reorder - invalid direction (400)
+  type: http
+  seq: 18
+}
+
+post {
+  url: {{baseUrl}}/web/offerte/999999/1/lijn/10/reorder
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "direction": "sideways"
+  }
+}
+
+assert {
+  res.status: eq 400
+}
+
+docs {
+  `direction` must be "up" or "down" - anything else is 400.
+}

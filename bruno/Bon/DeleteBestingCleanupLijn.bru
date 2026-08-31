@@ -1,0 +1,25 @@
+meta {
+  name: DeleteBestingCleanupLijn
+  type: http
+  seq: 35
+}
+
+delete {
+  url: {{baseUrl}}/web/bon/{{bestingBonnr}}/lijn/{{bestingLijnnr}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq deleted
+}
+
+docs {
+  Deletes the besteld<>0 test bonlijn so DeleteBestingCleanupBon can
+  delete its parent bon afterwards.
+}

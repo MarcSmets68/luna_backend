@@ -1,0 +1,36 @@
+meta {
+  name: Create (auto-allocate lijnnr)
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/web/offerte/999999/1/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "TESTAUTO",
+    "omschrijving": "Auto-allocated line"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.lijnnr: eq 10
+}
+
+docs {
+  Omits `lijnnr` - server auto-allocates it as MAX(lijnnr for this offerte,
+  default 0) + 10. Relies on offerte 999999/1 having no lines at this
+  point (see "Create subtotaal with nothing to sum" above), so the
+  expected result is lijnnr 10. Following requests in this folder build on
+  this line.
+}

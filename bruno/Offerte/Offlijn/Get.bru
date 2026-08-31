@@ -1,0 +1,25 @@
+meta {
+  name: Get
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/web/offerte/999999/1/lijn/10
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.lijnnr: eq 10
+}
+
+docs {
+  Gets a single offlijn by offnr+versie+lijnnr. 404 if the parent offerte or
+  the line doesn't exist.
+}

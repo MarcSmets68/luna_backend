@@ -1,0 +1,37 @@
+meta {
+  name: AnnuleerHappyPath
+  type: http
+  seq: 21
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{annuleerBonnr}}/annuleer
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {}
+}
+
+assert {
+  res.status: eq 200
+  res.body.stempel: eq O
+  res.body.bedrag: eq 0
+  res.body.recupelBedrag: eq 0
+  res.body.aBedrag: eq 0
+}
+
+docs {
+  Cancels the bon created by AnnuleerSetup (stempel "V" -> "O"). Body is
+  ignored - {} is sent to prove that. Asserts bedrag/recupelBedrag/aBedrag
+  are zeroed - `btw` (tot-btw) is deliberately NOT asserted to be zero
+  here, since legacy annul-bon doesn't clear it either (legacy-consistent,
+  not a bug - see Luna.BusinessLogic.BonBE:ClearBedragVelden). Requires
+  {{annuleerBonnr}} to be set (run "AnnuleerSetup" first).
+}

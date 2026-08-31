@@ -1,0 +1,25 @@
+meta {
+  name: UpdateLijnStempelDCleanupLijn
+  type: http
+  seq: 28
+}
+
+delete {
+  url: {{baseUrl}}/web/bon/{{stempelDBonnr}}/lijn/{{stempelDLijnnr}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq deleted
+}
+
+docs {
+  Deletes the stempel="D" test bonlijn so UpdateLijnStempelDCleanupBon can
+  delete its parent bon afterwards (delete 409s while bonlijn rows exist).
+}

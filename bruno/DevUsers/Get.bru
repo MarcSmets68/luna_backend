@@ -1,0 +1,32 @@
+meta {
+  name: Get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/dev-users
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  DEV/DEBUG endpoint only - not a production user-management API. Returns a
+  flat list of gebruiker rows for backend connectivity verification.
+  Password is never read/returned - see Luna.BusinessLogic.DevUsersBE class
+  header. Do not extend this endpoint with create/update/delete or wire it
+  into auth.
+
+  Response shape:
+  {
+    "items": [ { "kode": "MS", "naam": "Marc Smets", "email": "marc@example.com", "niveau": 5, "passief": false } ]
+  }
+}

@@ -1,0 +1,34 @@
+meta {
+  name: PutInvalidKlnr
+  type: http
+  seq: 7
+}
+
+put {
+  url: {{baseUrl}}/web/klant/abc
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "naam": "irrelevant"
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq Invalid klnr abc
+  res.body.error.code: eq 400
+}
+
+docs {
+  Regression test for a bug fixed in KlantHandler: a non-numeric {klnr}
+  path segment (e.g. "abc") must return 400 "Invalid klnr abc", not fall
+  through to a 404 lookup. Standalone request - no setup needed.
+}

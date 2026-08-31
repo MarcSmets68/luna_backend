@@ -1,0 +1,33 @@
+meta {
+  name: CreateDuplicate409
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/web/klant/999999/korting
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "TESTARTNR",
+    "korting": 10
+  }
+}
+
+assert {
+  res.status: eq 409
+  res.body.error.code: eq 409
+}
+
+docs {
+  409 when a korting row for klnr+artnr+swGroep=FALSE already exists.
+  Requires "Create" to have run first (and not yet cleaned up by "Delete").
+}

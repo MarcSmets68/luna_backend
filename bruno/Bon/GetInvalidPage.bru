@@ -1,0 +1,36 @@
+meta {
+  name: GetInvalidPage
+  type: http
+  seq: 38
+}
+
+get {
+  url: {{baseUrl}}/web/bon?page=abc
+  body: none
+  auth: none
+}
+
+params:query {
+  page: abc
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq Invalid page abc
+  res.body.error.code: eq 400
+}
+
+docs {
+  Regression test: GET /web/bon?page=abc must return 400 "Invalid page abc",
+  not silently fall back to page 1 (200). Same root cause/fix as
+  GetInvalidKlnr.bru - BonHandler:HandleGet used "IF iPage EQ ? THEN" after
+  "INTEGER(cPage) NO-ERROR", which never triggers because a failed
+  INTEGER() conversion leaves the target at its default initial value (0),
+  not the unknown value (?); the "IF iPage LT 1 THEN iPage = 1" clamp then
+  silently turned the bad value into page 1. Fixed to check
+  ERROR-STATUS:ERROR instead. Standalone request - no setup needed.
+}

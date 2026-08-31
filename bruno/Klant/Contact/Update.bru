@@ -1,0 +1,32 @@
+meta {
+  name: Update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/web/klant/999999/contact/1
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "tel": "111222333"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.tel: eq 111222333
+}
+
+docs {
+  Partial update - only fields present in the body are changed.
+  `klnr`/`lijnnr` are immutable. 404 if the row doesn't exist.
+}

@@ -1,0 +1,35 @@
+meta {
+  name: CreateInvalidRange400
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/web/klant/999999/korting
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "TESTARTNR2",
+    "korting": 150
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq korting must be between 0 and 100
+  res.body.error.code: eq 400
+}
+
+docs {
+  400 when korting is outside [0, 100] (Marc confirmed a 100% cap).
+  Standalone request - no setup/cleanup needed (nothing gets created).
+  Requires klnr 999999 to exist - run "Klant - Create" first.
+}

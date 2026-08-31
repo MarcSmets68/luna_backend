@@ -1,0 +1,35 @@
+meta {
+  name: List
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/artikel?pageSize=25&page=100
+  body: none
+  auth: none
+}
+
+params:query {
+  pageSize: 25
+  page: 100
+  ~artnr: 
+  ~omschrijving: 
+  ~groep: 
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists artikel rows (paged). Query params: artnr (prefix match), omschrijving
+  (substring match on NL/FR description), groep (exact match), page (default 1),
+  pageSize (default 25, max 200). Response includes hasMore instead of an exact
+  totalCount - see Backend/README.md for why. Backed by
+  Backend/src/Luna/Web/ArtikelHandler.cls + Luna/BusinessLogic/ArtikelBE.cls.
+}

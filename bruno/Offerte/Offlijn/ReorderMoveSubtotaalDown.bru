@@ -1,0 +1,32 @@
+meta {
+  name: Reorder - move subtotaal down (happy path)
+  type: http
+  seq: 17
+}
+
+post {
+  url: {{baseUrl}}/web/offerte/999999/1/lijn/30/reorder
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "direction": "down"
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Moving the subtotaal line (lijnnr 30) DOWN increases its lijnnr - this is
+  allowed (only decreasing a subtotaal's lijnnr is blocked). Swaps with
+  lijnnr 40.
+}
