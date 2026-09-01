@@ -408,7 +408,7 @@ CLASS Luna.Web.BonHandler INHERITS WebHandler:
         IF iPageSize LT 1 THEN iPageSize = 1.
         IF iPageSize GT 200 THEN iPageSize = 200.
 
-        hResult = oService:GetBonnen(iKlnr, cType, cBonnrFilter, cNaam, iPage, iPageSize, cGeparkeerd, OUTPUT lHasMore).
+        hResult = oService:GetBonnen(iKlnr, cType, cBonnrFilter, cNaam, iPage, iPageSize, cGeparkeerd, "":u, OUTPUT lHasMore).
         oBody   = ResultHandleToJson(hResult).
 
         oBody:Add("page":u, iPage).

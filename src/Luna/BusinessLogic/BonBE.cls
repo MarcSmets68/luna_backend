@@ -149,6 +149,13 @@ CLASS Luna.BusinessLogic.BonBE:
                  klnr uses the existing bon-x3 index; a type/bonnr/naam-only 
                  filter scans every candidate row and should be combined with 
                  klnr where possible. 
+                 pcVerzonden (added 2026-09-01 for Luna.BusinessLogic.AiSearchBE -
+                 the "orders in productie" AI-search example needs geparkeerd
+                 EQ false AND verzonden EQ false, mirroring the existing
+                 pcGeparkeerd tri-state filter): "":u/"true":u/"false":u, same
+                 convention as pcGeparkeerd. Luna.Web.BonHandler passes "":u
+                 (no ?verzonden= query param wired yet - AiSearchBE is the
+                 only caller today).
     ------------------------------------------------------------------------------*/ 
     METHOD PUBLIC HANDLE GetBonnen( 
         INPUT  piKlnr       AS INTEGER, 
@@ -158,6 +165,7 @@ CLASS Luna.BusinessLogic.BonBE:
         INPUT  piPage       AS INTEGER, 
         INPUT  piPageSize   AS INTEGER, 
         INPUT  pcGeparkeerd AS CHARACTER, 
+        INPUT  pcVerzonden  AS CHARACTER, 
         OUTPUT plHasMore    AS LOGICAL ): 
  
         DEFINE VARIABLE iSkip  AS INTEGER NO-UNDO. 
@@ -171,6 +179,7 @@ CLASS Luna.BusinessLogic.BonBE:
             pcBonnr      = TRIM(pcBonnr) 
             pcNaam       = UPPER(TRIM(pcNaam)) 
             pcGeparkeerd = TRIM(pcGeparkeerd) 
+            pcVerzonden  = TRIM(pcVerzonden) 
             iSkip        = (piPage - 1) * piPageSize 
             iSeen        = 0 
             iTaken       = 0 
@@ -185,6 +194,9 @@ CLASS Luna.BusinessLogic.BonBE:
               AND (pcGeparkeerd EQ "":u
                    OR (pcGeparkeerd EQ "true":u AND bon.geparkeerd)
                    OR (pcGeparkeerd EQ "false":u AND NOT bon.geparkeerd)) 
+              AND (pcVerzonden EQ "":u
+                   OR (pcVerzonden EQ "true":u AND bon.verzonden)
+                   OR (pcVerzonden EQ "false":u AND NOT bon.verzonden))
             BY bon.bonnr DESCENDING: 
  
             iSeen = iSeen + 1. 

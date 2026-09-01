@@ -18,7 +18,8 @@ Backend/
 │       │   ├── DevUsersHandler.cls    DEV/DEBUG ONLY - read-only flat list of `gebruiker` (GET /web/dev-users), Password never returned - do not extend/wire into auth
 │       │   ├── LeverancierHandler.cls CRUD for `lever` (GET/POST/PUT/DELETE /web/leverancier[/{levnr}])
 │       │   ├── LoginHandler.cls       Auth-MVP login (POST /web/login) - see "Auth-MVP (login/logout)" section below
-│       │   └── LogoutHandler.cls      Auth-MVP logout (POST /web/logout, X-Auth-Token header) - see "Auth-MVP (login/logout)" section below
+│       │   ├── LogoutHandler.cls      Auth-MVP logout (POST /web/logout, X-Auth-Token header) - see "Auth-MVP (login/logout)" section below
+│       │   └── AiSearchHandler.cls    AI-powered natural-language search (POST /web/ai-search) - see "AI Search" section below
 │       └── BusinessLogic/
 │           ├── LakproductieBE.cls          1:1 port of legacy ExportLakProductie.w (3 sources: lopende-orders / lopende-productielijnen / min-max-voorraad)
 │           ├── LakproductieVerkoopService.cls  Rolling 1/3/6/9/12-month verkoop totals per artnr, shared by LakproductieBE
@@ -40,7 +41,9 @@ Backend/
 │           ├── OrdlijnBE.cls          DB access for `ordlijn` (purchase order lines, read-only, child of BestelorderBE)
 │           ├── DevUsersBE.cls         DEV/DEBUG ONLY - DB access for `gebruiker` (read-only, Password never referenced)
 │           ├── LeverancierBE.cls      DB access + validation for lever (supplier) CRUD
-│           └── AuthBE.cls             Auth-MVP login/logout/session validation - see "Auth-MVP (login/logout)" section below
+│           ├── AuthBE.cls             Auth-MVP login/logout/session validation - see "Auth-MVP (login/logout)" section below
+│           ├── AiSearchBE.cls         AI-search orchestration + hardcoded entity/field/operator whitelist - see "AI Search" section below
+│           └── GeminiGateway.cls      Thin wrapper around the Google Gemini REST API, used only by AiSearchBE - see "AI Search" section below
 ├── build/                Compiled r-code (generated, not source of truth - safe to delete/regenerate)
 ├── scripts/
 │   ├── compile.p         CLI compile-all procedure
@@ -156,6 +159,11 @@ required.
 - `handler13=Luna.Web.LogoutHandler: /logout` — maps `POST /web/logout`
   to the Auth-MVP logout WebHandler. Same as handler12 above - added to
   the actual `openedge.properties` and PASOE restarted.
+- `handler14=Luna.Web.AiSearchHandler: /ai-search` — maps
+  `POST /web/ai-search` to the AI-powered natural-language search
+  WebHandler (see "AI Search" section below). Added to the actual
+  `openedge.properties` at `C:\OpenEdge\MarcOepas\conf` (outside this
+  workspace) and the PASOE instance has been restarted to pick it up.
 - `POST /web/lakproduktie/bestelling` (create a purchase order from a
   Lakproduktie bestelling-preview, see `Luna.BusinessLogic.LakproductieBestellingBE`)
   needed no `openedge.properties` change - it's routed to the same
@@ -843,3 +851,105 @@ in that doc's §1.4 and §1.5 - the `X-Auth-Token` header instead of
   this PASOE `MarcTest` configuration - PASOE/Tomcat intercepts it first.
   Confirmed live; use `X-Auth-Token` for any future endpoint that needs to
   read an auth token from a header.
+
+## AI Search (`/web/ai-search`)
+AI-powered natural-language search over bon/offerte/klant/artikel/factuur/
+bestelorder data, using Google Gemini for stage 1 (NL prompt -> structured
+intent) and stage 2 (results -> short NL summary). No auth required, same
+as the other list endpoints. See `Luna.BusinessLogic.AiSearchBE`'s class
+header for the full orchestration and the exact whitelist.
+
+| Method | Path            | Purpose |
+|--------|-----------------|---------|
+| POST   | `/web/ai-search` | Body `{"prompt": "..."}` (required, non-empty, max 500 chars - `400` otherwise). Always `200` for a search that ran (even with zero results or an ambiguous prompt) - see response shapes below. |
+
+**Config - `GEMINI_API_KEY`:** the Gemini API key is read from the
+`GEMINI_API_KEY` OS-environment variable by `Luna.BusinessLogic.
+GeminiGateway` (never hardcoded) - same pattern as `AUTH_EVERYONE_ADMIN` in
+`Luna.BusinessLogic.AuthBE`. Must be set in the environment the PASOE
+`MarcTest` agent process itself runs in (e.g. exported before `tcman
+start`) - a PASOE restart is required to pick up a new/changed key. If it's
+unset (or the Gemini call otherwise fails/times out - 8s timeout), stage 1
+fails and the endpoint returns `502` with a fixed Dutch message (see error
+table below) - **confirmed live** in this environment (no key configured
+here): `POST /web/ai-search` with a normal search prompt returns exactly
+`{"error": {"message": "De AI-zoekfunctie is momenteel niet beschikbaar.
+Probeer het later opnieuw.", "code": 502}}`.
+
+**Response shapes** (`resultType`: `results` / `no_results` /
+`clarification`, all `200 OK`):
+```json
+{
+  "queryText": "...", "resultType": "results", "entity": "bon",
+  "intent": { "entity": "bon", "filters": [...], "aggregation": {...}, "confidence": 0.91 },
+  "items": [ {...} ], "page": 1, "pageSize": 25, "hasMore": false,
+  "summary": "...", "clarificationQuestion": null
+}
+```
+`no_results` and `clarification` are the same shape with `items: []` and
+`entity`/`intent`/`summary` set to `null` (clarification) or a
+deterministic Dutch "no rows matched" summary with no second Gemini call
+(no_results) - see the design contract in the class header.
+
+**Error responses** (real HTTP errors, not part of the shapes above):
+
+| Situation | Status | Message |
+|---|---|---|
+| Empty/missing `prompt` | 400 | `prompt is required` |
+| `prompt` > 500 characters | 400 | `prompt is too long (max 500 characters)` |
+| Stage 1 (Gemini NL->intent) fails/times out | 502 | `De AI-zoekfunctie is momenteel niet beschikbaar. Probeer het later opnieuw.` |
+| Unexpected internal error | 500 | `Er is een fout opgetreden bij het verwerken van je zoekopdracht.` |
+| Method other than POST | 405 | `Method not allowed on /ai-search` |
+
+A stage 2 (summary generation) failure/timeout is **never** a 502 - it
+falls back to a deterministic template summary (design contract, see
+`AiSearchBE:BuildFallbackSummary`).
+
+**Whitelist (`AiSearchBE:InitWhitelist`)** - hardcoded ABL temp-tables,
+**not** a new DB table. An LLM-produced intent is only ever translated into
+a DB query through this whitelist and the existing entity Business
+Entities' own typed parameters - the model's text never reaches a WHERE
+clause. Deliberately scoped to what those BEs already support as filter
+parameters today (see the "Divergences from the original design doc" note
+in `AiSearchBE`'s class header for the handful of fields the original
+architect design listed that aren't wired up yet - e.g. `bon.datum`/
+`levDatum`, `offerte.passief`/`verkocht`/`verloren`, and `range` on
+`factuur.datum`):
+
+| Entity | Aggregatable fields | Filterable fields (operator, indexed?) |
+|---|---|---|
+| bon | bedrag | klnr (eq, indexed), bonnr (prefix, indexed), type (eq), naam (contains), geparkeerd (eq), verzonden (eq) |
+| offerte | bedrag, btw | klnr (eq, indexed), offnr (prefix, indexed), naam (contains) |
+| klant | saldo | klnr (eq, indexed), naam (contains) |
+| artikel | voorraad, aankoopprijs, verkoopprijs | artnr (prefix, indexed), groep (eq) - `omschrijving` deliberately NOT whitelisted (existing 15.000-row scan-depth cap/performance hotspot on `ArtikelBE:GetArtikelen`, not to be made worse here) |
+| factuur | totaal, nBedrag, totBtw | klnr (eq, indexed), datum (eq only, indexed), projectnr (eq, indexed), naam (contains) |
+| bestelorder | bedrag | levnr (eq, indexed), ordnr (prefix), naam (contains) |
+
+Every entity `requiresSelectiveFilter` (at least one filter on an
+`indexed` field) and caps `pageSize` at 50 - a prompt that doesn't resolve
+to a selective filter, a non-whitelisted entity/field/operator, or a
+confidence below `0.6`/an explicit `clarificationNeeded` from Gemini all
+produce a `clarification` result rather than ever touching the database.
+
+**`Luna.BusinessLogic.BonBE:GetBonnen`** gained a new `pcVerzonden`
+parameter (tri-state `""`/`"true"`/`"false"`, same convention as the
+existing `pcGeparkeerd`) so AI Search's flagship "openstaande orders"
+example (`geparkeerd = false AND verzonden = false`) is expressible -
+additive change, `Luna.Web.BonHandler`'s existing call site now passes
+`""` (no `?verzonden=` query param wired there yet, AiSearchBE is the only
+caller today).
+
+**Anti-hallucination check:** every number Gemini's stage-2 summary
+mentions is checked against the actual server-computed aggregates/sample
+data (`AiSearchBE:ValidateSummaryAgainstData`) - a best-effort digit-only
+comparison (ignores thousands/decimal punctuation, skips single-digit
+tokens), not a mathematically perfect one, but enough to catch a model
+inventing a materially different number. Any mismatch discards the
+generated summary in favor of the deterministic template.
+
+**Privacy note:** the prompt (stage 1) and a small, already-authorized
+data sample - aggregates + up to 20 sample rows, which can include
+customer/invoice data (stage 2) - are sent to Google's external Gemini
+API (no confirmed EU data residency). This is a deliberate,
+product-owner-approved tradeoff for this feature, not an oversight - see
+`Luna.BusinessLogic.GeminiGateway`'s class header.

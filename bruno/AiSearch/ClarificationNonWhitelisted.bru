@@ -1,0 +1,50 @@
+meta {
+  name: ClarificationNonWhitelisted
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/web/ai-search
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "prompt": "hoeveel dingen zijn er"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.resultType: eq clarification
+  res.body.entity: eq null
+  res.body.intent: eq null
+  res.body.items: eq []
+}
+
+docs {
+  Vague/non-selective prompt -> resultType "clarification" (still 200 OK,
+  not an error - see Backend/README.md "AI Search" section and
+  Luna.BusinessLogic.AiSearchBE:ValidateIntentAgainstWhitelist). Also
+  covers the "not whitelisted entity/field/operator" case from the design
+  contract - any of those produce the same resultType.
+
+  IMPORTANT: this scenario is normally reached via Gemini stage 1
+  returning a low-confidence/ambiguous intent for a vague prompt. Without
+  GEMINI_API_KEY configured (see Backend/README.md), stage 1 itself fails
+  first and this request instead returns 502 - confirmed live in the dev
+  environment this feature was built against. Configure GEMINI_API_KEY on
+  the PASOE agent to exercise this specific 200/clarification path; until
+  then, treat a 502 here as "stage 1 unavailable", not "clarification
+  logic is broken" - the clarification logic itself is unit-testable via
+  Luna.BusinessLogic.AiSearchBE:ValidateIntentAgainstWhitelist with a
+  hand-built intent, independent of a live Gemini call.
+}
+
