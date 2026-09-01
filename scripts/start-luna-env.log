@@ -61,3 +61,11 @@
 [2026-08-31 09:02:05] Starting MarcTest PASOE instance...
 [2026-08-31 09:03:40] Server is already running - startup action aborted
 [2026-08-31 09:03:42] start-luna-env.ps1 completed.
+[2026-09-01 08:25:33] LunaNew reachable on lhdc01:4500 - proceeding.
+[2026-09-01 08:25:33] Starting MarcTest PASOE instance...
+[2026-09-01 08:25:38] Server is already running - startup action aborted
+[2026-09-01 08:25:38] start-luna-env.ps1 completed.
+[2026-09-01 08:31:40] LunaNew reachable on lhdc01:4500 - proceeding.
+[2026-09-01 08:31:42] Starting MarcTest PASOE instance...
+[2026-09-01 08:39:03] Server is already running - startup action aborted
+[2026-09-01 08:39:04] start-luna-env.ps1 completed.
