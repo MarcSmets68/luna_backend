@@ -1,0 +1,38 @@
+meta {
+  name: TooLongPrompt400
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/web/ai-search
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "prompt": "{{longPrompt501Chars}}"
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.code: eq 400
+  res.body.error.message: eq prompt is too long (max 500 characters)
+}
+
+docs {
+  Prompt over the 500-character cap - 400. Set a `longPrompt501Chars`
+  variable (any string > 500 characters, e.g. 501 "a" characters) in the
+  Local environment before running this request, since Bruno's static
+  body doesn't support inline string repetition - see
+  Backend/src/Luna/Web/AiSearchHandler.cls for the exact length check
+  (LENGTH(cPrompt) GT 500).
+}
+

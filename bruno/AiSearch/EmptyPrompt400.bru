@@ -1,0 +1,35 @@
+meta {
+  name: EmptyPrompt400
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/web/ai-search
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "prompt": ""
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.code: eq 400
+  res.body.error.message: eq prompt is required
+}
+
+docs {
+  Empty prompt - 400, checked in both Luna.Web.AiSearchHandler (HTTP-level
+  input validation) and defensively again in AiSearchBE:ExecuteSearch.
+  A missing `prompt` key entirely gives the same result.
+}
+

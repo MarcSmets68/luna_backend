@@ -1,0 +1,47 @@
+meta {
+  name: Search
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/web/ai-search
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "prompt": "Toon alle openstaande orders voor Cone Lighting deze maand"
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Happy-path AI search - a concrete, selective search prompt. See
+  Backend/src/Luna/BusinessLogic/AiSearchBE.cls for the full orchestration
+  (Gemini stage 1 -> whitelist validation -> existing entity BE dispatch ->
+  aggregation -> Gemini stage 2 summary + anti-hallucination check).
+
+  Response is always 200 with one of three resultType values:
+  "results" | "no_results" | "clarification" - see the class header /
+  Backend/README.md "AI Search" section for the full shape of each.
+
+  Note: if GEMINI_API_KEY is not configured on the PASOE agent (see
+  Backend/README.md), stage 1 fails and this same request instead returns
+  502 with {"error": {"message": "De AI-zoekfunctie is momenteel niet
+  beschikbaar. Probeer het later opnieuw.", "code": 502}} - confirmed live
+  in the dev environment this feature was built against. Loosen the
+  `res.status: eq 200` assertion above (or add a GEMINI_API_KEY to the
+  Local environment) if running against an instance without a configured
+  key.
+}
+
