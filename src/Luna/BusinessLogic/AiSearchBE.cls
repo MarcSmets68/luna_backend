@@ -105,6 +105,28 @@ CLASS Luna.BusinessLogic.AiSearchBE:
 
     DEFINE PRIVATE VARIABLE oGemini AS GeminiGateway NO-UNDO.
 
+    /* Entity BE instances used by the Dispatch* methods below MUST be
+       kept alive as instance fields here, not as local variables inside
+       each Dispatch* method. The temp-tables those BEs return (ttBon,
+       ttKlant, etc.) are instance-scoped to their owning BE object - if
+       the only reference to that object is a local variable inside
+       DispatchBon/DispatchKlant/etc., the object (and its temp-table)
+       gets garbage-collected as soon as the Dispatch* method returns,
+       making the returned HANDLE dangling by the time ComputeAggregates
+       uses it further up the call stack in ExecuteSearch (observed as
+       "Invalid handle (3135)" / "Cannot access DEFAULT-BUFFER-HANDLE
+       (3140)" during testing). Keeping the BE instance referenced here,
+       for the lifetime of this AiSearchBE instance (which spans the
+       whole ExecuteSearch call, same as how WebHandlers like BonHandler
+       keep their own oService field alive for the whole request), keeps
+       the temp-table alive long enough to be used and serialized. */
+    DEFINE PRIVATE VARIABLE oBonBEInstance         AS BonBE         NO-UNDO.
+    DEFINE PRIVATE VARIABLE oOfferteBEInstance     AS OfferteBE     NO-UNDO.
+    DEFINE PRIVATE VARIABLE oKlantBEInstance       AS KlantBE       NO-UNDO.
+    DEFINE PRIVATE VARIABLE oArtikelBEInstance     AS ArtikelBE     NO-UNDO.
+    DEFINE PRIVATE VARIABLE oFactuurBEInstance     AS FactuurBE     NO-UNDO.
+    DEFINE PRIVATE VARIABLE oBestelorderBEInstance AS BestelorderBE NO-UNDO.
+
     /* Hardcoded whitelist - see class header. NOT a DB table. */
     DEFINE TEMP-TABLE ttWhitelistEntity NO-UNDO
         FIELD entity                 AS CHARACTER
@@ -641,7 +663,6 @@ CLASS Luna.BusinessLogic.AiSearchBE:
 
     METHOD PRIVATE HANDLE DispatchBon( INPUT poFilters AS JsonArray, INPUT piPageSize AS INTEGER, OUTPUT plHasMore AS LOGICAL ):
 
-        DEFINE VARIABLE oBonBE      AS BonBE      NO-UNDO.
         DEFINE VARIABLE cOp         AS CHARACTER  NO-UNDO.
         DEFINE VARIABLE cVal        AS CHARACTER  NO-UNDO.
         DEFINE VARIABLE iKlnr       AS INTEGER    NO-UNDO INITIAL 0.
@@ -658,15 +679,14 @@ CLASS Luna.BusinessLogic.AiSearchBE:
         IF GetFilter(poFilters, "geparkeerd":u, OUTPUT cOp, OUTPUT cVal) THEN cGeparkeerd = NormalizeBoolFilter(cVal).
         IF GetFilter(poFilters, "verzonden":u, OUTPUT cOp, OUTPUT cVal)  THEN cVerzonden = NormalizeBoolFilter(cVal).
 
-        oBonBE = NEW BonBE().
+        oBonBEInstance = NEW BonBE().
 
-        RETURN oBonBE:GetBonnen(iKlnr, cType, cBonnr, cNaam, 1, piPageSize, cGeparkeerd, cVerzonden, OUTPUT plHasMore).
+        RETURN oBonBEInstance:GetBonnen(iKlnr, cType, cBonnr, cNaam, 1, piPageSize, cGeparkeerd, cVerzonden, OUTPUT plHasMore).
 
     END METHOD.
 
     METHOD PRIVATE HANDLE DispatchOfferte( INPUT poFilters AS JsonArray, INPUT piPageSize AS INTEGER, OUTPUT plHasMore AS LOGICAL ):
 
-        DEFINE VARIABLE oBE    AS OfferteBE  NO-UNDO.
         DEFINE VARIABLE cOp    AS CHARACTER  NO-UNDO.
         DEFINE VARIABLE cVal   AS CHARACTER  NO-UNDO.
         DEFINE VARIABLE iKlnr  AS INTEGER    NO-UNDO INITIAL 0.
@@ -677,38 +697,36 @@ CLASS Luna.BusinessLogic.AiSearchBE:
         IF GetFilter(poFilters, "offnr":u, OUTPUT cOp, OUTPUT cVal) THEN cOffnr = cVal.
         IF GetFilter(poFilters, "naam":u, OUTPUT cOp, OUTPUT cVal)  THEN cNaam = cVal.
 
-        oBE = NEW OfferteBE().
+        oOfferteBEInstance = NEW OfferteBE().
 
-        RETURN oBE:GetOffertes(iKlnr, "":u, cOffnr, cNaam, 1, piPageSize, OUTPUT plHasMore).
+        RETURN oOfferteBEInstance:GetOffertes(iKlnr, "":u, cOffnr, cNaam, 1, piPageSize, OUTPUT plHasMore).
 
     END METHOD.
 
     METHOD PRIVATE HANDLE DispatchKlant( INPUT poFilters AS JsonArray, INPUT piPageSize AS INTEGER, OUTPUT plHasMore AS LOGICAL ):
 
-        DEFINE VARIABLE oBE   AS KlantBE   NO-UNDO.
         DEFINE VARIABLE cOp   AS CHARACTER NO-UNDO.
         DEFINE VARIABLE cVal  AS CHARACTER NO-UNDO.
         DEFINE VARIABLE iKlnr AS INTEGER   NO-UNDO INITIAL 0.
         DEFINE VARIABLE cNaam AS CHARACTER NO-UNDO INITIAL "":u.
 
-        oBE = NEW KlantBE().
+        oKlantBEInstance = NEW KlantBE().
 
         IF GetFilter(poFilters, "klnr":u, OUTPUT cOp, OUTPUT cVal) THEN
         DO:
             iKlnr = INTEGER(cVal) NO-ERROR.
             plHasMore = FALSE.
-            RETURN oBE:GetKlant(iKlnr).
+            RETURN oKlantBEInstance:GetKlant(iKlnr).
         END.
 
         IF GetFilter(poFilters, "naam":u, OUTPUT cOp, OUTPUT cVal) THEN cNaam = cVal.
 
-        RETURN oBE:GetKlanten(1, piPageSize, cNaam, OUTPUT plHasMore).
+        RETURN oKlantBEInstance:GetKlanten(1, piPageSize, cNaam, OUTPUT plHasMore).
 
     END METHOD.
 
     METHOD PRIVATE HANDLE DispatchArtikel( INPUT poFilters AS JsonArray, INPUT piPageSize AS INTEGER, OUTPUT plHasMore AS LOGICAL ):
 
-        DEFINE VARIABLE oBE     AS ArtikelBE  NO-UNDO.
         DEFINE VARIABLE cOp     AS CHARACTER  NO-UNDO.
         DEFINE VARIABLE cVal    AS CHARACTER  NO-UNDO.
         DEFINE VARIABLE cArtnr  AS CHARACTER  NO-UNDO INITIAL "":u.
@@ -717,15 +735,14 @@ CLASS Luna.BusinessLogic.AiSearchBE:
         IF GetFilter(poFilters, "artnr":u, OUTPUT cOp, OUTPUT cVal) THEN cArtnr = cVal.
         IF GetFilter(poFilters, "groep":u, OUTPUT cOp, OUTPUT cVal) THEN cGroep = cVal.
 
-        oBE = NEW ArtikelBE().
+        oArtikelBEInstance = NEW ArtikelBE().
 
-        RETURN oBE:GetArtikelen(cArtnr, "":u, cGroep, 1, piPageSize, "":u, FALSE, OUTPUT plHasMore).
+        RETURN oArtikelBEInstance:GetArtikelen(cArtnr, "":u, cGroep, 1, piPageSize, "":u, FALSE, OUTPUT plHasMore).
 
     END METHOD.
 
     METHOD PRIVATE HANDLE DispatchFactuur( INPUT poFilters AS JsonArray, INPUT piPageSize AS INTEGER, OUTPUT plHasMore AS LOGICAL ):
 
-        DEFINE VARIABLE oBE        AS FactuurBE NO-UNDO.
         DEFINE VARIABLE cOp        AS CHARACTER NO-UNDO.
         DEFINE VARIABLE cVal       AS CHARACTER NO-UNDO.
         DEFINE VARIABLE iKlnr      AS INTEGER   NO-UNDO INITIAL 0.
@@ -738,15 +755,14 @@ CLASS Luna.BusinessLogic.AiSearchBE:
         IF GetFilter(poFilters, "datum":u, OUTPUT cOp, OUTPUT cVal)     THEN dDatum = ParseIsoDate(cVal).
         IF GetFilter(poFilters, "projectnr":u, OUTPUT cOp, OUTPUT cVal) THEN iProjectnr = INTEGER(cVal) NO-ERROR.
 
-        oBE = NEW FactuurBE().
+        oFactuurBEInstance = NEW FactuurBE().
 
-        RETURN oBE:GetFacturen(iKlnr, cNaam, dDatum, iProjectnr, 1, piPageSize, OUTPUT plHasMore).
+        RETURN oFactuurBEInstance:GetFacturen(iKlnr, cNaam, dDatum, iProjectnr, 1, piPageSize, OUTPUT plHasMore).
 
     END METHOD.
 
     METHOD PRIVATE HANDLE DispatchBestelorder( INPUT poFilters AS JsonArray, INPUT piPageSize AS INTEGER, OUTPUT plHasMore AS LOGICAL ):
 
-        DEFINE VARIABLE oBE    AS BestelorderBE NO-UNDO.
         DEFINE VARIABLE cOp    AS CHARACTER     NO-UNDO.
         DEFINE VARIABLE cVal   AS CHARACTER     NO-UNDO.
         DEFINE VARIABLE iLevnr AS INTEGER       NO-UNDO INITIAL 0.
@@ -757,9 +773,9 @@ CLASS Luna.BusinessLogic.AiSearchBE:
         IF GetFilter(poFilters, "ordnr":u, OUTPUT cOp, OUTPUT cVal) THEN cOrdnr = cVal.
         IF GetFilter(poFilters, "naam":u, OUTPUT cOp, OUTPUT cVal)  THEN cNaam = cVal.
 
-        oBE = NEW BestelorderBE().
+        oBestelorderBEInstance = NEW BestelorderBE().
 
-        RETURN oBE:GetBestelorders(iLevnr, cOrdnr, cNaam, "":u, "":u, 1, piPageSize, OUTPUT plHasMore).
+        RETURN oBestelorderBEInstance:GetBestelorders(iLevnr, cOrdnr, cNaam, "":u, "":u, 1, piPageSize, OUTPUT plHasMore).
 
     END METHOD.
 

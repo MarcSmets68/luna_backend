@@ -230,7 +230,7 @@ CLASS Luna.Web.AiSearchHandler INHERITS WebHandler:
             oBody:Add("intent":u, STRING(?)).
 
         oBody:Add("items":u, oItemsBody:GetJsonArray("items":u)).
-        oBody:Add("page":u, oMetaRow:GetInteger("pageNr":u)).
+        oBody:Add("page":u, oMetaRow:GetInteger("page":u)).
         oBody:Add("pageSize":u, oMetaRow:GetInteger("pageSize":u)).
         oBody:Add("hasMore":u, oMetaRow:GetLogical("hasMore":u)).
         oBody:Add("summary":u, GetCharOrNull(oMetaRow, "summary":u)).
