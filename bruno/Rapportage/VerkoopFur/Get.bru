@@ -1,0 +1,62 @@
+meta {
+  name: Get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/rapportage/verkoop-fur
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.items: isArray
+  res.body.periodeVan: isDefined
+  res.body.periodeTot: isDefined
+  res.body.generatedAt: isDefined
+}
+
+docs {
+  Verkoop FUR dealer overview - Nomaled dealers (klant.swNomaled = TRUE)
+  who ordered a "FUR spot" article (bonlijn.artnr BEGINS "NOMALED.FUR")
+  in the rolling 12-months window (TODAY - 365 .. TODAY, both bounds
+  inclusive).
+
+  Response shape:
+  {
+    "items": [
+      { "klnr": 14644, "naam": "CONE LIGHTING BV", "aantalFurOrders": 3,
+        "totaalAantalStuks": 42, "laatsteBesteldatum": "2026-07-15" },
+      ...
+    ],
+    "periodeVan": "2025-08-20",
+    "periodeTot": "2026-08-20",
+    "generatedAt": "2026-08-20T10:15:03..."
+  }
+
+  Sorted `items` BY totaalAantalStuks DESCENDING (Marc-confirmed - see
+  docs/architecture/verkoop-fur-ontwerp.md Open flags #3, overrides the
+  architect's original laatsteBesteldatum suggestion).
+
+  Business rules baked into this result (see
+  Luna.BusinessLogic.VerkoopFurBE class header for the full rationale):
+  - bon.type must be "ORDERBEVESTIGING".
+  - Cancelled-order heuristic: bon.b-bedrag = 0 -> excluded (annul-bon
+    always zeroes this; accepted false-positive/false-negative risk per
+    Marc, see design doc Open flags #1).
+  - Only bon.klnr (primary) is attributed - klnr2/klnr3 are not
+    considered.
+  - naam is klant.naam (live/current), not a point-in-time snapshot.
+  - Not cached - this endpoint always recomputes live, generatedAt is
+    always "now".
+
+  Backed by Backend/src/Luna/Web/RapportageHandler.cls +
+  Luna/BusinessLogic/VerkoopFurBE.cls. Read-only, no auth (consistent
+  with every other documented handler).
+}
