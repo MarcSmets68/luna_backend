@@ -1,0 +1,25 @@
+meta {
+  name: Get
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/web/bon/{{bonnr}}/lijn/{{lijnnr}}/productie/{{plijnnr}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Gets a single productie sublijn. 404 if not found. Requires "Create"
+  (this folder) to have run first (sets {{plijnnr}}).
+}
+

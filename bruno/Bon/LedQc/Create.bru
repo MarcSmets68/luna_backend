@@ -1,0 +1,43 @@
+meta {
+  name: Create
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{bonnr}}/led-qc
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "groepnr": 1,
+    "omschr": "Test QC-regel",
+    "controle": "OK",
+    "id": "ABNA"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.bonnr: eq {{bonnr}}
+}
+
+script:post-response {
+  bru.setVar("qcGroepnr", res.body.groepnr);
+  bru.setVar("qcVolgnr", res.body.volgnr);
+  bru.setVar("qcLijnnr", res.body.lijnnr);
+}
+
+docs {
+  Creates a bon_led_qc row. `groepnr` is required in the body; `datum` is
+  server-side TODAY; `volgnr` is server-generated per bonnr+groepnr+datum.
+  Backed by Luna.BusinessLogic.BonLedQcBE.cls.
+}
+

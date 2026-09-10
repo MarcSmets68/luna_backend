@@ -434,11 +434,45 @@ CLASS Luna.BusinessLogic.BonBE:
         BUFFER pbBonlijn FOR bonlijn,
         BUFFER pbBon     FOR bon ):
 
+        ApplyBomReservationDelta( BUFFER pbArtikel, BUFFER pbBonlijn, BUFFER pbBon, (0 - pbBonlijn.te-leveren) ).
+
+    END METHOD.
+
+    /*------------------------------------------------------------------------------
+        Purpose: Generalized BOM (artlijn) sub-component reservation walk,
+                 shared by AnnuleerBon's ReleaseBomReservations (called
+                 with pdQtyDelta = -bonlijn.te-leveren, i.e. "release the
+                 whole line") and Luna.BusinessLogic.BonLijnReserveringBE
+                 (called with pdQtyDelta = the requested reservation
+                 delta, positive to reserve / negative to release). Only
+                 reached for bonlijn.artnr rows whose `artikel.soort` is
+                 TRUE (a "gemengd"/BOM article). PUBLIC so
+                 BonLijnReserveringBE can reuse it without duplicating
+                 this walk - see Bonlijn-reservering design (Fase 2/4),
+                 "GEEN duplicatie van die BOM-walk-logica".
+                 The "swVast" (fixed-quantity) branch keeps its original,
+                 non-proportional fixed amount (artlijn.aantal *
+                 dOffAantal), only its sign follows SIGN(pdQtyDelta) -
+                 this mirrors the legacy annul-bon behavior exactly for
+                 the pdQtyDelta = -te-leveren case (a full-line release);
+                 for partial reservation deltas on a swVast sub-component
+                 this is a literal, mechanical port per the approved
+                 design rather than a newly-derived proportional formula.
+    ------------------------------------------------------------------------------*/
+    METHOD PUBLIC VOID ApplyBomReservationDelta(
+        BUFFER pbArtikel  FOR artikel,
+        BUFFER pbBonlijn  FOR bonlijn,
+        BUFFER pbBon      FOR bon,
+        INPUT  pdQtyDelta AS DECIMAL ):
+
         DEFINE VARIABLE dOffAantal AS DECIMAL NO-UNDO.
+        DEFINE VARIABLE dSign      AS DECIMAL NO-UNDO.
         DEFINE BUFFER bfBonlijn  FOR bonlijn.
         DEFINE BUFFER bfArtikel  FOR artikel.
         DEFINE BUFFER bfArtlijn  FOR artlijn.
         DEFINE BUFFER bf2Artikel FOR artikel.
+
+        dSign = (IF pdQtyDelta GE 0 THEN 1 ELSE -1).
 
         IF pbBonlijn.groepnr NE 0 THEN
         DO:
@@ -455,19 +489,19 @@ CLASS Luna.BusinessLogic.BonBE:
             IF AVAILABLE bfArtikel AND bfArtikel.stock THEN
             DO:
                 IF NOT bfArtikel.soort THEN
-                    bfArtikel.pbesteld-kl = bfArtikel.pbesteld-kl -
-                        (IF artlijn.swVast THEN (artlijn.aantal * dOffAantal)
-                                           ELSE (pbBonlijn.te-leveren * artlijn.aantal)).
+                    bfArtikel.pbesteld-kl = bfArtikel.pbesteld-kl +
+                        (IF artlijn.swVast THEN dSign * (artlijn.aantal * dOffAantal)
+                                           ELSE (pdQtyDelta * artlijn.aantal)).
                 ELSE
                 DO:
-                    bfArtikel.pbesteld-kl = bfArtikel.pbesteld-kl - (pbBonlijn.te-leveren * artlijn.aantal).
+                    bfArtikel.pbesteld-kl = bfArtikel.pbesteld-kl + (pdQtyDelta * artlijn.aantal).
 
                     FOR EACH bfArtlijn OF bfArtikel NO-LOCK:
                         FIND FIRST bf2Artikel WHERE bf2Artikel.artnr EQ bfArtlijn.l-artnr EXCLUSIVE-LOCK NO-ERROR.
                         IF AVAILABLE bf2Artikel AND bf2Artikel.stock THEN
-                            bf2Artikel.pbesteld-kl = bf2Artikel.pbesteld-kl -
-                                (IF bfArtlijn.swVast THEN (bfArtlijn.aantal * (artlijn.aantal * dOffAantal))
-                                                     ELSE ((pbBonlijn.te-leveren * bfArtlijn.aantal) * artlijn.aantal)).
+                            bf2Artikel.pbesteld-kl = bf2Artikel.pbesteld-kl +
+                                (IF bfArtlijn.swVast THEN dSign * (bfArtlijn.aantal * (artlijn.aantal * dOffAantal))
+                                                     ELSE ((pdQtyDelta * bfArtlijn.aantal) * artlijn.aantal)).
                         RELEASE bf2Artikel.
                     END.
                 END.

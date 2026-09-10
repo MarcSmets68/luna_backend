@@ -1,0 +1,31 @@
+meta {
+  name: Update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/web/pakbon/{{paknr}}/lijn/{{paklijnnr}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "aantal": 3
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Partial update of a paklijn.
+}
+

@@ -1,0 +1,47 @@
+meta {
+  name: Create
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/web/pakbon/{{paknr}}/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "TESTART",
+    "omschr": "Test paklijn",
+    "aantal": 2,
+    "teLeveren": 2,
+    "vprijs": 50.0,
+    "bedrag": 100.0,
+    "bonnr": {{bonnr}},
+    "blijnnr": {{lijnnr}}
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.paknr: eq {{paknr}}
+}
+
+script:post-response {
+  bru.setVar("paklijnnr", res.body.lijnnr);
+}
+
+docs {
+  Creates a paklijn under pakbon {{paknr}}. `lijnnr` is server-generated
+  (last lijnnr for this paknr + 1). Setting bonnr/blijnnr here (matching
+  the Bon/Create.bru + Bon/CreateLijn.bru chain) also makes
+  Bon/PakbonnenForLijn.bru return this row. Requires "Create" (this
+  folder's parent, Pakbon/Create.bru) to have run first.
+}
+

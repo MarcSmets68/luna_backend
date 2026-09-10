@@ -1,0 +1,39 @@
+meta {
+  name: Apply
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{bonnr}}/lijn/{{lijnnr}}/reservering
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "delta": 1
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.bonnr: eq {{bonnr}}
+  res.body.lijnnr: eq {{lijnnr}}
+}
+
+docs {
+  Reserves 1 unit of stock against bonlijn {{bonnr}}/{{lijnnr}}
+  (bonlijn.gereserv += delta, artikel.gereserveerd += delta, plus a BOM
+  walk if the article is "gemengd"). Resulting gereserv must stay within
+  [0, teLeveren] or this 400s. Send a negative delta to release. Requires
+  "Create" (bon) and "CreateLijn" to have run first. Backed by
+  Luna.BusinessLogic.BonLijnReserveringBE.cls, which reuses
+  BonBE:ApplyBomReservationDelta (no duplicated BOM-walk logic).
+}
+

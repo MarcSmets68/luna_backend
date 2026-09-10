@@ -1,0 +1,34 @@
+meta {
+  name: Afhalen
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/web/pakbon/{{paknr}}/afhalen
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "afgehaaldId": "ABNA"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.afgehaald: eq true
+  res.body.afgehaaldId: eq ABNA
+}
+
+docs {
+  Marks the pakbon as picked up: afgehaald=true, afgehaaldId from the
+  body, afgehaaldDatum=TODAY, afgehaaldUur=STRING(TIME,"HH:MM:SS").
+}
+

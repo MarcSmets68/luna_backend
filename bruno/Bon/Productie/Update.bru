@@ -1,0 +1,32 @@
+meta {
+  name: Update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/web/bon/{{bonnr}}/lijn/{{lijnnr}}/productie/{{plijnnr}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "aantal": 7,
+    "omschr": "Bijgewerkte productie sublijn"
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Partial update of a productie sublijn.
+}
+

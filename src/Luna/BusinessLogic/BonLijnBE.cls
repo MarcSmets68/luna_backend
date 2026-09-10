@@ -84,6 +84,9 @@ CLASS Luna.BusinessLogic.BonLijnBE:
         FIELD subtotaal    AS LOGICAL   SERIALIZE-NAME "subtotaal":u
         FIELD kolomtitel   AS LOGICAL   SERIALIZE-NAME "kolomtitel":u
         FIELD infolijn     AS LOGICAL   SERIALIZE-NAME "infolijn":u
+        FIELD gereserv         AS DECIMAL SERIALIZE-NAME "gereserv":u
+        FIELD effectiefGereserv AS DECIMAL SERIALIZE-NAME "effectiefGereserv":u
+        FIELD swEffectief       AS LOGICAL SERIALIZE-NAME "swEffectief":u
         INDEX idx-lijnnr IS PRIMARY bonnr lijnnr.
 
     /*------------------------------------------------------------------------------
@@ -133,6 +136,9 @@ CLASS Luna.BusinessLogic.BonLijnBE:
             pbTt.subtotaal    = pbBonLijn.subtotaal
             pbTt.kolomtitel   = pbBonLijn.kolomtitel
             pbTt.infolijn     = pbBonLijn.infolijn
+            pbTt.gereserv          = pbBonLijn.gereserv
+            pbTt.effectiefGereserv = pbBonLijn.effectief-gereserv
+            pbTt.swEffectief       = pbBonLijn.swEffectief
             .
 
     END METHOD.
@@ -312,6 +318,14 @@ CLASS Luna.BusinessLogic.BonLijnBE:
 
         EnsureBonExists( piBonnr ).
 
+        IF CAN-FIND(FIRST bonlijn_productie
+            WHERE bonlijn_productie.bonnr  EQ piBonnr
+              AND bonlijn_productie.blijnnr EQ piLijnnr
+              AND bonlijn_productie.besteld NE 0) THEN
+            UNDO, THROW NEW Progress.Lang.AppError(
+                SUBSTITUTE("Bonlijn &1/&2 has a productie sublijn with besteld <> 0 and cannot be deleted":u,
+                    piBonnr, piLijnnr), 409).
+
         DO TRANSACTION:
             FIND FIRST bonlijn EXCLUSIVE-LOCK
                 WHERE bonlijn.bonnr EQ piBonnr
@@ -326,3 +340,4 @@ CLASS Luna.BusinessLogic.BonLijnBE:
     END METHOD.
 
 END CLASS.
+

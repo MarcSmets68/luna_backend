@@ -1,0 +1,29 @@
+meta {
+  name: PakbonnenForLijn
+  type: http
+  seq: 30
+}
+
+get {
+  url: {{baseUrl}}/web/bon/{{bonnr}}/lijn/{{lijnnr}}/pakbonnen
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Read-only reverse lookup: which pakbon(nen) contain bonlijn
+  {{bonnr}}/{{lijnnr}}, via the paklijn-x4 index on paklijn.bonnr (no
+  bonlijn.paknr field exists in the schema). Typically an empty
+  {"items":[]} unless a Pakbon/Lijn/Create.bru request was made with
+  matching bonnr/blijnnr values. Backed by
+  Luna.BusinessLogic.PakLijnBE:GetPakLijnenForBonlijn.
+}
+
