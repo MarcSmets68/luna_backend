@@ -525,6 +525,15 @@ if PASOE is ever redeployed/reprovisioned on another machine, these 9
 handler lines need to be re-added there by hand, mirroring the existing
 `handler1`-`handler15` entries.
 
+**Full reference**: see `docs/backend/led-reference-data.md` for the
+per-table endpoint contracts (with concrete JSON examples for
+`led_technieklever`, `led_auteur` and `led_eind`), the error-code table,
+and the "Deviations from design intent" section (the `art_led`
+field-mismatch and the `ledType`-default-in-handler defect found and fixed
+by backend-tester). End-user documentation: `docs/handleidingen/led-reference-data.md`
+(note: no frontend exists yet for this feature, so the handleiding
+describes the reference-data's business purpose only, not screen steps).
+
 ## Offerte CRUD (`/web/offerte`)
 Full CRUD over a curated core subset of the `offerte` (quote) table (~90
 fields in total; only identification, customer, amount and status fields
