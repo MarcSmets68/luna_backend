@@ -136,6 +136,12 @@ CLASS Luna.BusinessLogic.LedTechniekleverBE:
 
         EMPTY TEMP-TABLE ttLedTechnieklever.
 
+        /* Business rule: led-type defaults to "Geen" (matches the DB default)
+           when the caller does not supply a non-blank value. This decision
+           belongs here, not in any calling WebHandler. */
+        IF TRIM(pcLedType) EQ "":u THEN
+            pcLedType = "Geen":u.
+
         IF NOT LevnrExists(piLevnr) THEN
             UNDO, THROW NEW Progress.Lang.AppError(SUBSTITUTE("lever &1 not found":u, piLevnr), 404).
 

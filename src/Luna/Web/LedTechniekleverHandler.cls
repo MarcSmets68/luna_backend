@@ -279,10 +279,13 @@ CLASS Luna.Web.LedTechniekleverHandler INHERITS WebHandler:
         ASSIGN
             cLaktechniek = oReqBody:GetCharacter("laktechniek":u)
             cKleursoort  = oReqBody:GetCharacter("kleursoort":u)
-            cLedType     = (IF oReqBody:Has("ledType":u) AND TRIM(oReqBody:GetCharacter("ledType":u)) NE "":u
-                             THEN oReqBody:GetCharacter("ledType":u) ELSE "Geen":u)
+            cLedType     = (IF oReqBody:Has("ledType":u) THEN oReqBody:GetCharacter("ledType":u) ELSE "":u)
             iLevnr       = oReqBody:GetInteger("levnr":u)
             .
+
+        /* NOTE: default value for a blank/missing ledType ("Geen") is a
+           business rule and is applied by LedTechniekleverBE:CreateItem,
+           not here - the handler only passes through what it received. */
 
         hResult = oService:CreateItem(cLaktechniek, cKleursoort, cLedType, iLevnr, oReqBody).
         oBody   = ResultHandleToJson(hResult).
