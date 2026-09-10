@@ -1,0 +1,25 @@
+meta {
+  name: Get
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/web/led-kenmerk/TESTQA1
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.kode: eq TESTQA1
+}
+
+docs {
+  Gets a single led_kenmerk by kode. 404 if it doesn't exist. Requires
+  kode TESTQA1 to exist - run "Create" first.
+}  

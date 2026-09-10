@@ -1,0 +1,32 @@
+meta {
+  name: Update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/web/led-tt/%23CEILINGBOX%20or%20ROSETTE/P1
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "tt": "updated"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.tt: eq updated
+}
+
+docs {
+  Partial update - only tt is writable, artnr/onderdeel are immutable.
+  404 if the row doesn't exist - run "Create" first.
+}  

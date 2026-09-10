@@ -1,0 +1,33 @@
+meta {
+  name: Update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/web/led-3ol-kodes/TESTQAKODE
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "comp": "B"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.comp: eq B
+}
+
+docs {
+  Partial update - artnr/comp/excelKode/samenstellingKode are
+  writable, kode is immutable. 404 if kode doesn't exist, or if a new
+  artnr (if supplied) isn't found in artikel. Run "Create" first.
+}  

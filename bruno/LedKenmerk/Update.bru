@@ -1,0 +1,31 @@
+meta {
+  name: Update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/web/led-kenmerk/TESTQA1
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {}
+}
+
+assert {
+  res.status: eq 200
+  res.body.kode: eq TESTQA1
+}
+
+docs {
+  led_kenmerk has no fields besides its immutable key, so PUT is a no-op
+  that just re-confirms the row exists and returns it. 404 if kode
+  TESTQA1 doesn't exist - run "Create" first.
+}  

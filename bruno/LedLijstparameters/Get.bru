@@ -1,0 +1,28 @@
+meta {
+  name: Get
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/web/led-lijstparameters/TESTCAT/1/%23CEILINGBOX%20or%20ROSETTE
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.categorie: eq TESTCAT
+}
+
+docs {
+  Gets a single led_lijstparameters row by categorie/volgnr/artnr (3
+  path segments, in that order). 404 if it doesn't exist, or 400 if not
+  exactly 3 non-empty segments. Requires the row created by "Create"
+  first. artnr must be URL-encoded (used here: "#CEILINGBOX or
+  ROSETTE").
+}  

@@ -1,0 +1,28 @@
+meta {
+  name: Get
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/web/led-technieklever/TSTQ/TQ/Geen/1
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.laktechniek: eq TSTQ
+}
+
+docs {
+  Gets a single led_technieklever row by
+  laktechniek/kleursoort/ledType/levnr (4 path segments, in that
+  order). 404 if it doesn't exist, or 400 if not exactly 4 non-empty
+  segments / levnr isn't a valid integer. Requires the row created by
+  "Create" first. levnr 1 must exist in lever.
+}  

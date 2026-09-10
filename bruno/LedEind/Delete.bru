@@ -1,0 +1,25 @@
+meta {
+  name: Delete
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/web/led-eind/TESTEIND/TESTPROF/TESTCOVER
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq deleted
+}
+
+docs {
+  Deletes the led_eind row matching eind/profiel/cover. 404 if 0 rows
+  match, 409 if >1 match. Run "Create" first.
+} 

@@ -1,0 +1,25 @@
+meta {
+  name: Delete
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/web/led-auteur/%23CEILINGBOX%20or%20ROSETTE
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq deleted
+}
+
+docs {
+  Deletes a led_auteur row by artnr. 404 if it doesn't exist. Run
+  "Create" first.
+} 

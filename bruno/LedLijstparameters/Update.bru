@@ -1,0 +1,33 @@
+meta {
+  name: Update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/web/led-lijstparameters/TESTCAT/1/%23CEILINGBOX%20or%20ROSETTE
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "swBegins": false
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.swBegins: eq false
+}
+
+docs {
+  Partial update - only swBegins is writable, categorie/volgnr/artnr are
+  immutable even if present in the body. 404 if the row doesn't exist -
+  run "Create" first.
+}  

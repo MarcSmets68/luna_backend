@@ -1,0 +1,33 @@
+meta {
+  name: Create
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/web/led-auteur
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "#CEILINGBOX or ROSETTE",
+    "profiel": true
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+docs {
+  Creates a led_auteur row. 404 if artnr isn't found in artikel; 409 if
+  artnr already has a led_auteur row. Run "Delete" afterwards to clean
+  up test data.
+}  

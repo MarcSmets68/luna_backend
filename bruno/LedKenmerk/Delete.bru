@@ -1,0 +1,27 @@
+meta {
+  name: Delete
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/web/led-kenmerk/TESTQA1
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq deleted
+}
+
+docs {
+  Deletes a led_kenmerk by kode. 404 if not found; 409 if still
+  referenced by artikel.led-kenmerk (see art_led - checked against the
+  live schema, it has no led-kenmerk field so it is not checked). Run
+  "Create" first to have TESTQA1 to delete.
+} 

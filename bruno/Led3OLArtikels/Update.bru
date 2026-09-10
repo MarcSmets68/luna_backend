@@ -1,0 +1,32 @@
+meta {
+  name: Update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/web/led-3ol-artikels/%23CEILINGBOX%20or%20ROSETTE/P1
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "lengte": 20
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.lengte: eq 20
+}
+
+docs {
+  Partial update - lengte/aantal/swExport are writable, artnr/onderdeel
+  are immutable. 404 if the row doesn't exist - run "Create" first.
+}  

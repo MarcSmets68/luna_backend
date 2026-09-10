@@ -1,0 +1,32 @@
+meta {
+  name: Update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/web/led-auteur/%23CEILINGBOX%20or%20ROSETTE
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "profiel": false
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.profiel: eq false
+}
+
+docs {
+  Partial update - only profiel is writable, artnr is immutable. 404
+  if the row doesn't exist - run "Create" first.
+}  

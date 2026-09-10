@@ -1,0 +1,31 @@
+meta {
+  name: List
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/led-lijstparameters?pageSize=10
+  body: none
+  auth: none
+}
+
+params:query {
+  pageSize: 10
+  ~categorie:
+  ~artnr:
+  ~page:
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists led_lijstparameters rows (paged). Query params: categorie
+  (exact), artnr (exact), page (default 1), pageSize (default 25, max 200).
+}  

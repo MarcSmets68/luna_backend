@@ -1,0 +1,35 @@
+meta {
+  name: List
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/led-3ol-artikels?pageSize=10
+  body: none
+  auth: none
+}
+
+params:query {
+  pageSize: 10
+  ~artnr:
+  ~artnrPrefix:
+  ~page:
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists led_3OL_artikels rows (paged). Query params: artnr (exact),
+  artnrPrefix (BEGINS), page (default 1), pageSize (default 25, max
+  200). This table has ~244K rows in production - the filter and page
+  window are both pushed down to the ABL query (BEGINS on the unique
+  led_3OL_artikels-x1 index) by Luna.BusinessLogic.Led3OLArtikelsBE,
+  never loading the full table into memory.
+}  

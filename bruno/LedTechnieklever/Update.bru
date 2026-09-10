@@ -1,0 +1,33 @@
+meta {
+  name: Update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/web/led-technieklever/TSTQ/TQ/Geen/1
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "instelkost": 9.9
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.instelkost: eq 9.9
+}
+
+docs {
+  Partial update - only instelkost/kleursupplement are writable, the
+  4-part key is immutable even if present in the body. 404 if the row
+  doesn't exist - run "Create" first.
+}  

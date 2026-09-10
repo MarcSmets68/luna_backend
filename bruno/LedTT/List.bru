@@ -1,0 +1,33 @@
+meta {
+  name: List
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/led-tt?pageSize=10
+  body: none
+  auth: none
+}
+
+params:query {
+  pageSize: 10
+  ~artnr:
+  ~artnrPrefix:
+  ~page:
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists led_TT rows (paged). Query params: artnr (exact), artnrPrefix
+  (BEGINS), page (default 1), pageSize (default 25, max 200). Table is
+  currently empty in production and its real usage is unconfirmed -
+  built structurally identical to led_3OL_suspension per the design.
+}  

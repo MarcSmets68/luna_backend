@@ -1,0 +1,33 @@
+meta {
+  name: List
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/led-3ol-kodes?pageSize=10
+  body: none
+  auth: none
+}
+
+params:query {
+  pageSize: 10
+  ~kode:
+  ~kodePrefix:
+  ~artnr:
+  ~page:
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists led_3OL_kodes rows (paged). Query params: kode (exact),
+  kodePrefix (BEGINS), artnr (exact), page (default 1), pageSize
+  (default 25, max 200).
+}  

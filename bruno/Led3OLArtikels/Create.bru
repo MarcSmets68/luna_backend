@@ -1,0 +1,37 @@
+meta {
+  name: Create
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/web/led-3ol-artikels
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "#CEILINGBOX or ROSETTE",
+    "onderdeel": "P1",
+    "lengte": 10,
+    "aantal": 1.5,
+    "swExport": true
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.onderdeel: eq P1
+}
+
+docs {
+  Creates a led_3OL_artikels row. 404 if artnr isn't found in artikel;
+  409 if the artnr/onderdeel combo already exists. Run "Delete"
+  afterwards to clean up test data.
+}  

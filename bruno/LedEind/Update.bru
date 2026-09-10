@@ -1,0 +1,31 @@
+meta {
+  name: Update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/web/led-eind/TESTEIND/TESTPROF/TESTCOVER
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {}
+}
+
+assert {
+  res.status: eq 200
+  res.body.eind: eq TESTEIND
+}
+
+docs {
+  led_eind has no fields besides its 3-part key, which is immutable via
+  PUT - this just re-confirms the key resolves to exactly one row (404
+  if 0, 409 if >1) and returns it. Run "Create" first.
+}  

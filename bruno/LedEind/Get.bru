@@ -1,0 +1,28 @@
+meta {
+  name: Get
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/web/led-eind/TESTEIND/TESTPROF/TESTCOVER
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.eind: eq TESTEIND
+}
+
+docs {
+  Gets a single led_eind row by eind/profiel/cover (3 path segments).
+  Counts matches first: 0 -> 404, 1 -> 200, >1 -> 409 ("multiple rows
+  match, data integrity issue") since eind/profiel/cover isn't declared
+  unique at the DB level even though it's treated as unique in
+  practice. Requires the row created by "Create" first.
+}  

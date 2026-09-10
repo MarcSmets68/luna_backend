@@ -1,0 +1,36 @@
+meta {
+  name: Create
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/web/led-eind
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "eind": "TESTEIND",
+    "profiel": "TESTPROF",
+    "cover": "TESTCOVER"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.eind: eq TESTEIND
+}
+
+docs {
+  Creates a led_eind row. No referential validation. 409 if the exact
+  eind/profiel/cover combo already exists (uses the same match-count
+  check as Get/Update/Delete). Run "Delete" afterwards to clean up test
+  data.
+}  

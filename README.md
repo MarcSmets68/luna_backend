@@ -459,6 +459,72 @@ both `/web/leverancier` and `/web/klant` with a BOM'd body (now `400`, was
 `500`), and confirmed a normal (non-BOM) `POST`/`PUT` on both endpoints
 still returns `201`/`200` as documented.
 
+## LED reference-data CRUD (9 tables)
+Full CRUD for 9 small/medium LED reference/lookup tables, all following the
+same thin-Handler/thick-BE pattern as `/web/leverancier` above. All list
+endpoints use the lookahead-row pagination style (`{"items": [...], "page":
+1, "pageSize": 25, "hasMore": false}`, no exact `totalCount`). Single-record
+GET/POST/PUT return the bare object; DELETE returns `{"status": "deleted",
+<key fields>}`. Error envelope: `{"error": {"message": "...", "code": n}}`.
+Composite keys are `/`-delimited path segments in the fixed order shown
+below; PUT ignores key fields even if present in the body (delete+recreate
+to change a key). No auth (matches `lakproduktie`/`leverancier` precedent).
+
+| Table | Path | Key (path segments) | Handler / BE |
+|---|---|---|---|
+| `led_lijstparameters` | `/web/led-lijstparameters` | categorie, volgnr, artnr | `LedLijstparametersHandler` / `LedLijstparametersBE` |
+| `led_kenmerk` | `/web/led-kenmerk` | kode | `LedKenmerkHandler` / `LedKenmerkBE` |
+| `led_eind` | `/web/led-eind` | eind, profiel, cover | `LedEindHandler` / `LedEindBE` |
+| `led_auteur` | `/web/led-auteur` | artnr | `LedAuteurHandler` / `LedAuteurBE` |
+| `led_technieklever` | `/web/led-technieklever` | laktechniek, kleursoort, ledType, levnr | `LedTechniekleverHandler` / `LedTechniekleverBE` |
+| `led_TT` | `/web/led-tt` | artnr, onderdeel | `LedTTHandler` / `LedTTBE` |
+| `led_3OL_artikels` | `/web/led-3ol-artikels` | artnr, onderdeel | `Led3OLArtikelsHandler` / `Led3OLArtikelsBE` |
+| `led_3OL_kodes` | `/web/led-3ol-kodes` | kode | `Led3OLKodesHandler` / `Led3OLKodesBE` |
+| `led_3OL_suspension` | `/web/led-3ol-suspension` | artnr, onderdeel | `Led3OLSuspensionHandler` / `Led3OLSuspensionBE` |
+
+**Referential validation (404 if missing):** `artnr` fields are validated
+against `artikel.artnr` on create/update for `led_lijstparameters`,
+`led_auteur`, `led_TT`, `led_3OL_artikels`, `led_3OL_kodes` and
+`led_3OL_suspension`. `led_technieklever.levnr` is validated against
+`lever.levnr`. `led_kenmerk` and `led_eind` have no referential validation
+(nothing to validate against).
+
+**`led_kenmerk` DELETE (409 if referenced):** blocked if
+`artikel.led-kenmerk EQ kode` for any artikel row. The design originally
+also called for checking `art_led.led-kenmerk` - `art_led` does exist in
+the live schema, but (confirmed against `docs/db-analysis/schema_dump.txt`)
+it has **no** `led-kenmerk` field, so only `artikel` is checked. This is a
+documented divergence from the original design doc, not an oversight.
+
+**`led_eind` (eind/profiel/cover):** `led_eind-x1` is **not** declared
+unique at the DB level even though the combo is treated as unique in
+practice. Every GET/UPDATE/DELETE (and the duplicate-key guard on
+POST) counts matches first: 0 → 404, 1 → proceed, >1 → 409 ("multiple rows
+match, data integrity issue") - never `FIND FIRST` and silently proceed.
+
+**Mandatory pagination pushdown (`led_auteur` ~536K rows, `led_3OL_artikels`
+~244K rows):** `GetItems` in both BEs folds the `artnr`/`artnrPrefix` filter
+into the `FOR EACH ... WHERE artnr BEGINS ...` clause (range-scanning the
+underlying unique index) and applies the page/skip window inside that same
+loop with an early `LEAVE` once one extra row beyond the page is found -
+same index-range-scan-with-early-exit pattern as
+`Luna.BusinessLogic.ArtikelBE:GetArtikelen` against the ~1.8M-row `artikel`
+table. Neither BE ever loads the full table into memory.
+
+**List filters per table:** all tables with an `artnr` field accept `artnr`
+(exact) and `artnrPrefix` (BEGINS). Tables without `artnr` expose their own
+natural filter: `led_kenmerk` → `kode`/`kodePrefix`; `led_lijstparameters` →
+`categorie`, `artnr`; `led_eind` → `eind`/`eindPrefix`; `led_technieklever`
+→ `laktechniek`, `levnr`; `led_3OL_kodes` → `kode`/`kodePrefix` + `artnr`.
+
+**Deployment note:** the 9 new `handler16`-`handler24` entries were added to
+the live PASOE config at `C:\OpenEdge\MarcOepas\conf\openedge.properties`
+(`[MarcTest.ROOT.WEB]` section). That file lives **outside** this git repo
+(it's a per-machine PASOE deployment artifact, not checked in anywhere) -
+if PASOE is ever redeployed/reprovisioned on another machine, these 9
+handler lines need to be re-added there by hand, mirroring the existing
+`handler1`-`handler15` entries.
+
 ## Offerte CRUD (`/web/offerte`)
 Full CRUD over a curated core subset of the `offerte` (quote) table (~90
 fields in total; only identification, customer, amount and status fields
