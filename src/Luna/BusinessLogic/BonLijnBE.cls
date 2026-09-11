@@ -33,6 +33,9 @@
                   subtotaal    -> subtotaal
                   kolomtitel   -> kolomtitel
                   infolijn     -> infolijn
+                  gereserv           -> gereserv           (read-only, computed by reservation logic)
+                  effectiefGereserv  -> effectief-gereserv  (read-only, computed by reservation logic)
+                  swEffectief        -> swEffectief         (read-only, drives under-reservation indicator)
     Syntax      : Called from Luna.Web.BonHandler (GET/POST/PUT/DELETE
                   /web/bon/{bonnr}/lijn and /web/bon/{bonnr}/lijn/{lijnnr})
     Description : Owns all DB access for this feature - no direct DB access
@@ -95,7 +98,7 @@ CLASS Luna.BusinessLogic.BonLijnBE:
         FIELD subtotaal    AS LOGICAL   SERIALIZE-NAME "subtotaal":u
         FIELD kolomtitel   AS LOGICAL   SERIALIZE-NAME "kolomtitel":u
         FIELD infolijn     AS LOGICAL   SERIALIZE-NAME "infolijn":u
-        FIELD gereserv         AS DECIMAL SERIALIZE-NAME "gereserv":u
+        FIELD gereserv          AS DECIMAL SERIALIZE-NAME "gereserv":u
         FIELD effectiefGereserv AS DECIMAL SERIALIZE-NAME "effectiefGereserv":u
         FIELD swEffectief       AS LOGICAL SERIALIZE-NAME "swEffectief":u
         INDEX idx-lijnnr IS PRIMARY bonnr lijnnr.
