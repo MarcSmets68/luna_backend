@@ -1,0 +1,36 @@
+﻿meta {
+  name: UpdateConflictingFlags400
+  type: http
+  seq: 47
+}
+
+put {
+  url: {{baseUrl}}/web/bon/{{flagsBonnr}}/lijn/{{flagsPlainLijnnr}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "infolijn": true
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.code: eq 400
+  res.body.error.message: eq A line can be at most one of subtotaal/kolomtitel/infolijn
+}
+
+docs {
+  The line already has kolomtitel=true (set by FlagsGuardSetKolomtitel).
+  Setting infolijn=true without explicitly clearing kolomtitel in the
+  same body must 400 - the guard is evaluated against the merged state
+  (existing row + body), not just the body's own fields. Requires
+  FlagsGuardSetKolomtitel to have run first.
+}

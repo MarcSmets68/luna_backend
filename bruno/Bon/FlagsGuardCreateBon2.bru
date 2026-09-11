@@ -1,0 +1,43 @@
+﻿meta {
+  name: FlagsGuardCreateBon2
+  type: http
+  seq: 41
+}
+
+post {
+  url: {{baseUrl}}/web/bon
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "type": "TEST",
+    "klnr": 7629,
+    "naam": "ZTEST-FLAGSGUARD-2",
+    "munt": "EUR"
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  bru.setVar("flagsBonnr2", res.body.bonnr);
+}
+
+docs {
+  Creates a second, deliberately empty (zero-lines) dedicated bon, used
+  only by CreateSubtotaalNoPreceding400 below to prove that a subtotaal
+  line cannot be created when there is no preceding plain line under the
+  bonnr to sum. Stores the new bonnr into {{flagsBonnr2}}. Kept separate
+  from {{flagsBonnr}} so the "no preceding line" case is never
+  accidentally satisfied by a line created by an earlier test in this
+  sequence.
+}

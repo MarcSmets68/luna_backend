@@ -1,0 +1,36 @@
+﻿meta {
+  name: FlagsGuardSetKolomtitel
+  type: http
+  seq: 46
+}
+
+put {
+  url: {{baseUrl}}/web/bon/{{flagsBonnr}}/lijn/{{flagsPlainLijnnr}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "kolomtitel": true
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.kolomtitel: eq true
+}
+
+docs {
+  Sets kolomtitel=true on the plain line ({{flagsPlainLijnnr}}). This is
+  a legal update on its own (the merged state has exactly one of
+  subtotaal/kolomtitel/infolijn set) and sets up
+  UpdateConflictingFlags400 below, which attempts to also set infolijn
+  without clearing kolomtitel first. Requires FlagsGuardCreatePlainLine
+  to have run first.
+}

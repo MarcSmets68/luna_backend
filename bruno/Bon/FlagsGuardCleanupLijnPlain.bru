@@ -1,0 +1,25 @@
+﻿meta {
+  name: FlagsGuardCleanupLijnPlain
+  type: http
+  seq: 49
+}
+
+delete {
+  url: {{baseUrl}}/web/bon/{{flagsBonnr}}/lijn/{{flagsPlainLijnnr}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq deleted
+}
+
+docs {
+  Deletes the plain test bonlijn ({{flagsPlainLijnnr}}) under
+  {{flagsBonnr}}, cleaning up after the flags-guard test sequence above.
+}
