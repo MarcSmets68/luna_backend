@@ -244,6 +244,7 @@ CLASS Luna.BusinessLogic.ArtikelBE:
         INPUT  piPageSize         AS INTEGER,
         INPUT  pcOnderMinimum     AS CHARACTER,
         INPUT  plExternInBewerking AS LOGICAL,
+        INPUT  plLageVoorraad     AS LOGICAL,
         OUTPUT plHasMore          AS LOGICAL ):
 
         DEFINE VARIABLE iSkip          AS INTEGER NO-UNDO.
@@ -306,7 +307,16 @@ CLASS Luna.BusinessLogic.ArtikelBE:
            narrows the index range, but when pcArtnr is blank the engine
            silently scanned the full table pre-filtering on groep before
            any row reached iRowsScanned, so the cap never triggered
-           (measured live at 13+s). It's evaluated per-row below instead. */
+           (measured live at 13+s). It's evaluated per-row below instead.
+
+           plLageVoorraad (low-stock filter): mutually exclusive with every
+           other filter parameter above (pcArtnr/pcOmschrijving/pcGroep/
+           pcOnderMinimum/plExternInBewerking) - when TRUE, those are all
+           ignored (the caller in Luna.Web.ArtikelHandler enforces this by
+           passing blank/FALSE for all of them). See the per-row check in
+           the loop body for the exact rule, which must stay byte-for-byte
+           identical to Luna.BusinessLogic.DashboardBE.GetStatCards's
+           lageVoorraadCount rule. */
         FOR EACH artikel NO-LOCK
             WHERE artikel.artnr BEGINS pcArtnr
             BY artikel.artnr:
@@ -332,9 +342,9 @@ CLASS Luna.BusinessLogic.ArtikelBE:
                per-row IF/NEXT check, same pattern as omschrijving/
                onderMinimum, so every physically-visited row counts towards
                iMaxRowsScanned regardless of whether it matches groep. */
-            IF pcGroep NE "":u AND artikel.groep NE pcGroep THEN NEXT.
+            IF NOT plLageVoorraad AND pcGroep NE "":u AND artikel.groep NE pcGroep THEN NEXT.
 
-            IF pcOmschrijving NE "":u THEN
+            IF NOT plLageVoorraad AND pcOmschrijving NE "":u THEN
             DO:
                 IF INDEX(UPPER(artikel.omschr-n), pcOmschrijving) EQ 0
                    AND INDEX(UPPER(artikel.omschr-f), pcOmschrijving) EQ 0 THEN
@@ -343,7 +353,7 @@ CLASS Luna.BusinessLogic.ArtikelBE:
 
             /* BR-1: "onder minimum" always requires stock = TRUE - vermijdt
                betekenisloze vergelijkingen op niet-voorraadartikelen. */
-            IF pcOnderMinimum NE "":u THEN
+            IF NOT plLageVoorraad AND pcOnderMinimum NE "":u THEN
             DO:
                 lMatch = artikel.stock AND
                     (   (pcOnderMinimum EQ "intern":u AND artikel.aantal   LT artikel.minv)
@@ -353,7 +363,19 @@ CLASS Luna.BusinessLogic.ArtikelBE:
                 IF NOT lMatch THEN NEXT.
             END.
 
-            IF plExternInBewerking AND NOT (artikel.x-gereserveerd GT 0) THEN NEXT.
+            IF NOT plLageVoorraad AND plExternInBewerking AND NOT (artikel.x-gereserveerd GT 0) THEN NEXT.
+
+            /* Lage voorraad (exclusief filter): moet byte-voor-byte identiek blijven
+               aan Luna.BusinessLogic.DashboardBE.GetStatCards's lageVoorraadCount
+               regel (zie class header + FOR EACH daar) - deze twee mogen niet
+               onafhankelijk uit elkaar groeien. */
+            IF plLageVoorraad THEN
+            DO:
+                IF NOT (artikel.stock     EQ TRUE
+                    AND artikel.blokkeren EQ FALSE
+                    AND artikel.minv      GT 0
+                    AND artikel.aantal    LE artikel.minv) THEN NEXT.
+            END.
 
             iSeen = iSeen + 1.
 

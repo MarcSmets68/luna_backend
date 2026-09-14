@@ -42,6 +42,10 @@
                     full table scan - accepted as a known performance
                     tradeoff (confirmed with Marc 2026-08-12) until a
                     dedicated index or precomputed figure exists.
+                    Luna.BusinessLogic.ArtikelBE.GetArtikelen's
+                    plLageVoorraad per-row filter is a second, intentionally
+                    duplicated consumer of this exact rule - keep both in
+                    sync if it ever changes.
                   - "Recente activiteit": the most recent offerte/bon/
                     factuur rows (by date) across all three tables, newest
                     first. There is no activity-log table, so this reflects

@@ -20,7 +20,11 @@
                   GET /web/artikel supports optional
                   ?onderMinimum=intern|extern|beide and
                   ?externInBewerking=true|false filters alongside the
-                  existing artnr/omschrijving/groep/page/pageSize ones.
+                  existing artnr/omschrijving/groep/page/pageSize ones, plus
+                  ?lageVoorraad=true|false. lageVoorraad is EXCLUSIVE: when
+                  true, all other list filters (artnr/omschrijving/groep/
+                  onderMinimum/externInBewerking) are ignored, not combined
+                  and not validated.
     Description : Thin WebHandler only - routing, request parsing, response
                   formatting and HTTP status/error mapping. No business logic
                   and no direct DB access - all of that lives in
@@ -56,6 +60,10 @@
                   URI:QueryString itself instead, fixing this for both the
                   PUT/DELETE query fallback and the existing GET
                   ?artnr=... filter (see docs/backend/artikel.md).
+                  2026-08-29 - added ?lageVoorraad=true|false to the GET
+                  list filter (exclusive with the other list filters - see
+                  Syntax above and Luna.BusinessLogic.ArtikelBE.
+                  GetArtikelen).
   ----------------------------------------------------------------------*/
 
 USING Progress.Lang.*.
@@ -313,6 +321,8 @@ CLASS Luna.Web.ArtikelHandler INHERITS WebHandler:
         DEFINE VARIABLE cOnderMinimum AS CHARACTER   NO-UNDO.
         DEFINE VARIABLE cExternInBew  AS CHARACTER   NO-UNDO.
         DEFINE VARIABLE lExternInBew  AS LOGICAL     NO-UNDO.
+        DEFINE VARIABLE cLageVoorraad AS CHARACTER   NO-UNDO.
+        DEFINE VARIABLE lLageVoorraad AS LOGICAL     NO-UNDO.
         DEFINE VARIABLE iPage         AS INTEGER     NO-UNDO.
         DEFINE VARIABLE iPageSize     AS INTEGER     NO-UNDO.
         DEFINE VARIABLE lHasMore      AS LOGICAL     NO-UNDO.
@@ -376,6 +386,15 @@ CLASS Luna.Web.ArtikelHandler INHERITS WebHandler:
         END.
         lExternInBew = (cExternInBew EQ "true":u).
 
+        cLageVoorraad = QueryParamHelper:GetQueryValue(poRequest, "lageVoorraad":u).
+
+        IF cLageVoorraad NE "":u AND LOOKUP(cLageVoorraad, "true,false":u) EQ 0 THEN
+        DO:
+            WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest), SUBSTITUTE("Invalid lageVoorraad &1":u, cLageVoorraad)).
+            RETURN 0.
+        END.
+        lLageVoorraad = (cLageVoorraad EQ "true":u).
+
         iPage = INTEGER(QueryParamHelper:GetQueryValue(poRequest, "page":u)) NO-ERROR.
         IF iPage EQ ? OR iPage LT 1 THEN iPage = 1.
 
@@ -383,8 +402,12 @@ CLASS Luna.Web.ArtikelHandler INHERITS WebHandler:
         IF iPageSize EQ ? OR iPageSize LT 1 THEN iPageSize = 25.
         IF iPageSize GT 200 THEN iPageSize = 200.
 
-        hResult = oService:GetArtikelen(cArtnrFilter, cOmschrijving, cGroep, iPage, iPageSize,
-                                         cOnderMinimum, lExternInBew, OUTPUT lHasMore).
+        IF lLageVoorraad THEN
+            hResult = oService:GetArtikelen("":u, "":u, "":u, iPage, iPageSize,
+                                             "":u, FALSE, TRUE, OUTPUT lHasMore).
+        ELSE
+            hResult = oService:GetArtikelen(cArtnrFilter, cOmschrijving, cGroep, iPage, iPageSize,
+                                             cOnderMinimum, lExternInBew, FALSE, OUTPUT lHasMore).
         oBody   = ResultHandleToJson(hResult).
 
         oBody:Add("page":u, iPage).

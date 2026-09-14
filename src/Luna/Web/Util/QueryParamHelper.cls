@@ -96,7 +96,7 @@ CLASS Luna.Web.Util.QueryParamHelper:
        query param, or its values containing a literal "&" or "%26" will
        silently mis-split. */
     DEFINE PRIVATE STATIC VARIABLE cKnownParamNames AS CHARACTER NO-UNDO INITIAL
-        "artnr,omschrijving,groep,onderMinimum,externInBewerking,page,pageSize,datumVan,datumTot,beweging":u.
+        "artnr,omschrijving,groep,onderMinimum,externInBewerking,lageVoorraad,page,pageSize,datumVan,datumTot,beweging":u.
 
     /*------------------------------------------------------------------------------
         Purpose: Returns the correctly (singly) decoded value of the named query

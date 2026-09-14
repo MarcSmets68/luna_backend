@@ -1,0 +1,36 @@
+meta {
+  name: ListLageVoorraad
+  type: http
+  seq: 20
+}
+
+get {
+  url: {{baseUrl}}/web/artikel?lageVoorraad=true&pageSize=5
+  body: none
+  auth: none
+}
+
+params:query {
+  lageVoorraad: true
+  pageSize: 5
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.items: isArray
+}
+
+docs {
+  ?lageVoorraad=true filter: artikel rows where stock = TRUE, NOT
+  geblokkeerd, voorraadMin > 0 and voorraad <= voorraadMin - same rule as
+  Luna.BusinessLogic.DashboardBE.GetStatCards's "Lage voorraad" stat card
+  (kept byte-for-byte identical, see class header notes in both
+  ArtikelBE.cls and DashboardBE.cls). This filter is EXCLUSIVE: when
+  true, all other list filters (artnr/omschrijving/groep/onderMinimum/
+  externInBewerking) are ignored, not combined and not validated.
+}
+

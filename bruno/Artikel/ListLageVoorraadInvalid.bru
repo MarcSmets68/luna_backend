@@ -1,0 +1,32 @@
+meta {
+  name: ListLageVoorraadInvalid
+  type: http
+  seq: 21
+}
+
+get {
+  url: {{baseUrl}}/web/artikel?lageVoorraad=banana
+  body: none
+  auth: none
+}
+
+params:query {
+  lageVoorraad: banana
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.code: eq 400
+  res.body.error.message: eq Invalid lageVoorraad banana
+}
+
+docs {
+  Invalid ?lageVoorraad value (not true/false) - 400 with "Invalid
+  lageVoorraad banana", same validation pattern as onderMinimum/
+  externInBewerking.
+}
+
