@@ -737,7 +737,7 @@ CLASS Luna.BusinessLogic.AiSearchBE:
 
         oArtikelBEInstance = NEW ArtikelBE().
 
-        RETURN oArtikelBEInstance:GetArtikelen(cArtnr, "":u, cGroep, 1, piPageSize, "":u, FALSE, OUTPUT plHasMore).
+        RETURN oArtikelBEInstance:GetArtikelen(cArtnr, "":u, cGroep, 1, piPageSize, "":u, FALSE, "":u, OUTPUT plHasMore).
 
     END METHOD.
 
