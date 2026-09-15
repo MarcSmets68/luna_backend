@@ -244,6 +244,7 @@ CLASS Luna.BusinessLogic.ArtikelBE:
         INPUT  piPageSize         AS INTEGER,
         INPUT  pcOnderMinimum     AS CHARACTER,
         INPUT  plExternInBewerking AS LOGICAL,
+        INPUT  pcGeblokkeerd      AS CHARACTER,
         OUTPUT plHasMore          AS LOGICAL ):
 
         DEFINE VARIABLE iSkip          AS INTEGER NO-UNDO.
@@ -260,6 +261,7 @@ CLASS Luna.BusinessLogic.ArtikelBE:
             pcOmschrijving = UPPER(TRIM(pcOmschrijving))
             pcGroep        = TRIM(pcGroep)
             pcOnderMinimum = LC(TRIM(pcOnderMinimum))
+            pcGeblokkeerd  = LC(TRIM(pcGeblokkeerd))
             iSkip          = (piPage - 1) * piPageSize
             iSeen          = 0
             iTaken         = 0
@@ -270,6 +272,10 @@ CLASS Luna.BusinessLogic.ArtikelBE:
         IF pcOnderMinimum NE "":u AND LOOKUP(pcOnderMinimum, "intern,extern,beide":u) EQ 0 THEN
             UNDO, THROW NEW Progress.Lang.AppError(
                 SUBSTITUTE("Invalid onderMinimum &1, expected intern/extern/beide":u, pcOnderMinimum), 400).
+
+        IF pcGeblokkeerd NE "":u AND LOOKUP(pcGeblokkeerd, "true,false":u) EQ 0 THEN
+            UNDO, THROW NEW Progress.Lang.AppError(
+                SUBSTITUTE("Invalid geblokkeerd &1, expected true/false":u, pcGeblokkeerd), 400).
 
         /* artikel.artnr BEGINS pcArtnr - written as a single, un-OR'd BEGINS
            condition (not "pcArtnr EQ '' OR artikel.artnr BEGINS pcArtnr") so
@@ -354,6 +360,12 @@ CLASS Luna.BusinessLogic.ArtikelBE:
             END.
 
             IF plExternInBewerking AND NOT (artikel.x-gereserveerd GT 0) THEN NEXT.
+
+            /* geblokkeerd-filter: "true" = enkel geblokkeerde artikelen,
+               "false" = enkel niet-geblokkeerde, leeg = geen filter. Per-rij
+               geëvalueerd zodat iRowsScanned elke bezochte rij telt. */
+            IF pcGeblokkeerd EQ "true":u  AND NOT artikel.blokkeren THEN NEXT.
+            IF pcGeblokkeerd EQ "false":u AND artikel.blokkeren     THEN NEXT.
 
             iSeen = iSeen + 1.
 
