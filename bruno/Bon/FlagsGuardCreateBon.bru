@@ -1,0 +1,43 @@
+﻿meta {
+  name: FlagsGuardCreateBon
+  type: http
+  seq: 40
+}
+
+post {
+  url: {{baseUrl}}/web/bon
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "type": "TEST",
+    "klnr": 7629,
+    "naam": "ZTEST-FLAGSGUARD",
+    "munt": "EUR"
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  bru.setVar("flagsBonnr", res.body.bonnr);
+}
+
+docs {
+  Creates a dedicated bon for the non-item bonlijn (subtotaal/kolomtitel/
+  infolijn) mutual-exclusivity + subtotaal-preceding-line guard test
+  sequence below, independent of the {{bonnr}}/{{stempelDBonnr}} used by
+  other test sequences in this folder. Stores the new bonnr into
+  {{flagsBonnr}}. This bon will get a plain line added to it (see
+  FlagsGuardCreatePlainLine) so a subtotaal line can legally be created
+  under it later.
+}

@@ -48,6 +48,17 @@
                   CREATE, mirroring how BonBE:CreateBon generates bonnr -
                   it is never read from the request body. No cascade on
                   delete - bonlijn has no child tables in this scope.
+                  Non-item line guards: a bonlijn is either a normal (item)
+                  line or exactly one of subtotaal/kolomtitel/infolijn -
+                  never more than one at a time. This is enforced on create
+                  (against the request body) and on update (against the
+                  merged state of the existing row + body), via the shared
+                  HasConflictingFlags helper. A subtotaal line additionally
+                  requires at least one preceding normal line under the
+                  same bonnr to sum - checked on create only. Reads
+                  (GetBonLijn/GetBonLijnen) are never guarded, so
+                  pre-existing rows that predate this validation stay
+                  readable even if they violate it.
     Author(s)   : Devin
     Created     : 2026-08-13
   ----------------------------------------------------------------------*/
@@ -232,28 +243,80 @@ CLASS Luna.BusinessLogic.BonLijnBE:
     END METHOD.
 
     /*------------------------------------------------------------------------------
+        Purpose: Returns TRUE if more than one of subtotaal/kolomtitel/
+                 infolijn is set. A bonlijn is either a normal (item) line
+                 or exactly one of these three non-item line types - never
+                 more than one at a time.
+    ------------------------------------------------------------------------------*/
+    METHOD PRIVATE LOGICAL HasConflictingFlags(
+        INPUT plSubtotaal  AS LOGICAL,
+        INPUT plKolomtitel AS LOGICAL,
+        INPUT plInfolijn   AS LOGICAL ):
+
+        DEFINE VARIABLE iCount AS INTEGER NO-UNDO.
+
+        IF plSubtotaal  THEN iCount = iCount + 1.
+        IF plKolomtitel THEN iCount = iCount + 1.
+        IF plInfolijn   THEN iCount = iCount + 1.
+
+        RETURN iCount GT 1.
+
+    END METHOD.
+
+    /*------------------------------------------------------------------------------
         Purpose: Creates a new bonlijn under the given bonnr. `lijnnr` is
                  computed server-side as (last lijnnr for this bonnr, via
                  the bonlijn-x1 index) + 1, held under the same
                  EXCLUSIVE-LOCK/transaction as the CREATE so there is no
                  race between the FIND LAST and the CREATE. `lijnnr` sent
                  in the request body (if any) is ignored - it is never read
-                 from poBody.
+                 from poBody. A line can be at most one of subtotaal/
+                 kolomtitel/infolijn (checked against the request body
+                 up front); a subtotaal line additionally requires at least
+                 one preceding normal (item) line under the same bonnr to
+                 sum, checked inside the transaction right before the
+                 CREATE.
         Errors : AppError code 404 - the parent bonnr doesn't exist.
+                 AppError code 400 - more than one of subtotaal/kolomtitel/
+                 infolijn set, or a subtotaal line with no preceding
+                 normal line to sum.
     ------------------------------------------------------------------------------*/
     METHOD PUBLIC HANDLE CreateBonLijn( INPUT piBonnr AS INTEGER, INPUT poBody AS JsonObject ):
 
-        DEFINE VARIABLE iNewLijnnr AS INTEGER NO-UNDO.
+        DEFINE VARIABLE iNewLijnnr  AS INTEGER NO-UNDO.
+        DEFINE VARIABLE lSubtotaal  AS LOGICAL NO-UNDO.
+        DEFINE VARIABLE lKolomtitel AS LOGICAL NO-UNDO.
+        DEFINE VARIABLE lInfolijn   AS LOGICAL NO-UNDO.
 
         EnsureBonExists( piBonnr ).
 
         EMPTY TEMP-TABLE ttBonLijn.
+
+        IF poBody:Has("subtotaal":u)  THEN lSubtotaal  = poBody:GetLogical("subtotaal":u).
+        IF poBody:Has("kolomtitel":u) THEN lKolomtitel = poBody:GetLogical("kolomtitel":u).
+        IF poBody:Has("infolijn":u)   THEN lInfolijn   = poBody:GetLogical("infolijn":u).
+
+        IF HasConflictingFlags(lSubtotaal, lKolomtitel, lInfolijn) THEN
+            UNDO, THROW NEW Progress.Lang.AppError(
+                "A line can be at most one of subtotaal/kolomtitel/infolijn":u, 400).
 
         DO TRANSACTION:
             FIND LAST bonlijn USE-INDEX bonlijn-x1 EXCLUSIVE-LOCK
                 WHERE bonlijn.bonnr EQ piBonnr NO-ERROR.
 
             iNewLijnnr = (IF AVAILABLE bonlijn THEN bonlijn.lijnnr ELSE 0) + 1.
+
+            IF lSubtotaal THEN
+            DO:
+                IF NOT CAN-FIND(FIRST bonlijn
+                    WHERE bonlijn.bonnr EQ piBonnr
+                      AND bonlijn.lijnnr LT iNewLijnnr
+                      AND bonlijn.subtotaal EQ FALSE
+                      AND bonlijn.kolomtitel EQ FALSE
+                      AND bonlijn.infolijn EQ FALSE) THEN
+                    UNDO, THROW NEW Progress.Lang.AppError(
+                        "Cannot create a subtotaal line with no preceding lines to sum":u, 400).
+            END.
 
             CREATE bonlijn.
             ASSIGN
@@ -278,6 +341,13 @@ CLASS Luna.BusinessLogic.BonLijnBE:
         Errors : AppError code 404 - the parent bonnr doesn't exist, or the
                  lijnnr doesn't exist under it.
                  AppError code 409 - the bonlijn has stempel "D" (geleverd).
+                 AppError code 400 - the merged state (existing row + body)
+                 would have more than one of subtotaal/kolomtitel/infolijn
+                 set. This is checked unconditionally against the merged
+                 state, so an update to a pre-existing row that already has
+                 more than one flag set (from before this guard existed)
+                 will now 400 even if the update body itself doesn't touch
+                 those fields.
     ------------------------------------------------------------------------------*/
     METHOD PUBLIC HANDLE UpdateBonLijn(
         INPUT piBonnr  AS INTEGER,
@@ -302,6 +372,10 @@ CLASS Luna.BusinessLogic.BonLijnBE:
                         piBonnr, piLijnnr), 409).
 
             ApplyFields( INPUT poBody, BUFFER bonlijn ).
+
+            IF HasConflictingFlags(bonlijn.subtotaal, bonlijn.kolomtitel, bonlijn.infolijn) THEN
+                UNDO, THROW NEW Progress.Lang.AppError(
+                    "A line can be at most one of subtotaal/kolomtitel/infolijn":u, 400).
 
             CREATE ttBonLijn.
             CopyToTt( BUFFER bonlijn, BUFFER ttBonLijn ).

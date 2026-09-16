@@ -1,0 +1,37 @@
+﻿meta {
+  name: CreateConflictingFlags400
+  type: http
+  seq: 43
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{flagsBonnr}}/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "subtotaal": true,
+    "kolomtitel": true
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.code: eq 400
+  res.body.error.message: eq A line can be at most one of subtotaal/kolomtitel/infolijn
+}
+
+docs {
+  A bonlijn can be at most one of subtotaal/kolomtitel/infolijn - sending
+  both subtotaal and kolomtitel true in the create body must 400, before
+  any row is created (checked against the body as sent, ahead of the
+  transaction). Requires {{flagsBonnr}} to be set (run FlagsGuardCreateBon
+  first).
+}
