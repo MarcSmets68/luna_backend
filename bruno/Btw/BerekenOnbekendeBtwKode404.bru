@@ -1,0 +1,39 @@
+meta {
+  name: BerekenOnbekendeBtwKode404
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/web/btw/bereken
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "regels": [
+      { "btwKode": "9", "bedrag": 10, "totaalRecupel": 0 }
+    ],
+    "swRegime": true,
+    "swPrijsRecup": false
+  }
+}
+
+assert {
+  res.status: eq 404
+  res.body.error.message: eq Unknown btw-kode '9'
+  res.body.error.code: eq 404
+}
+
+docs {
+  Unknown btwKode "9" (not in the shared LunaNew btw-kode table - real
+  kodes there are "0","1","2","3","4") -> AppError 404 raised inside
+  BtwBerekeningBE:FindBtwKodeGroep. Confirmed live against MarcTest
+  2026-09-27.
+}

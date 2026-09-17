@@ -20,7 +20,8 @@ Backend/
 │       │   ├── LoginHandler.cls       Auth-MVP login (POST /web/login) - see "Auth-MVP (login/logout)" section below
 │       │   ├── LogoutHandler.cls      Auth-MVP logout (POST /web/logout, X-Auth-Token header) - see "Auth-MVP (login/logout)" section below
 │       │   ├── AiSearchHandler.cls    AI-powered natural-language search (POST /web/ai-search) - see "AI Search" section below
-│       │   └── PricingHandler.cls     Iteratie A pricing engine (POST /web/pricing/bereken) - see "Pricing engine (Iteratie A, K1-K5)" section below
+│       │   ├── PricingHandler.cls     Iteratie A pricing engine (POST /web/pricing/bereken) - see "Pricing engine (Iteratie A, K1-K5)" section below
+│       │   └── BtwHandler.cls         Iteratie B BTW/VAT calculation engine (POST /web/btw/bereken) - see "BTW/VAT engine (Iteratie B)" section below
 │       └── BusinessLogic/
 │           ├── LakproductieBE.cls          1:1 port of legacy ExportLakProductie.w (3 sources: lopende-orders / lopende-productielijnen / min-max-voorraad)
 │           ├── LakproductieVerkoopService.cls  Rolling 1/3/6/9/12-month verkoop totals per artnr, shared by LakproductieBE
@@ -45,7 +46,8 @@ Backend/
 │           ├── AuthBE.cls             Auth-MVP login/logout/session validation - see "Auth-MVP (login/logout)" section below
 │           ├── AiSearchBE.cls         AI-search orchestration + hardcoded entity/field/operator whitelist - see "AI Search" section below
 │           ├── GeminiGateway.cls      Thin wrapper around the Google Gemini REST API, used only by AiSearchBE - see "AI Search" section below
-│           └── PricingEngineBE.cls    Iteratie A pure read-only pricing engine (K1-K5) - 1:1 port of legacy Include/Prijs.i - see "Pricing engine (Iteratie A, K1-K5)" section below
+│           ├── PricingEngineBE.cls    Iteratie A pure read-only pricing engine (K1-K5) - 1:1 port of legacy Include/Prijs.i - see "Pricing engine (Iteratie A, K1-K5)" section below
+│           └── BtwBerekeningBE.cls    Iteratie B pure read-only BTW/VAT calculation engine (max 2 btw-kode groups, K3/K5 document discount) - see "BTW/VAT engine (Iteratie B)" section below
 ├── build/                Compiled r-code (generated, not source of truth - safe to delete/regenerate)
 ├── scripts/
 │   ├── compile.p         CLI compile-all procedure
@@ -181,6 +183,10 @@ required.
   "Pricing engine (Iteratie A, K1-K5)" section below). Added to the actual
   `openedge.properties` at `C:\OpenEdge\MarcOepas\conf` (outside this
   workspace) and the PASOE instance has been restarted to pick it up.
+  `handler27=Luna.Web.BtwHandler: /btw` — maps `POST /web/btw/bereken` to
+  the BTW/VAT calculation engine WebHandler (see "BTW/VAT engine
+  (Iteratie B)" section below). Also added to that same live
+  `openedge.properties` and the PASOE instance restarted to pick it up.
 
 Restart the instance after changing `openedge.properties`:
 ```powershell
@@ -1022,6 +1028,71 @@ path, K3 (always 0, documentKorting ignored), K4/K5 (documentKorting
 passthrough), unknown `typeKorting` (400), unknown `artnr` (404), and
 missing/non-numeric `klnr`/`aantal` (400) - see `Backend/bruno/Pricing/`
 for the exact requests/assertions.
+
+## BTW/VAT engine (Iteratie B) (`/web/btw/bereken`)
+Pure read-only VAT calculation service - the only DB access is a
+`NO-LOCK FIND` on `btw-kode` to resolve a group's percentage. Does not
+write to any table. See `Luna.BusinessLogic.BtwBerekeningBE`'s class
+header for the full algorithm.
+
+| Method | Path                | Purpose |
+|--------|---------------------|---------|
+| POST   | `/web/btw/bereken`  | Body `{"regels", "swRegime", "swPrijsRecup", "typeKorting", "documentKortingBedrag", "documentKortingPercentage"}` - groups `regels` by `btwKode` (max 2 unique), applies a document-level discount (K3 fixed amount pro-rata by group share, K5 uniform percentage, or none), then applies each group's btw-kode percentage. |
+
+**Request body:**
+```json
+{
+  "regels": [
+    { "btwKode": "21", "bedrag": 100.00, "totaalRecupel": 0 },
+    { "btwKode": "6", "bedrag": 50.00, "totaalRecupel": 5.00 }
+  ],
+  "swRegime": true,
+  "swPrijsRecup": true,
+  "typeKorting": "K5",
+  "documentKortingPercentage": 10,
+  "documentKortingBedrag": 0
+}
+```
+`typeKorting` is optional, one of `""` (no discount, default), `"K3"`
+(fixed `documentKortingBedrag`, distributed pro-rata over each group's raw
+basis share) or `"K5"` (uniform `documentKortingPercentage"` applied per
+group - already pro-rata by construction). When `swRegime` is `false`,
+the btw-kode grouping/lookup is skipped entirely: the discount is applied
+to the flat sum of all `regels[].bedrag` (recupel is **not** included in
+that path), `groepen` comes back empty, and `totBtw` is always `0`.
+
+**Response 200** (matches the worked example above - 100 @ 21% + 55
+(50 + 5 recupel) @ 6% raw basis, 10% K5 discount distributed pro-rata):
+```json
+{
+  "totaal": { "regimeToegepast": true, "totaalBasis": 139.50, "totBtw": 21.87, "totaalInclBtw": 161.37 },
+  "groepen": [
+    { "btwKode": "21", "percentage": 21, "basis": 90.00, "btwBedrag": 18.90 },
+    { "btwKode": "6", "percentage": 6, "basis": 49.50, "btwBedrag": 2.97 }
+  ]
+}
+```
+
+**Errors** (same `{"error":{"message","code"}}` envelope as the other
+handlers):
+- `400` - malformed JSON body, missing/empty `regels`, `swRegime`/
+  `swPrijsRecup` missing or not boolean (checked in `BtwHandler`, the
+  thin parsing layer).
+- `400` - unrecognized `typeKorting` (not `""`/`K3`/`K5`), or more than 2
+  unique `btwKode` values across `regels` (both raised in
+  `BtwBerekeningBE:BerekenBtw`).
+- `404` - a `btwKode` used by a group does not exist in `btw-kode`
+  (raised in `BtwBerekeningBE:FindBtwKodeGroep`).
+- `500` - fallback for anything unexpected (no ABL stack trace ever
+  reaches the client).
+
+Confirmed live against `MarcTest` 2026-09-27: the worked happy-path
+example above (139.50/21.87/161.37), `swRegime: false` flat-totals path,
+more than 2 unique `btwKode` values (400), unknown `btwKode` (404), and
+an unrecognized `typeKorting` (400) - see `Backend/bruno/Btw/` for the
+exact requests/assertions. Standard `btw-kode` rows for `"21"` and `"6"`
+already exist in the shared `LunaNew` test database (confirmed via the
+live smoke test, not assumed).
 
 **Not yet exercised live in this environment** (no matching test data
 found in `LunaNew` at the time of writing - flagging for backend-tester

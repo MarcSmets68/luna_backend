@@ -1,0 +1,44 @@
+meta {
+  name: BerekenGeenKorting
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/web/btw/bereken
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "regels": [
+      { "btwKode": "3", "bedrag": 100.00, "totaalRecupel": 0 }
+    ],
+    "swRegime": true,
+    "swPrijsRecup": false
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.totaal.regimeToegepast: eq true
+  res.body.totaal.totaalBasis: eq 100
+  res.body.totaal.totBtw: eq 21
+  res.body.totaal.totaalInclBtw: eq 121
+  res.body.groepen: length 1
+  res.body.groepen[0].btwKode: eq 3
+  res.body.groepen[0].percentage: eq 21
+}
+
+docs {
+  Single group, no typeKorting/documentKorting fields at all (both are
+  optional - typeKorting defaults to "" / no discount, the two
+  documentKorting* fields default to 0). Single btw-kode "3" (21%) on
+  100 -> 21 btw, 121 incl. Confirmed live against MarcTest 2026-09-27.
+}
