@@ -1,0 +1,43 @@
+meta {
+  name: OmzettenNaarOrder
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/web/offerte/2161043/1/omzetten-naar-order
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {}
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Iteratie D - Offerte->Order conversie. Converts offerte 2161043/1 (a
+  LunaNew test offerte with at least one overdraagbare item line) into a
+  new bon. Response shape:
+  {bonnr, offnr, versie, offerteStempel, aantalLijnenOvergenomen,
+  aantalLedLijnenOvergenomen, totBtw, totaalBasis, totaalInclBtw}.
+
+  NOTE: this request is NOT idempotent - offnr 2161043/1 can only be
+  converted once (a second run will 409, see
+  OmzettenNaarOrderAlreadyConverted409.bru). If you need to re-run this
+  request, pick a different open (stempel "O") offerte/versie with at
+  least one transferable line, update the URL, and update
+  OmzettenNaarOrderAlreadyConverted409.bru to match.
+
+  Body is not read by the server - {} is sent to keep the request
+  self-documenting; any JSON object (even {}) satisfies the handler's
+  "must be a JSON object" body check.
+}

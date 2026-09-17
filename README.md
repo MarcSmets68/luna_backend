@@ -526,6 +526,7 @@ offerte and every method 404s if that offnr+versie doesn't exist.
 | PUT    | `/web/offerte/{offnr}/{versie}/lijn/{lijnnr}`     | Update. Partial - only fields present in the body are changed. 404 if not found. 400 if the resulting merged state (existing row + body) would leave more than one of `subtotaal`/`kolomtitel`/`infolijn` `true`. |
 | DELETE | `/web/offerte/{offnr}/{versie}/lijn/{lijnnr}`     | Delete. 404 if not found. |
 | POST   | `/web/offerte/{offnr}/{versie}/lijn/{lijnnr}/reorder` | Moves the line one position `up` or `down` (body: `{"direction": "up"|"down"}`) by swapping `lijnnr` with its immediate neighbor in that direction. 404 if the line or the neighbor doesn't exist. 400 if the swap would decrease a `subtotaal` line's `lijnnr` (moving a subtotaal line down/away from its group is allowed). Returns `200` with the full refreshed `{"items": [...]}` line list, ordered by `lijnnr` - see `Luna.BusinessLogic.OfflijnBE:ReorderOfflijn`. |
+| POST   | `/web/offerte/{offnr}/{versie}/omzetten-naar-order` | Iteratie D - converts an open (`stempel = "O"`) offerte into a new `bon` (order). Body not read (send `{}`). 404 if not found, 409 if not `stempel = "O"`, 400 if no overdraagbare (transferable) lines. See `docs/backend/offerte.md`'s "Iteratie D" section and `Luna.BusinessLogic.OfferteConversieBE` for the full algorithm. |
 
 Errors are returned as `{"error": {"message": "...", "code": <status>}}`.
 Deleting the parent offerte (`DELETE /web/offerte/{offnr}/{versie}`)

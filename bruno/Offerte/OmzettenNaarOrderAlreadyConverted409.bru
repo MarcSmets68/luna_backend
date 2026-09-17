@@ -1,0 +1,32 @@
+meta {
+  name: OmzettenNaarOrderAlreadyConverted409
+  type: http
+  seq: 15
+}
+
+post {
+  url: {{baseUrl}}/web/offerte/2161043/1/omzetten-naar-order
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {}
+}
+
+assert {
+  res.status: eq 409
+}
+
+docs {
+  Run OmzettenNaarOrder.bru first. Offerte 2161043/1 ends up with
+  stempel "D" after a successful conversion, so re-running the
+  conversion on the same offnr/versie must 409 (the re-conversion race
+  guard - see OfferteConversieBE:EnsureOfferteOpenbaar / the re-check
+  inside the transaction).
+}
