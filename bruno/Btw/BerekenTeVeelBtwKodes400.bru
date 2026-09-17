@@ -1,0 +1,40 @@
+meta {
+  name: BerekenTeVeelBtwKodes400
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/web/btw/bereken
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "regels": [
+      { "btwKode": "3", "bedrag": 10, "totaalRecupel": 0 },
+      { "btwKode": "1", "bedrag": 10, "totaalRecupel": 0 },
+      { "btwKode": "2", "bedrag": 10, "totaalRecupel": 0 }
+    ],
+    "swRegime": true,
+    "swPrijsRecup": false
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq Maximum 2 unieke btw-kodes toegestaan, gevonden: 3
+  res.body.error.code: eq 400
+}
+
+docs {
+  3 unique btwKode values in regels while swRegime = true -> AppError 400
+  raised inside BtwBerekeningBE:BerekenMetRegime. Confirmed live against
+  MarcTest 2026-09-27.
+}

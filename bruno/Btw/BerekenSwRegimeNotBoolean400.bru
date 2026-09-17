@@ -1,0 +1,38 @@
+meta {
+  name: BerekenSwRegimeNotBoolean400
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/web/btw/bereken
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "regels": [
+      { "btwKode": "3", "bedrag": 10 }
+    ],
+    "swRegime": "yes",
+    "swPrijsRecup": false
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq Missing/invalid required boolean field 'swRegime'
+  res.body.error.code: eq 400
+}
+
+docs {
+  "swRegime" sent as a JSON string instead of a boolean -> AppError 400
+  raised inside BtwHandler:GetRequiredLogical (thin parsing layer).
+  Confirmed live against MarcTest 2026-09-27.
+}

@@ -1,0 +1,39 @@
+meta {
+  name: BerekenOnbekendeTypeKorting400
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/web/btw/bereken
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "regels": [
+      { "btwKode": "3", "bedrag": 10, "totaalRecupel": 0 }
+    ],
+    "swRegime": true,
+    "swPrijsRecup": false,
+    "typeKorting": "K1"
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq Unknown typeKorting 'K1', expected '', K3 or K5
+  res.body.error.code: eq 400
+}
+
+docs {
+  typeKorting only accepts "", "K3" or "K5" in this engine (unlike the
+  pricing engine's K1-K5) -> AppError 400 raised inside
+  BtwBerekeningBE:BerekenBtw. Confirmed live against MarcTest 2026-09-27.
+}
