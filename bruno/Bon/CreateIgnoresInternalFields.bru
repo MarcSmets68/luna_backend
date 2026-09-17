@@ -1,0 +1,69 @@
+meta {
+  name: CreateIgnoresInternalFields
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{bonnr}}/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "TESTART-INTERNAL",
+    "omschrijving": "Test regel - internal fields must be ignored",
+    "aantal": 1,
+    "vprijs": 10.0,
+    "offnr": 12345,
+    "versie": 1,
+    "olijnnr": 7,
+    "swLed": true,
+    "swSikta": true,
+    "montage": true,
+    "ledmontage": true,
+    "circuit": 99,
+    "recupel": 1.5,
+    "meer_min": 2.5,
+    "off_aantal": 4,
+    "swStdPrijs": true,
+    "uitverkoop": true,
+    "SiktaKleurKodes": "ABC",
+    "gereserv": 999
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.bonnr: eq {{bonnr}}
+}
+
+script:post-response {
+  bru.setVar("internalFieldsLijnnr", res.body.lijnnr);
+}
+
+docs {
+  Iteratie D - Onderdeel 2 regression proof: this request hits the
+  PUBLIC POST /web/bon/{bonnr}/lijn contract (Luna.BusinessLogic.
+  BonLijnBE:CreateBonLijn, which delegates to CreateBonLijnInternal with
+  piExplicitLijnnr = 0) and includes every field that is ONLY meant to be
+  settable via the internal offerte-conversion path (offnr, versie,
+  olijnnr, swLed, swSikta, montage, ledmontage, circuit, recupel,
+  meer_min, off_aantal, swStdPrijs, uitverkoop, SiktaKleurKodes,
+  gereserv). None of these fields are part of ttBonLijn's response
+  shape, so the response body itself can't prove they were ignored -
+  the response only proves the request still succeeds and behaves like
+  a normal item-line create (i.e. the extra keys don't break anything).
+  backend-tester should additionally spot-check the DB row for
+  {{bonnr}}/{{internalFieldsLijnnr}} (bonlijn.offnr/versie/olijnnr/
+  swLed/circuit/recupel/gereserv etc.) and confirm they are all still
+  0/""/no - this was verified manually during implementation (see
+  handoff note) but isn't asserted here since the API has no field to
+  read them back through.
+}

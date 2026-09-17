@@ -277,12 +277,30 @@ CLASS Luna.BusinessLogic.BonBE:
     END METHOD.
 
     /*------------------------------------------------------------------------------
-        Purpose: Creates a new bon. `bonnr` is computed server-side as
-                 (last bonnr, via the bon-x1 index) + 1, held under the same
-                 EXCLUSIVE-LOCK/transaction as the CREATE so there is no race
-                 between the FIND LAST and the CREATE. `bonnr`, `bedrag` and
-                 `btw` in the request body (if any) are ignored - see
-                 ApplyFields.
+        Purpose: Allocates the next bonnr as (last bonnr, via the bon-x1
+                 index) + 1. Extracted from CreateBon (Iteratie D -
+                 Offerte->Order conversie) so OfferteConversieBE can obtain a
+                 new bonnr through the same allocation logic instead of
+                 duplicating it. MUST be called from within a transaction
+                 that holds the resulting CREATE bon under the same
+                 EXCLUSIVE-LOCK scope, so there is no race between the FIND
+                 LAST and the CREATE - same contract as before extraction.
+    ------------------------------------------------------------------------------*/
+    METHOD PUBLIC INTEGER AllocateBonnr():
+
+        FIND LAST bon USE-INDEX bon-x1 EXCLUSIVE-LOCK NO-ERROR.
+
+        RETURN (IF AVAILABLE bon THEN bon.bonnr ELSE 0) + 1.
+
+    END METHOD.
+
+    /*------------------------------------------------------------------------------
+        Purpose: Creates a new bon. `bonnr` is computed server-side via
+                 AllocateBonnr() (last bonnr, via the bon-x1 index, + 1),
+                 held under the same EXCLUSIVE-LOCK/transaction as the
+                 CREATE so there is no race between the FIND LAST and the
+                 CREATE. `bonnr`, `bedrag` and `btw` in the request body (if
+                 any) are ignored - see ApplyFields.
     ------------------------------------------------------------------------------*/
     METHOD PUBLIC HANDLE CreateBon( INPUT poBody AS JsonObject ):
 
@@ -291,9 +309,7 @@ CLASS Luna.BusinessLogic.BonBE:
         EMPTY TEMP-TABLE ttBon.
 
         DO TRANSACTION:
-            FIND LAST bon USE-INDEX bon-x1 EXCLUSIVE-LOCK NO-ERROR.
-
-            iNewBonnr = (IF AVAILABLE bon THEN bon.bonnr ELSE 0) + 1.
+            iNewBonnr = AllocateBonnr().
 
             CREATE bon.
             ASSIGN bon.bonnr = iNewBonnr.

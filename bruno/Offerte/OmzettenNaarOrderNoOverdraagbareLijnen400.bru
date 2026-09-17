@@ -1,0 +1,33 @@
+meta {
+  name: OmzettenNaarOrderNoOverdraagbareLijnen400
+  type: http
+  seq: 17
+}
+
+post {
+  url: {{baseUrl}}/web/offerte/66666/0/omzetten-naar-order
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {}
+}
+
+assert {
+  res.status: eq 400
+}
+
+docs {
+  Offerte 66666/0 (LunaNew test data, stempel "O") has no offlijn rows
+  matching the overdraagbare-lijnen guard (te-leveren <> 0 OR
+  kolomtitel OR infolijn) AND variante = FALSE - must 400 before any
+  transaction/side effect. If this offerte's data changes in LunaNew,
+  find a replacement via the same query used during implementation
+  (see handoff note) and update this request's URL.
+}
