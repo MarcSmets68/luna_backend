@@ -1,0 +1,40 @@
+meta {
+  name: AutoReserveringCancelClampCreateLijn
+  type: http
+  seq: 64
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{autoresCancelBonnr}}/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "100%.126397",
+    "aantal": 100,
+    "teLeveren": 100,
+    "vprijs": 5.0
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.bonnr: eq {{autoresCancelBonnr}}
+}
+
+docs {
+  Creates a shortfall bonlijn (same artnr/scenario as
+  AutoReserveringShortfall, on the dedicated {{autoresCancelBonnr}} bon)
+  so gereserv (2 at implementation time) ends up lower than teLeveren
+  (100). This under-reservation is exactly the case the
+  ReleaseReservationsForBon/ReleaseBomReservations clamp fix protects
+  against on cancel - see AutoReserveringCancelClampAnnuleer. Requires
+  {{autoresCancelBonnr}} (run "AutoReserveringCancelClampSetup" first).
+}

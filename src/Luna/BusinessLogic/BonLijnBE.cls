@@ -326,6 +326,17 @@ CLASS Luna.BusinessLogic.BonLijnBE:
 
             ApplyFields( INPUT poBody, BUFFER bonlijn ).
 
+            /* Iteratie C - automatische voorraadreservering: reserves
+               stock (and, for a BOM article, its artlijn components) for
+               the newly created line. Runs inside this same transaction
+               (no own DO TRANSACTION - see Luna.BusinessLogic.
+               BonLijnAutoReserveringBE) and is called before the ttBonLijn
+               snapshot copy below so bonlijn.gereserv (set by
+               ReserveerBijCreate) is included in the response. The `bon`
+               buffer used here was already populated (NO-LOCK) by
+               EnsureBonExists above - reused as-is, no new lookup. */
+            NEW Luna.BusinessLogic.BonLijnAutoReserveringBE():ReserveerBijCreate( BUFFER bonlijn, BUFFER bon ).
+
             CREATE ttBonLijn.
             CopyToTt( BUFFER bonlijn, BUFFER ttBonLijn ).
         END.

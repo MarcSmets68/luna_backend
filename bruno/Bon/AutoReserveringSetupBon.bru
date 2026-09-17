@@ -1,0 +1,44 @@
+meta {
+  name: AutoReserveringSetupBon
+  type: http
+  seq: 60
+}
+
+post {
+  url: {{baseUrl}}/web/bon
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "type": "TEST",
+    "stempel": "V",
+    "klnr": 7629,
+    "naam": "ZTEST-AUTORESERVERING",
+    "munt": "EUR"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.stempel: eq V
+}
+
+script:post-response {
+  bru.setVar("autoresBonnr", res.body.bonnr);
+}
+
+docs {
+  Creates a dedicated bon (stempel "V" so it can later be cancelled via
+  AutoReserveringCancelClampAnnuleer) for the Iteratie C automatische
+  voorraadreservering test sequence below, independent of the {{bonnr}}
+  used by the plain CRUD requests above. Stores the new bonnr into
+  {{autoresBonnr}} - used by AutoReserveringHappyPathBom and
+  AutoReserveringShortfall.
+}

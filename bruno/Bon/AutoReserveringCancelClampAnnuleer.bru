@@ -1,0 +1,42 @@
+meta {
+  name: AutoReserveringCancelClampAnnuleer
+  type: http
+  seq: 65
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{autoresCancelBonnr}}/annuleer
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {}
+}
+
+assert {
+  res.status: eq 200
+  res.body.stempel: eq O
+}
+
+docs {
+  Cancels the bon created by AutoReserveringCancelClampSetup, which has
+  an under-reserved bonlijn (gereserv 2 < teLeveren 100, from
+  AutoReserveringCancelClampCreateLijn). Before the clamp fix in
+  Luna.BusinessLogic.BonBE (ReleaseReservationsForBon/
+  ReleaseBomReservations), this cancel would have subtracted the FULL
+  te-leveren (100) from artikel.besteld-kl even though only 2 was ever
+  added, pushing besteld-kl to -98. The 200 response here only proves
+  the cancel doesn't error - the actual clamp effect (besteld-kl staying
+  at/above 0) is NOT observable through any exposed GET endpoint (no API
+  exposes besteld-kl/pbesteld-kl) and was confirmed via direct ABL/DB
+  query during backend-coder implementation - see the handoff note for
+  the exact before/after values (besteld-kl 0 -> 0 clamped, and for the
+  BOM-component clamp case, a component's pbesteld-kl 8 -> 0 clamped
+  instead of going to -2). Requires {{autoresCancelBonnr}}.
+}
