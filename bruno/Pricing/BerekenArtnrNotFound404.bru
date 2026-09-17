@@ -1,0 +1,37 @@
+meta {
+  name: BerekenArtnrNotFound404
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/web/pricing/bereken
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "DOES-NOT-EXIST-999",
+    "klnr": 1,
+    "aantal": 3,
+    "typeKorting": "K1",
+    "documentKorting": 0
+  }
+}
+
+assert {
+  res.status: eq 404
+  res.body.error.message: eq Artikel DOES-NOT-EXIST-999 not found
+  res.body.error.code: eq 404
+}
+
+docs {
+  Unknown artnr -> AppError 404 raised inside
+  PricingEngineBE:BerekenPrijs before any of the 4 calculation steps run.
+}

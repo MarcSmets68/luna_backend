@@ -19,7 +19,8 @@ Backend/
 │       │   ├── LeverancierHandler.cls CRUD for `lever` (GET/POST/PUT/DELETE /web/leverancier[/{levnr}])
 │       │   ├── LoginHandler.cls       Auth-MVP login (POST /web/login) - see "Auth-MVP (login/logout)" section below
 │       │   ├── LogoutHandler.cls      Auth-MVP logout (POST /web/logout, X-Auth-Token header) - see "Auth-MVP (login/logout)" section below
-│       │   └── AiSearchHandler.cls    AI-powered natural-language search (POST /web/ai-search) - see "AI Search" section below
+│       │   ├── AiSearchHandler.cls    AI-powered natural-language search (POST /web/ai-search) - see "AI Search" section below
+│       │   └── PricingHandler.cls     Iteratie A pricing engine (POST /web/pricing/bereken) - see "Pricing engine (Iteratie A, K1-K5)" section below
 │       └── BusinessLogic/
 │           ├── LakproductieBE.cls          1:1 port of legacy ExportLakProductie.w (3 sources: lopende-orders / lopende-productielijnen / min-max-voorraad)
 │           ├── LakproductieVerkoopService.cls  Rolling 1/3/6/9/12-month verkoop totals per artnr, shared by LakproductieBE
@@ -43,7 +44,8 @@ Backend/
 │           ├── LeverancierBE.cls      DB access + validation for lever (supplier) CRUD
 │           ├── AuthBE.cls             Auth-MVP login/logout/session validation - see "Auth-MVP (login/logout)" section below
 │           ├── AiSearchBE.cls         AI-search orchestration + hardcoded entity/field/operator whitelist - see "AI Search" section below
-│           └── GeminiGateway.cls      Thin wrapper around the Google Gemini REST API, used only by AiSearchBE - see "AI Search" section below
+│           ├── GeminiGateway.cls      Thin wrapper around the Google Gemini REST API, used only by AiSearchBE - see "AI Search" section below
+│           └── PricingEngineBE.cls    Iteratie A pure read-only pricing engine (K1-K5) - 1:1 port of legacy Include/Prijs.i - see "Pricing engine (Iteratie A, K1-K5)" section below
 ├── build/                Compiled r-code (generated, not source of truth - safe to delete/regenerate)
 ├── scripts/
 │   ├── compile.p         CLI compile-all procedure
@@ -170,6 +172,15 @@ required.
   `Luna.Web.LakproductieHandler` mapping already in place for
   `GET /web/lakproduktie`, via that mount point's implicit trailing
   wildcard (same approach as handler5/handler7 above).
+- Several other feature branches added `handler15`..`handler25` directly
+  to the live `openedge.properties` (rapportage, LED reference-data
+  endpoints, pakbon) ahead of this README being updated for them - not
+  documented here, see the live file at `C:\OpenEdge\MarcOepas\conf` for
+  the current full list. `handler26=Luna.Web.PricingHandler: /pricing` —
+  maps `POST /web/pricing/bereken` to the pricing-engine WebHandler (see
+  "Pricing engine (Iteratie A, K1-K5)" section below). Added to the actual
+  `openedge.properties` at `C:\OpenEdge\MarcOepas\conf` (outside this
+  workspace) and the PASOE instance has been restarted to pick it up.
 
 Restart the instance after changing `openedge.properties`:
 ```powershell
@@ -953,3 +964,74 @@ customer/invoice data (stage 2) - are sent to Google's external Gemini
 API (no confirmed EU data residency). This is a deliberate,
 product-owner-approved tradeoff for this feature, not an oversight - see
 `Luna.BusinessLogic.GeminiGateway`'s class header.
+
+## Pricing engine (Iteratie A, K1-K5) (`/web/pricing/bereken`)
+Pure read-only pricing service - does NOT write to `offlijn`/`bonlijn` or
+any other table. 1:1 port of the legacy `Include/Prijs.i` procedures
+(`CprijsI`/`GprijsI`/`AprijsI`) plus the promotie (`actie`) override
+confirmed against 4 independent legacy call sites. See
+`Luna.BusinessLogic.PricingEngineBE`'s class header for the full
+orchestration, the exact legacy source verified against
+(`\\LHDC01\TESTLUNA$\LunaV12\Include\Prijs.i`), and the documented,
+deliberate simplifications vs. the legacy procedures (sw-uitverkoop
+always TRUE, iplGroep always FALSE, sw-LedConfig replaced by "does an
+art_profiel record exist", and the `kortingLocked` simplification).
+
+| Method | Path                     | Purpose |
+|--------|--------------------------|---------|
+| POST   | `/web/pricing/bereken`   | Body `{"artnr", "klnr", "aantal", "typeKorting", "documentKorting"}` - computes vprijs/aprijs/korting/promotie for one artnr/klnr/aantal/typeKorting combination. |
+
+**Request body:**
+```json
+{
+  "artnr": "ART-001",
+  "klnr": 10165,
+  "aantal": 3,
+  "typeKorting": "K1",
+  "documentKorting": 0
+}
+```
+`typeKorting` must be one of `K1`-`K5`. `documentKorting` is only relevant
+for `K3`/`K4`/`K5` (K3 ignores it - see `BepaalKorting`; K4/K5 pass it
+straight through). The architect design doc's optional `context` field
+adds nothing to the calculation and is deliberately not read by this
+handler.
+
+**Response 200:**
+```json
+{
+  "artnr": "ART-001", "klnr": 10165, "aantal": 3,
+  "vprijs": 84.2, "aprijs": 42.1, "korting": 0,
+  "kortingLocked": false, "promotieActief": false,
+  "nettoPrijsToegepast": false, "uitverkoopToegepast": false
+}
+```
+
+**Errors** (same `{"error":{"message","code"}}` envelope as the other
+handlers):
+- `400` - `typeKorting` not one of `K1`-`K5` (raised in
+  `PricingEngineBE:BerekenPrijs`).
+- `400` - `klnr`/`aantal`/`artnr` missing or non-numeric where required
+  (checked in `PricingHandler`, the thin parsing layer).
+- `404` - `artnr` not found in `artikel`.
+- `500` - fallback for anything unexpected (no ABL stack trace ever
+  reaches the client).
+
+Confirmed live against `MarcTest` 2026-09-20: K1 discount-lookup happy
+path, K3 (always 0, documentKorting ignored), K4/K5 (documentKorting
+passthrough), unknown `typeKorting` (400), unknown `artnr` (404), and
+missing/non-numeric `klnr`/`aantal` (400) - see `Backend/bruno/Pricing/`
+for the exact requests/assertions.
+
+**Not yet exercised live in this environment** (no matching test data
+found in `LunaNew` at the time of writing - flagging for backend-tester
+to set up/locate before signing off on full coverage): a `korting` row
+that actually matches one of the 15 hierarchy steps (so `korting > 0` on
+the response), an `art_profiel` row for the test artikel (to exercise the
+profielgroep-based steps b/g/l), an `art_netto` exact-match row
+(`nettoPrijsToegepast: true`), an `artikel.uitverkoop = TRUE` row with a
+non-zero `uit-prijs`/`korting` (`uitverkoopToegepast: true` and the
+korting early-return), a composite (`artikel.soort = TRUE`) article with
+`artlijn` rows (BOM recomputation path in both `BepaalVerkoopprijs` and
+`BepaalAankoopprijs`), and an `actie` row with `vdatum <= TODAY <= tdatum`
+and a non-zero `vprijs` (`promotieActief: true`, `kortingLocked: true`).

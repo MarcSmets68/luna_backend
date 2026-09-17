@@ -1,0 +1,48 @@
+meta {
+  name: BerekenK1
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/web/pricing/bereken
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "100%.1009020BL",
+    "klnr": 1,
+    "aantal": 2,
+    "typeKorting": "K1",
+    "documentKorting": 0
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.artnr: eq 100%.1009020BL
+  res.body.klnr: eq 1
+  res.body.aantal: eq 2
+  res.body.vprijs: eq 84.2
+  res.body.aprijs: eq 42.1
+  res.body.korting: eq 0
+  res.body.kortingLocked: eq false
+  res.body.promotieActief: eq false
+  res.body.nettoPrijsToegepast: eq false
+  res.body.uitverkoopToegepast: eq false
+}
+
+docs {
+  K1 discount-lookup happy path against a real LunaNew article/klant with
+  no matching korting/actie/art_netto rows for this combination - vprijs/
+  aprijs simply pass through artikel.vprijs/aprijs unchanged, korting is 0.
+  Verified live against MarcTest 2026-09-20. If this artikel's base
+  vprijs/aprijs changes in LunaNew, update the asserted values here.
+}

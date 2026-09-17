@@ -1,0 +1,35 @@
+meta {
+  name: BerekenMissingKlnr400
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/web/pricing/bereken
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "#CEILINGBOX or ROSETTE",
+    "aantal": 3,
+    "typeKorting": "K1"
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq Missing required field 'klnr'
+  res.body.error.code: eq 400
+}
+
+docs {
+  klnr missing from the request body -> AppError 400 raised in
+  PricingHandler:GetRequiredInteger (thin parsing layer).
+}
