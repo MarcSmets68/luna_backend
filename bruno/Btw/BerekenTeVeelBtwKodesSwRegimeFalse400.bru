@@ -1,0 +1,45 @@
+meta {
+  name: BerekenTeVeelBtwKodesSwRegimeFalse400
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/web/btw/bereken
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "regels": [
+      { "btwKode": "3", "bedrag": 10, "totaalRecupel": 0 },
+      { "btwKode": "1", "bedrag": 10, "totaalRecupel": 0 },
+      { "btwKode": "2", "bedrag": 10, "totaalRecupel": 0 }
+    ],
+    "swRegime": false,
+    "swPrijsRecup": false
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq Maximum 2 unieke btw-kodes toegestaan, gevonden: 3
+  res.body.error.code: eq 400
+}
+
+docs {
+  Regression test for bug fixed 2026-09-28: the ">2 unique btwKode"
+  validation used to only run inside BerekenMetRegime (swRegime:true
+  path), so this exact same 3-unique-kode payload with swRegime:false
+  wrongly returned 200. It now runs regime-independently in
+  BtwBerekeningBE:ValidateAantalBtwKodes, called from BerekenBtw before
+  branching on swRegime, so both paths raise the same AppError 400.
+  Companion test to BerekenTeVeelBtwKodes400.bru (which covers the
+  swRegime:true path).
+}

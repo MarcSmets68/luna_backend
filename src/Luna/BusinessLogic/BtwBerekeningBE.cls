@@ -12,6 +12,23 @@
                   post-discount basis. If plSwRegime is FALSE, the whole
                   btw-kode/group lookup is skipped and only a flat
                   totaal (no VAT) is returned.
+
+                  The "max 2 unique btw-kodes" validation is regime-
+                  independent: it runs once in BerekenBtw before branching
+                  on plSwRegime, so it also applies on the swRegime:FALSE
+                  path (fixed 2026-09-28, was previously only enforced on
+                  the swRegime:TRUE path).
+
+                  ttBtwGroep.basis/btwBedrag are rounded to 4 decimals
+                  (ROUND(..., 4)) before being written to the temp-table.
+                  This is a deliberate compromise, not full 2-decimal
+                  rounding at group level: 4 decimals keeps enough
+                  precision that summing groups into totBtw/totaalBasis
+                  still comes out correct once rounded to 2 decimals,
+                  while eliminating the floating-point noise (e.g.
+                  89.9999999995 instead of 90.00) that leaked into the
+                  JSON response when the pro-rata K3 chain was left
+                  fully unrounded (fixed 2026-09-28).
     Author(s)   : Devin
     Created     : 2026-09-27
   ----------------------------------------------------------------------*/
@@ -84,6 +101,8 @@ CLASS Luna.BusinessLogic.BtwBerekeningBE:
         EMPTY TEMP-TABLE ttBtwGroep.
         EMPTY TEMP-TABLE ttGroepAgg.
 
+        ValidateAantalBtwKodes(phInvoerLijnen).
+
         IF plSwRegime THEN
             BerekenMetRegime(phInvoerLijnen, plSwPrijsRecup, pcTypeKorting,
                 pdDocumentKortingBedrag, pdDocumentKortingPercentage).
@@ -92,6 +111,45 @@ CLASS Luna.BusinessLogic.BtwBerekeningBE:
                 pdDocumentKortingBedrag, pdDocumentKortingPercentage).
 
         RETURN DATASET dsBtwResultaat:HANDLE.
+
+    END METHOD.
+
+    /*------------------------------------------------------------------------------
+        Purpose: Regime-independent guard: max 2 unique btw-kodes across
+                 phInvoerLijnen. Runs once from BerekenBtw before branching
+                 on plSwRegime, so both BerekenMetRegime and
+                 BerekenZonderRegime are covered (fixed 2026-09-28 - was
+                 previously only enforced inside BerekenMetRegime).
+        Errors : AppError 400 - more than 2 unique btw-kodes found.
+    ------------------------------------------------------------------------------*/
+    METHOD PRIVATE VOID ValidateAantalBtwKodes( INPUT phInvoerLijnen AS HANDLE ):
+
+        DEFINE VARIABLE hBuffer     AS HANDLE    NO-UNDO.
+        DEFINE VARIABLE hQuery      AS HANDLE    NO-UNDO.
+        DEFINE VARIABLE cVorigeKode AS CHARACTER NO-UNDO INITIAL ?.
+        DEFINE VARIABLE iAantal     AS INTEGER   NO-UNDO.
+
+        hBuffer = phInvoerLijnen:DEFAULT-BUFFER-HANDLE.
+
+        CREATE QUERY hQuery.
+        hQuery:SET-BUFFERS(hBuffer).
+        hQuery:QUERY-PREPARE(SUBSTITUTE("FOR EACH &1 BY &1.btwKode":u, hBuffer:NAME)).
+        hQuery:QUERY-OPEN().
+        hQuery:GET-FIRST().
+        DO WHILE NOT hQuery:QUERY-OFF-END:
+            IF hBuffer:BUFFER-FIELD("btwKode":u):BUFFER-VALUE NE cVorigeKode THEN
+            DO:
+                iAantal     = iAantal + 1.
+                cVorigeKode = hBuffer:BUFFER-FIELD("btwKode":u):BUFFER-VALUE.
+            END.
+            hQuery:GET-NEXT().
+        END.
+        hQuery:QUERY-CLOSE().
+        DELETE OBJECT hQuery.
+
+        IF iAantal GT 2 THEN
+            UNDO, THROW NEW Progress.Lang.AppError(
+                SUBSTITUTE("Maximum 2 unieke btw-kodes toegestaan, gevonden: &1":u, iAantal), 400).
 
     END METHOD.
 
@@ -112,7 +170,6 @@ CLASS Luna.BusinessLogic.BtwBerekeningBE:
         DEFINE VARIABLE cBtwKode         AS CHARACTER NO-UNDO.
         DEFINE VARIABLE dBedrag          AS DECIMAL   NO-UNDO.
         DEFINE VARIABLE dRecupel         AS DECIMAL   NO-UNDO.
-        DEFINE VARIABLE iAantalGroepen   AS INTEGER   NO-UNDO.
         DEFINE VARIABLE dTotaalBasisRuw  AS DECIMAL   NO-UNDO.
         DEFINE VARIABLE dReductie        AS DECIMAL   NO-UNDO.
         DEFINE VARIABLE dBasisNaKorting  AS DECIMAL   NO-UNDO.
@@ -150,14 +207,9 @@ CLASS Luna.BusinessLogic.BtwBerekeningBE:
         hQuery:QUERY-CLOSE().
         DELETE OBJECT hQuery.
 
-        iAantalGroepen = 0.
-        FOR EACH ttGroepAgg NO-LOCK:
-            iAantalGroepen = iAantalGroepen + 1.
-        END.
-
-        IF iAantalGroepen GT 2 THEN
-            UNDO, THROW NEW Progress.Lang.AppError(
-                SUBSTITUTE("Maximum 2 unieke btw-kodes toegestaan, gevonden: &1":u, iAantalGroepen), 400).
+        /* Max-2-unique-btw-kodes guard now runs regime-independently in
+           ValidateAantalBtwKodes(), called once from BerekenBtw before
+           this method is even reached - see class header. */
 
         dTotaalBasisRuw = 0.
         FOR EACH ttGroepAgg NO-LOCK:
@@ -207,8 +259,14 @@ CLASS Luna.BusinessLogic.BtwBerekeningBE:
 
     /*------------------------------------------------------------------------------
         Purpose: Resolves the btw-kode percentage for one group and creates
-                 the corresponding ttBtwGroep row (unrounded basis/btwBedrag
-                 - see class header/design doc).
+                 the corresponding ttBtwGroep row. basis/btwBedrag are
+                 rounded to 4 decimals (ROUND(..., 4)) - not left fully
+                 unrounded and not rounded to 2 decimals - to avoid the
+                 floating-point noise from the pro-rata K3 chain leaking
+                 into the JSON response, while keeping enough precision
+                 that summing groups into totBtw/totaalBasis still comes
+                 out correct after the final ROUND(..., 2) - see class
+                 header (fixed 2026-09-28).
         Errors : AppError 404 - pcBtwKode not found in btw-kode.
     ------------------------------------------------------------------------------*/
     METHOD PRIVATE VOID FindBtwKodeGroep( INPUT pcBtwKode AS CHARACTER, INPUT pdBasisNaKorting AS DECIMAL ):
@@ -221,8 +279,8 @@ CLASS Luna.BusinessLogic.BtwBerekeningBE:
         ASSIGN
             ttBtwGroep.btwKode    = pcBtwKode
             ttBtwGroep.percentage = btw-kode.btw
-            ttBtwGroep.basis      = pdBasisNaKorting
-            ttBtwGroep.btwBedrag  = pdBasisNaKorting * btw-kode.btw / 100
+            ttBtwGroep.basis      = ROUND(pdBasisNaKorting, 4)
+            ttBtwGroep.btwBedrag  = ROUND(pdBasisNaKorting * btw-kode.btw / 100, 4)
             .
 
     END METHOD.
