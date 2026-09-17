@@ -77,6 +77,30 @@
          project-datum; flagging this doc/code divergence explicitly per
          the "fix the design doc too" rule.
 
+    Bugfix round (2026-10) - two bugs fixed, see docs/backend/offerte.md's
+    "Bugfix round" subsection for the full writeup:
+      7. The original "Pass 1 (all subtotaal lines) then Pass 2 (all other
+         lines)" 2-pass structure referenced throughout decisions 1-2 above
+         is GONE - replaced by ProcessOfferteLijnenGeinterleaved/
+         ProcessGroup, which walks the offerte once and fully processes
+         each group (its items followed by its own subtotaal line) the
+         first time any of that group's lines is encountered, so a group's
+         subtotaal bonlijn.lijnnr always lands right after that group's own
+         item bonlijnen instead of every subtotaal line being front-loaded
+         ahead of every item line in the bon. BuildGroepMapping (decision 1)
+         and VolgendeLijnnr() are otherwise unchanged; the
+         ttGroepExpansion-extension for subtotaal-blok-splitsing (decision
+         2) is unchanged in mechanics, only moved from "upfront in Pass 1"
+         to "on-demand inside ProcessGroup".
+      8. CopyLedLijnen's deadline-lijn exception (led_lijn=0 AND lijnnr=30)
+         guard was permanently dead code (off_led.doc-lijnnr is always 0 on
+         this specific row) - fixed to match the legacy source (Offerte.w
+         line 12118-12180) exactly: text-match on bonlijn.omschr =
+         off_led.opm instead of doc-lijnnr, unconditional creation (no
+         doc-lijnnr guard at all), and the sibling bonlijn's
+         lev-dat/bestel-dat/btw-kode are now also copied onto the new
+         deadline bonlijn.
+
     Author(s)   : Devin
     Created     : 2026-10-04
   ----------------------------------------------------------------------*/
@@ -108,6 +132,7 @@ CLASS Luna.BusinessLogic.OfferteConversieBE:
     DEFINE PRIVATE TEMP-TABLE ttGroepMap NO-UNDO
         FIELD oldGroepnr AS INTEGER
         FIELD newGroepnr AS INTEGER
+        FIELD verwerkt   AS LOGICAL INITIAL FALSE
         INDEX idx-pk IS UNIQUE oldGroepnr.
 
     DEFINE PRIVATE TEMP-TABLE ttSubgroepMap NO-UNDO
@@ -131,6 +156,7 @@ CLASS Luna.BusinessLogic.OfferteConversieBE:
         FIELD bonGroepnr AS INTEGER
         INDEX idx-pk IS UNIQUE offGroepnr.
 
+    DEFINE PRIVATE VARIABLE iStapLijnnr                 AS INTEGER   NO-UNDO INITIAL 5000.
     DEFINE PRIVATE VARIABLE iLijnnrCounter              AS INTEGER   NO-UNDO.
     DEFINE PRIVATE VARIABLE iGroepnrCounter              AS INTEGER   NO-UNDO.
     DEFINE PRIVATE VARIABLE iSubgroepnrCounter           AS INTEGER   NO-UNDO.
@@ -257,8 +283,7 @@ CLASS Luna.BusinessLogic.OfferteConversieBE:
 
             CreateBonHeader( BUFFER offerte ).
 
-            ProcessPass1Subtotalen( BUFFER offerte ).
-            ProcessPass2Overige( BUFFER offerte ).
+            ProcessOfferteLijnenGeinterleaved( BUFFER offerte ).
 
             CopyLedLijnen( BUFFER offerte ).
 
@@ -363,7 +388,7 @@ CLASS Luna.BusinessLogic.OfferteConversieBE:
     ------------------------------------------------------------------------------*/
     METHOD PRIVATE INTEGER VolgendeLijnnr():
 
-        iLijnnrCounter = iLijnnrCounter + 5000.
+        iLijnnrCounter = iLijnnrCounter + iStapLijnnr.
         RETURN iLijnnrCounter.
 
     END METHOD.
@@ -491,355 +516,479 @@ CLASS Luna.BusinessLogic.OfferteConversieBE:
     END METHOD.
 
     /*------------------------------------------------------------------------------
-        Purpose: Pass 1 - creates the bonlijn for every transferable
-                 subtotaal offlijn, in offerte-lijnnr order, handling the
-                 subtotaal-blok-splitsing rule (splitsen=TRUE -> N physical
-                 group copies, splitsen=FALSE -> off_aantal scaling within
-                 the one group). Extends ttGroepExpansion for split groups.
+        Purpose: Bugfix (interleaved lijnnr ordering). Orchestrates the
+                 whole offerte -> bonlijn conversion in ONE pass over
+                 offerte-lijnnr order, processing each groepnr's items AND
+                 its own subtotaal line together (via ProcessGroup) before
+                 moving on to the next group - so a group's subtotaal
+                 bonlijn always lands right after that group's item
+                 bonlijnen in bonlijn.lijnnr order, instead of every
+                 subtotaal line being front-loaded ahead of every item line
+                 (the bug this replaces the old ProcessPass1Subtotalen/
+                 ProcessPass2Overige 2-pass structure for).
+                 groepnr = 0 lines are created directly, one at a time, in
+                 the order they're encountered. A nonzero groepnr is fully
+                 handled (all its copies, items and subtotaal line) the
+                 FIRST time any of its offlijn rows is encountered in
+                 lijnnr order - ttGroepMap.verwerkt then guards every later
+                 row belonging to the same groepnr from being reprocessed.
     ------------------------------------------------------------------------------*/
-    METHOD PRIVATE VOID ProcessPass1Subtotalen( BUFFER pbOfferte FOR offerte ):
+    METHOD PRIVATE VOID ProcessOfferteLijnenGeinterleaved( BUFFER pbOfferte FOR offerte ):
 
         DEFINE BUFFER bOfflijn FOR offlijn.
-        DEFINE VARIABLE dSubAantal    AS DECIMAL NO-UNDO.
-        DEFINE VARIABLE iNieuwGroep   AS INTEGER NO-UNDO.
-        DEFINE VARIABLE iCopy         AS INTEGER NO-UNDO.
-        DEFINE VARIABLE iAantalCopies AS INTEGER NO-UNDO.
-        DEFINE VARIABLE iNewLijnnr    AS INTEGER NO-UNDO.
-        DEFINE VARIABLE oBody         AS JsonObject NO-UNDO.
-        DEFINE VARIABLE hResult       AS HANDLE     NO-UNDO.
 
         FOR EACH bOfflijn OF pbOfferte
-            WHERE bOfflijn.subtotaal EQ TRUE
             NO-LOCK BY bOfflijn.lijnnr:
 
             IF NOT IsOverdraagbaar( BUFFER bOfflijn ) THEN NEXT.
 
-            dSubAantal = MAXIMUM(1, bOfflijn.aantal).
+            IF bOfflijn.groepnr EQ 0 THEN
+            DO:
+                /* Defensief: een subtotaal-lijn met groepnr = 0 zou niet
+                   mogen voorkomen (subtotaal hoort altijd bij een groep) -
+                   overgeslagen in plaats van als losstaande lijn gemaakt. */
+                IF bOfflijn.subtotaal THEN NEXT.
 
-            IF dSubAantal GT 1 AND bOfflijn.splitsen THEN
-                iAantalCopies = INTEGER(dSubAantal).
-            ELSE
-                iAantalCopies = 1.
+                CreateOngroepeerdeLijn( BUFFER pbOfferte, BUFFER bOfflijn ).
 
-            DO iCopy = 1 TO iAantalCopies:
+                FIND CURRENT bOfflijn EXCLUSIVE-LOCK.
+                ASSIGN
+                    bOfflijn.stempel    = "D":u
+                    bOfflijn.te-leveren = 0
+                    .
 
-                IF iCopy EQ 1 THEN
-                    iNieuwGroep = NieuwGroepnr(bOfflijn.groepnr).
-                ELSE
-                DO:
-                    iGroepnrCounter = iGroepnrCounter + 1.
-                    iNieuwGroep = iGroepnrCounter.
-                    CREATE ttGroepExpansion.
-                    ASSIGN
-                        ttGroepExpansion.oldGroepnr = bOfflijn.groepnr
-                        ttGroepExpansion.copyIndex  = iCopy
-                        ttGroepExpansion.newGroepnr = iNieuwGroep
-                        .
-                END.
-
-                iNewLijnnr = VolgendeLijnnr().
-
-                oBody = NEW JsonObject().
-                oBody:Add("artnr":u, bOfflijn.artnr).
-                oBody:Add("omschrijving":u, bOfflijn.omschr).
-                oBody:Add("aantal":u, bOfflijn.aantal).
-                oBody:Add("teLeveren":u, bOfflijn.te-leveren).
-                oBody:Add("vprijs":u, bOfflijn.vprijs).
-                oBody:Add("aprijs":u, bOfflijn.aprijs).
-                oBody:Add("korting":u, bOfflijn.korting).
-                oBody:Add("btwKode":u, bOfflijn.btw-kode).
-                oBody:Add("bedrag":u, 0.0).
-                oBody:Add("klnr":u, bon.klnr).
-                oBody:Add("groepnr":u, iNieuwGroep).
-                oBody:Add("subgroepnr":u, NieuwSubgroepnr(bOfflijn.subgroepnr)).
-                oBody:Add("hold":u, bOfflijn.hold).
-                oBody:Add("opm":u, bOfflijn.opm).
-                oBody:Add("subtotaal":u, TRUE).
-                oBody:Add("bestelDatum":u, bon.bestel-datum).
-                oBody:Add("levDatum":u, (IF bOfflijn.montage THEN bOfflijn.lev-dat ELSE bon.lev-dat)).
-                oBody:Add("stempel":u, "O":u).
-                oBody:Add("offnr":u, pbOfferte.offnr).
-                oBody:Add("versie":u, pbOfferte.versie).
-                oBody:Add("olijnnr":u, bOfflijn.lijnnr).
-                oBody:Add("swLed":u, bOfflijn.swLed).
-                oBody:Add("swSikta":u, bOfflijn.swSikta).
-                oBody:Add("montage":u, bOfflijn.montage).
-                oBody:Add("ledmontage":u, bOfflijn.ledmontage).
-                oBody:Add("circuit":u, bOfflijn.circuit).
-                oBody:Add("recupel":u, bOfflijn.recupel).
-                oBody:Add("meer_min":u, bOfflijn.meer_min).
-                oBody:Add("off_aantal":u, (IF dSubAantal GT 1 AND NOT bOfflijn.splitsen THEN dSubAantal ELSE 1)).
-                oBody:Add("swStdPrijs":u, bOfflijn.swStdPrijs).
-                oBody:Add("uitverkoop":u, bOfflijn.uitverkoop).
-                oBody:Add("SiktaKleurKodes":u, bOfflijn.SiktaKleurKodes[1]).
-
-                hResult = NEW BonLijnBE():CreateBonLijnInternal( iBonnr, oBody, iNewLijnnr ).
-
-                IF iCopy EQ 1 THEN
-                DO:
-                    CREATE ttLijnnrMap.
-                    ASSIGN
-                        ttLijnnrMap.offLijnnr = bOfflijn.lijnnr
-                        ttLijnnrMap.bonLijnnr = iNewLijnnr
-                        .
-                END.
-
-                VoegBtwInvoerlijnToe(bOfflijn.btw-kode, 0.0, 0.0).
-
+                iAantalLijnenOvergenomen = iAantalLijnenOvergenomen + 1.
             END.
+            ELSE
+            DO:
+                FIND FIRST ttGroepMap WHERE ttGroepMap.oldGroepnr EQ bOfflijn.groepnr NO-ERROR.
 
-            FIND CURRENT bOfflijn EXCLUSIVE-LOCK.
-            ASSIGN
-                bOfflijn.stempel     = "D":u
-                bOfflijn.te-leveren  = 0
-                .
+                IF AVAILABLE ttGroepMap AND ttGroepMap.verwerkt THEN
+                    NEXT.   /* rij hoort bij een groep die net in zijn geheel verwerkt is */
 
-            iAantalLijnenOvergenomen = iAantalLijnenOvergenomen + 1.
+                ProcessGroup( BUFFER pbOfferte, bOfflijn.groepnr ).
+
+                IF AVAILABLE ttGroepMap THEN
+                    ttGroepMap.verwerkt = TRUE.
+            END.
 
         END.
 
     END METHOD.
 
     /*------------------------------------------------------------------------------
-        Purpose: Pass 2 - creates the bonlijn(en) for every remaining
-                 transferable offlijn (item/kolomtitel/infolijn, i.e.
-                 subtotaal = FALSE), in offerte-lijnnr order. Item lines
-                 are repriced via PricingEngineBE. A line whose groepnr
-                 belongs to a split subtotaal block (ttGroepExpansion has
-                 more than 1 copy for it) is replicated once per copy;
-                 groepnr = 0 lines have no ttGroepExpansion entry and are
-                 created exactly once, ungrouped.
+        Purpose: Fully processes one offerte groepnr - every physical
+                 group-copy (subtotaal-blok-splitsing, unchanged logic,
+                 now extended on-demand here instead of upfront in the old
+                 Pass 1) gets its subtotaal bonlijn (reserved lijnnr slot,
+                 placed BEFORE its item bonlijnen are created so the
+                 auto-reservation sibling-lookup in BonLijnBE already finds
+                 it) followed immediately by that copy's item bonlijnen -
+                 so within bonlijn.lijnnr order the subtotaal line for a
+                 group always comes right after that group's own items,
+                 never ahead of every group in the bon like before. Marks
+                 every source offlijn row for this groepnr as converted
+                 exactly once (not once per copy).
     ------------------------------------------------------------------------------*/
-    METHOD PRIVATE VOID ProcessPass2Overige( BUFFER pbOfferte FOR offerte ):
+    METHOD PRIVATE VOID ProcessGroup( BUFFER pbOfferte FOR offerte, INPUT piOldGroepnr AS INTEGER ):
 
-        DEFINE BUFFER bOfflijn           FOR offlijn.
-        DEFINE BUFFER bSubtotaalOfflijn  FOR offlijn.
-        DEFINE VARIABLE cTypeKortingPricing AS CHARACTER   NO-UNDO.
-        DEFINE VARIABLE oPricingService     AS PricingEngineBE NO-UNDO.
-        DEFINE VARIABLE hPricingTable       AS HANDLE    NO-UNDO.
-        DEFINE VARIABLE hPricingBuffer      AS HANDLE    NO-UNDO.
-        DEFINE VARIABLE dVprijs             AS DECIMAL   NO-UNDO.
-        DEFINE VARIABLE dAprijs             AS DECIMAL   NO-UNDO.
-        DEFINE VARIABLE dKorting            AS DECIMAL   NO-UNDO.
-        DEFINE VARIABLE dBedrag             AS DECIMAL   NO-UNDO.
-        DEFINE VARIABLE dAantalOpBonlijn    AS DECIMAL   NO-UNDO.
-        DEFINE VARIABLE lIsItemLijn         AS LOGICAL   NO-UNDO.
-        DEFINE VARIABLE dSubAantal          AS DECIMAL   NO-UNDO.
-        DEFINE VARIABLE lSplitsen           AS LOGICAL   NO-UNDO.
-        DEFINE VARIABLE dOffAantal          AS DECIMAL   NO-UNDO.
-        DEFINE VARIABLE iNewLijnnr          AS INTEGER   NO-UNDO.
-        DEFINE VARIABLE oBody               AS JsonObject NO-UNDO.
-        DEFINE VARIABLE hResult             AS HANDLE    NO-UNDO.
-        DEFINE VARIABLE lFirstCopyDone      AS LOGICAL   NO-UNDO.
-        DEFINE VARIABLE iCopyGroepnr        AS INTEGER   NO-UNDO.
-        DEFINE VARIABLE lAnyCopyMade        AS LOGICAL   NO-UNDO.
+        DEFINE BUFFER bItemLijn      FOR offlijn.
+        DEFINE BUFFER bSubtotaalLijn FOR offlijn.
+        DEFINE VARIABLE iNItems              AS INTEGER NO-UNDO.
+        DEFINE VARIABLE lHeeftSubtotaalRegel AS LOGICAL NO-UNDO.
+        DEFINE VARIABLE dSubAantal           AS DECIMAL NO-UNDO.
+        DEFINE VARIABLE lSplitsen            AS LOGICAL NO-UNDO.
+        DEFINE VARIABLE iAantalCopies        AS INTEGER NO-UNDO.
+        DEFINE VARIABLE iCopy                AS INTEGER NO-UNDO.
+        DEFINE VARIABLE iSubtotaalLijnnr     AS INTEGER NO-UNDO.
 
-        cTypeKortingPricing = BepaalTypeKortingVoorPricing().
+        ASSIGN
+            iNItems              = 0
+            lHeeftSubtotaalRegel = FALSE
+            dSubAantal           = 1
+            lSplitsen            = FALSE
+            .
 
-        FOR EACH bOfflijn OF pbOfferte
-            WHERE bOfflijn.subtotaal EQ FALSE
-            NO-LOCK BY bOfflijn.lijnnr:
+        /* --- Count the transferable item rows for this group (nItems) --- */
+        FOR EACH bItemLijn OF pbOfferte NO-LOCK
+            WHERE bItemLijn.groepnr   EQ piOldGroepnr
+              AND bItemLijn.subtotaal EQ FALSE
+            BY bItemLijn.lijnnr:
+            IF NOT IsOverdraagbaar( BUFFER bItemLijn ) THEN NEXT.
+            iNItems = iNItems + 1.
+        END.
 
-            IF NOT IsOverdraagbaar( BUFFER bOfflijn ) THEN NEXT.
-
-            lIsItemLijn = NOT bOfflijn.kolomtitel AND NOT bOfflijn.infolijn.
-
+        /* --- Find this group's transferable subtotaal row (if any) - same
+               "only the first/only transferable subtotaal row counts" rule
+               the old Pass 1 applied (a non-transferable subtotaal row,
+               e.g. already converted in an earlier partial conversion, is
+               skipped exactly like Pass 1 used to skip it). bSubtotaalLijn
+               stays positioned on it for CreateSubtotaalBonlijn below. --- */
+        FOR EACH bSubtotaalLijn OF pbOfferte NO-LOCK
+            WHERE bSubtotaalLijn.groepnr   EQ piOldGroepnr
+              AND bSubtotaalLijn.subtotaal EQ TRUE
+            BY bSubtotaalLijn.lijnnr:
+            IF NOT IsOverdraagbaar( BUFFER bSubtotaalLijn ) THEN NEXT.
             ASSIGN
-                dVprijs  = bOfflijn.vprijs
-                dAprijs  = bOfflijn.aprijs
-                dKorting = bOfflijn.korting
+                lHeeftSubtotaalRegel = TRUE
+                dSubAantal           = MAXIMUM(1, bSubtotaalLijn.aantal)
+                lSplitsen            = bSubtotaalLijn.splitsen
                 .
+            LEAVE.
+        END.
 
-            IF lIsItemLijn THEN
-            DO:
-                /* oPricingService MUST be a variable (not a bare NEW
-                   PricingEngineBE() inline expression) - see
-                   oBtwService's declaration comment for why: the returned
-                   ttPricingResult temp-table handle is owned by this
-                   instance and would be invalid the moment nothing keeps
-                   the instance alive. */
-                oPricingService = NEW PricingEngineBE().
-                hPricingTable   = oPricingService:BerekenPrijs(
-                    bOfflijn.artnr, bon.klnr, bOfflijn.aantal, cTypeKortingPricing, pbOfferte.korting).
-                hPricingBuffer = hPricingTable:DEFAULT-BUFFER-HANDLE.
-                hPricingBuffer:FIND-FIRST().
+        /* --- Subtotaal-blok-splitsing: extend ttGroepExpansion with extra
+               physical group copies beyond the default copyIndex 1 seeded
+               by BuildGroepMapping - unchanged logic, now applied on-demand
+               instead of upfront in the old Pass 1. --- */
+        IF lHeeftSubtotaalRegel AND dSubAantal GT 1 AND lSplitsen THEN
+        DO:
+            iAantalCopies = INTEGER(dSubAantal).
+            DO iCopy = 2 TO iAantalCopies:
+                iGroepnrCounter = iGroepnrCounter + 1.
+                CREATE ttGroepExpansion.
                 ASSIGN
-                    dVprijs  = hPricingBuffer:BUFFER-FIELD("vprijs":u):BUFFER-VALUE
-                    dAprijs  = hPricingBuffer:BUFFER-FIELD("aprijs":u):BUFFER-VALUE
-                    dKorting = hPricingBuffer:BUFFER-FIELD("korting":u):BUFFER-VALUE
+                    ttGroepExpansion.oldGroepnr = piOldGroepnr
+                    ttGroepExpansion.copyIndex  = iCopy
+                    ttGroepExpansion.newGroepnr = iGroepnrCounter
                     .
             END.
+        END.
 
-            ASSIGN
-                dSubAantal = 1
-                lSplitsen  = FALSE
-                dOffAantal = 1
-                .
+        /* --- Per physical copy: subtotaal bonlijn (reserved lijnnr slot)
+               first, then this copy's item bonlijnen, then "catch up"
+               iLijnnrCounter past the reserved slot for the next
+               copy/group. --- */
+        FOR EACH ttGroepExpansion NO-LOCK
+            WHERE ttGroepExpansion.oldGroepnr EQ piOldGroepnr
+            BY ttGroepExpansion.copyIndex:
 
-            IF bOfflijn.groepnr NE 0 THEN
+            IF lHeeftSubtotaalRegel THEN
             DO:
-                FIND FIRST bSubtotaalOfflijn OF pbOfferte
-                    WHERE bSubtotaalOfflijn.groepnr   EQ bOfflijn.groepnr
-                      AND bSubtotaalOfflijn.subtotaal EQ TRUE NO-LOCK NO-ERROR.
-                IF AVAILABLE bSubtotaalOfflijn THEN
-                DO:
-                    dSubAantal = MAXIMUM(1, bSubtotaalOfflijn.aantal).
-                    lSplitsen  = bSubtotaalOfflijn.splitsen.
-                    IF dSubAantal GT 1 AND NOT lSplitsen THEN
-                        dOffAantal = dSubAantal.
-                END.
+                iSubtotaalLijnnr = iLijnnrCounter + (iNItems + 1) * iStapLijnnr.
+                CreateSubtotaalBonlijn( BUFFER pbOfferte, BUFFER bSubtotaalLijn,
+                    ttGroepExpansion.newGroepnr, iSubtotaalLijnnr, dSubAantal, lSplitsen, ttGroepExpansion.copyIndex ).
             END.
 
-            lFirstCopyDone = FALSE.
-            lAnyCopyMade   = FALSE.
-
-            IF bOfflijn.groepnr NE 0 THEN
-            DO:
-                FOR EACH ttGroepExpansion
-                    WHERE ttGroepExpansion.oldGroepnr EQ bOfflijn.groepnr
-                    BY ttGroepExpansion.copyIndex:
-
-                    lAnyCopyMade = TRUE.
-                    iCopyGroepnr = ttGroepExpansion.newGroepnr.
-
-                    ASSIGN
-                        dAantalOpBonlijn = (IF dSubAantal GT 1 AND NOT lSplitsen THEN bOfflijn.aantal * dSubAantal ELSE bOfflijn.aantal)
-                        dBedrag          = 0
-                        iNewLijnnr       = VolgendeLijnnr()
-                        .
-
-                    IF lIsItemLijn THEN
-                        dBedrag = ROUND(dAantalOpBonlijn * dVprijs * (1 - dKorting / 100), 2).
-
-                    oBody = NEW JsonObject().
-                    oBody:Add("artnr":u, bOfflijn.artnr).
-                    oBody:Add("omschrijving":u, bOfflijn.omschr).
-                    oBody:Add("aantal":u, dAantalOpBonlijn).
-                    oBody:Add("teLeveren":u, bOfflijn.te-leveren).
-                    oBody:Add("vprijs":u, dVprijs).
-                    oBody:Add("aprijs":u, dAprijs).
-                    oBody:Add("korting":u, dKorting).
-                    oBody:Add("btwKode":u, bOfflijn.btw-kode).
-                    oBody:Add("bedrag":u, dBedrag).
-                    oBody:Add("klnr":u, bon.klnr).
-                    oBody:Add("groepnr":u, iCopyGroepnr).
-                    oBody:Add("subgroepnr":u, NieuwSubgroepnr(bOfflijn.subgroepnr)).
-                    oBody:Add("hold":u, bOfflijn.hold).
-                    oBody:Add("opm":u, bOfflijn.opm).
-                    oBody:Add("kolomtitel":u, bOfflijn.kolomtitel).
-                    oBody:Add("infolijn":u, bOfflijn.infolijn).
-                    oBody:Add("subtotaal":u, FALSE).
-                    oBody:Add("bestelDatum":u, bon.bestel-datum).
-                    oBody:Add("levDatum":u, (IF bOfflijn.montage THEN bOfflijn.lev-dat ELSE bon.lev-dat)).
-                    oBody:Add("stempel":u, "O":u).
-                    oBody:Add("besteld":u, 0).
-                    oBody:Add("offnr":u, pbOfferte.offnr).
-                    oBody:Add("versie":u, pbOfferte.versie).
-                    oBody:Add("olijnnr":u, bOfflijn.lijnnr).
-                    oBody:Add("swLed":u, bOfflijn.swLed).
-                    oBody:Add("swSikta":u, bOfflijn.swSikta).
-                    oBody:Add("montage":u, bOfflijn.montage).
-                    oBody:Add("ledmontage":u, bOfflijn.ledmontage).
-                    oBody:Add("circuit":u, bOfflijn.circuit).
-                    oBody:Add("recupel":u, bOfflijn.recupel).
-                    oBody:Add("meer_min":u, bOfflijn.meer_min).
-                    oBody:Add("off_aantal":u, dOffAantal).
-                    oBody:Add("swStdPrijs":u, bOfflijn.swStdPrijs).
-                    oBody:Add("uitverkoop":u, bOfflijn.uitverkoop).
-                    oBody:Add("SiktaKleurKodes":u, bOfflijn.SiktaKleurKodes[1]).
-
-                    IF NOT lIsItemLijn THEN
-                        oBody:Add("gereserv":u, bOfflijn.te-leveren).
-
-                    hResult = NEW BonLijnBE():CreateBonLijnInternal( iBonnr, oBody, iNewLijnnr ).
-
-                    IF NOT lFirstCopyDone THEN
-                    DO:
-                        IF NOT CAN-FIND(FIRST ttLijnnrMap WHERE ttLijnnrMap.offLijnnr EQ bOfflijn.lijnnr) THEN
-                        DO:
-                            CREATE ttLijnnrMap.
-                            ASSIGN
-                                ttLijnnrMap.offLijnnr = bOfflijn.lijnnr
-                                ttLijnnrMap.bonLijnnr = iNewLijnnr
-                                .
-                        END.
-                        lFirstCopyDone = TRUE.
-                    END.
-
-                    VoegBtwInvoerlijnToe(bOfflijn.btw-kode, dBedrag, 0.0).
-
-                END.
+            FOR EACH bItemLijn OF pbOfferte NO-LOCK
+                WHERE bItemLijn.groepnr   EQ piOldGroepnr
+                  AND bItemLijn.subtotaal EQ FALSE
+                BY bItemLijn.lijnnr:
+                IF NOT IsOverdraagbaar( BUFFER bItemLijn ) THEN NEXT.
+                CreateGroepItemBonlijn( BUFFER pbOfferte, BUFFER bItemLijn,
+                    ttGroepExpansion.newGroepnr, dSubAantal, lSplitsen, ttGroepExpansion.copyIndex ).
             END.
 
-            IF NOT lAnyCopyMade THEN
-            DO:
-                iNewLijnnr = VolgendeLijnnr().
-
-                dBedrag = 0.
-                IF lIsItemLijn THEN
-                    dBedrag = ROUND(bOfflijn.aantal * dVprijs * (1 - dKorting / 100), 2).
-
-                oBody = NEW JsonObject().
-                oBody:Add("artnr":u, bOfflijn.artnr).
-                oBody:Add("omschrijving":u, bOfflijn.omschr).
-                oBody:Add("aantal":u, bOfflijn.aantal).
-                oBody:Add("teLeveren":u, bOfflijn.te-leveren).
-                oBody:Add("vprijs":u, dVprijs).
-                oBody:Add("aprijs":u, dAprijs).
-                oBody:Add("korting":u, dKorting).
-                oBody:Add("btwKode":u, bOfflijn.btw-kode).
-                oBody:Add("bedrag":u, dBedrag).
-                oBody:Add("klnr":u, bon.klnr).
-                oBody:Add("groepnr":u, 0).
-                oBody:Add("subgroepnr":u, NieuwSubgroepnr(bOfflijn.subgroepnr)).
-                oBody:Add("hold":u, bOfflijn.hold).
-                oBody:Add("opm":u, bOfflijn.opm).
-                oBody:Add("kolomtitel":u, bOfflijn.kolomtitel).
-                oBody:Add("infolijn":u, bOfflijn.infolijn).
-                oBody:Add("subtotaal":u, FALSE).
-                oBody:Add("bestelDatum":u, bon.bestel-datum).
-                oBody:Add("levDatum":u, (IF bOfflijn.montage THEN bOfflijn.lev-dat ELSE bon.lev-dat)).
-                oBody:Add("stempel":u, "O":u).
-                oBody:Add("besteld":u, 0).
-                oBody:Add("offnr":u, pbOfferte.offnr).
-                oBody:Add("versie":u, pbOfferte.versie).
-                oBody:Add("olijnnr":u, bOfflijn.lijnnr).
-                oBody:Add("swLed":u, bOfflijn.swLed).
-                oBody:Add("swSikta":u, bOfflijn.swSikta).
-                oBody:Add("montage":u, bOfflijn.montage).
-                oBody:Add("ledmontage":u, bOfflijn.ledmontage).
-                oBody:Add("circuit":u, bOfflijn.circuit).
-                oBody:Add("recupel":u, bOfflijn.recupel).
-                oBody:Add("meer_min":u, bOfflijn.meer_min).
-                oBody:Add("off_aantal":u, 1).
-                oBody:Add("swStdPrijs":u, bOfflijn.swStdPrijs).
-                oBody:Add("uitverkoop":u, bOfflijn.uitverkoop).
-                oBody:Add("SiktaKleurKodes":u, bOfflijn.SiktaKleurKodes[1]).
-
-                IF NOT lIsItemLijn THEN
-                    oBody:Add("gereserv":u, bOfflijn.te-leveren).
-
-                hResult = NEW BonLijnBE():CreateBonLijnInternal( iBonnr, oBody, iNewLijnnr ).
-
-                CREATE ttLijnnrMap.
-                ASSIGN
-                    ttLijnnrMap.offLijnnr = bOfflijn.lijnnr
-                    ttLijnnrMap.bonLijnnr = iNewLijnnr
-                    .
-
-                VoegBtwInvoerlijnToe(bOfflijn.btw-kode, dBedrag, 0.0).
-
-            END.
-
-            FIND CURRENT bOfflijn EXCLUSIVE-LOCK.
-            ASSIGN
-                bOfflijn.stempel    = "D":u
-                bOfflijn.te-leveren = 0
-                .
-
-            iAantalLijnenOvergenomen = iAantalLijnenOvergenomen + 1.
+            IF lHeeftSubtotaalRegel THEN
+                iLijnnrCounter = iSubtotaalLijnnr.   /* inhalen, geen collision voor de volgende copy/groep */
 
         END.
+
+        /* --- Mark every source offlijn row of this group (subtotaal AND
+               item rows together) as converted, exactly once - not once
+               per physical copy. --- */
+        FOR EACH bItemLijn OF pbOfferte EXCLUSIVE-LOCK
+            WHERE bItemLijn.groepnr EQ piOldGroepnr:
+            IF NOT IsOverdraagbaar( BUFFER bItemLijn ) THEN NEXT.
+            ASSIGN
+                bItemLijn.stempel    = "D":u
+                bItemLijn.te-leveren = 0
+                .
+            iAantalLijnenOvergenomen = iAantalLijnenOvergenomen + 1.
+        END.
+
+    END METHOD.
+
+    /*------------------------------------------------------------------------------
+        Purpose: Creates one groep's subtotaal bonlijn at the given
+                 (already-reserved, not VolgendeLijnnr()-consumed) lijnnr,
+                 for the given physical group-copy. Body/off_aantal-scaling
+                 logic unchanged from the old Pass 1 - only the lijnnr
+                 source and call site changed.
+    ------------------------------------------------------------------------------*/
+    METHOD PRIVATE VOID CreateSubtotaalBonlijn(
+        BUFFER pbOfferte FOR offerte, BUFFER pbSubtotaalLijn FOR offlijn,
+        INPUT piNieuwGroep AS INTEGER, INPUT piLijnnr AS INTEGER,
+        INPUT pdSubAantal AS DECIMAL, INPUT plSplitsen AS LOGICAL, INPUT piCopyIndex AS INTEGER ):
+
+        DEFINE VARIABLE oBody   AS JsonObject NO-UNDO.
+        DEFINE VARIABLE hResult AS HANDLE     NO-UNDO.
+
+        oBody = NEW JsonObject().
+        oBody:Add("artnr":u, pbSubtotaalLijn.artnr).
+        oBody:Add("omschrijving":u, pbSubtotaalLijn.omschr).
+        oBody:Add("aantal":u, pbSubtotaalLijn.aantal).
+        oBody:Add("teLeveren":u, pbSubtotaalLijn.te-leveren).
+        oBody:Add("vprijs":u, pbSubtotaalLijn.vprijs).
+        oBody:Add("aprijs":u, pbSubtotaalLijn.aprijs).
+        oBody:Add("korting":u, pbSubtotaalLijn.korting).
+        oBody:Add("btwKode":u, pbSubtotaalLijn.btw-kode).
+        oBody:Add("bedrag":u, 0.0).
+        oBody:Add("klnr":u, bon.klnr).
+        oBody:Add("groepnr":u, piNieuwGroep).
+        oBody:Add("subgroepnr":u, NieuwSubgroepnr(pbSubtotaalLijn.subgroepnr)).
+        oBody:Add("hold":u, pbSubtotaalLijn.hold).
+        oBody:Add("opm":u, pbSubtotaalLijn.opm).
+        oBody:Add("subtotaal":u, TRUE).
+        oBody:Add("bestelDatum":u, bon.bestel-datum).
+        oBody:Add("levDatum":u, (IF pbSubtotaalLijn.montage THEN pbSubtotaalLijn.lev-dat ELSE bon.lev-dat)).
+        oBody:Add("stempel":u, "O":u).
+        oBody:Add("offnr":u, pbOfferte.offnr).
+        oBody:Add("versie":u, pbOfferte.versie).
+        oBody:Add("olijnnr":u, pbSubtotaalLijn.lijnnr).
+        oBody:Add("swLed":u, pbSubtotaalLijn.swLed).
+        oBody:Add("swSikta":u, pbSubtotaalLijn.swSikta).
+        oBody:Add("montage":u, pbSubtotaalLijn.montage).
+        oBody:Add("ledmontage":u, pbSubtotaalLijn.ledmontage).
+        oBody:Add("circuit":u, pbSubtotaalLijn.circuit).
+        oBody:Add("recupel":u, pbSubtotaalLijn.recupel).
+        oBody:Add("meer_min":u, pbSubtotaalLijn.meer_min).
+        oBody:Add("off_aantal":u, (IF pdSubAantal GT 1 AND NOT plSplitsen THEN pdSubAantal ELSE 1)).
+        oBody:Add("swStdPrijs":u, pbSubtotaalLijn.swStdPrijs).
+        oBody:Add("uitverkoop":u, pbSubtotaalLijn.uitverkoop).
+        oBody:Add("SiktaKleurKodes":u, pbSubtotaalLijn.SiktaKleurKodes[1]).
+
+        hResult = NEW BonLijnBE():CreateBonLijnInternal( iBonnr, oBody, piLijnnr ).
+
+        IF piCopyIndex EQ 1 AND NOT CAN-FIND(FIRST ttLijnnrMap WHERE ttLijnnrMap.offLijnnr EQ pbSubtotaalLijn.lijnnr) THEN
+        DO:
+            CREATE ttLijnnrMap.
+            ASSIGN
+                ttLijnnrMap.offLijnnr = pbSubtotaalLijn.lijnnr
+                ttLijnnrMap.bonLijnnr = piLijnnr
+                .
+        END.
+
+        VoegBtwInvoerlijnToe(pbSubtotaalLijn.btw-kode, 0.0, 0.0).
+
+    END METHOD.
+
+    /*------------------------------------------------------------------------------
+        Purpose: Creates one item/kolomtitel/infolijn bonlijn belonging to
+                 a nonzero-groepnr offlijn, for the given physical
+                 group-copy - allocates its own lijnnr via VolgendeLijnnr().
+                 Item lines are repriced via PricingEngineBE (once per call,
+                 i.e. once per copy - a deliberate, documented divergence
+                 from the old Pass 2, which priced once per offlijn and
+                 reused the result across all copies; pricing is a pure
+                 function of artnr/klnr/aantal/korting so the result is
+                 identical either way, this only costs a few extra calls
+                 for the rare split-groep case). Body/scaling logic
+                 otherwise unchanged from the old Pass 2's per-copy branch.
+    ------------------------------------------------------------------------------*/
+    METHOD PRIVATE VOID CreateGroepItemBonlijn(
+        BUFFER pbOfferte FOR offerte, BUFFER pbOfflijn FOR offlijn,
+        INPUT piNieuwGroep AS INTEGER, INPUT pdSubAantal AS DECIMAL,
+        INPUT plSplitsen AS LOGICAL, INPUT piCopyIndex AS INTEGER ):
+
+        DEFINE VARIABLE cTypeKortingPricing AS CHARACTER       NO-UNDO.
+        DEFINE VARIABLE oPricingService     AS PricingEngineBE NO-UNDO.
+        DEFINE VARIABLE hPricingTable       AS HANDLE          NO-UNDO.
+        DEFINE VARIABLE hPricingBuffer      AS HANDLE          NO-UNDO.
+        DEFINE VARIABLE dVprijs             AS DECIMAL         NO-UNDO.
+        DEFINE VARIABLE dAprijs             AS DECIMAL         NO-UNDO.
+        DEFINE VARIABLE dKorting            AS DECIMAL         NO-UNDO.
+        DEFINE VARIABLE dBedrag             AS DECIMAL         NO-UNDO.
+        DEFINE VARIABLE dAantalOpBonlijn    AS DECIMAL         NO-UNDO.
+        DEFINE VARIABLE dOffAantal          AS DECIMAL         NO-UNDO.
+        DEFINE VARIABLE lIsItemLijn         AS LOGICAL         NO-UNDO.
+        DEFINE VARIABLE iNewLijnnr          AS INTEGER         NO-UNDO.
+        DEFINE VARIABLE oBody               AS JsonObject      NO-UNDO.
+        DEFINE VARIABLE hResult             AS HANDLE          NO-UNDO.
+
+        lIsItemLijn = NOT pbOfflijn.kolomtitel AND NOT pbOfflijn.infolijn.
+
+        ASSIGN
+            dVprijs  = pbOfflijn.vprijs
+            dAprijs  = pbOfflijn.aprijs
+            dKorting = pbOfflijn.korting
+            .
+
+        IF lIsItemLijn THEN
+        DO:
+            cTypeKortingPricing = BepaalTypeKortingVoorPricing().
+
+            /* oPricingService MUST be a variable (not a bare NEW
+               PricingEngineBE() inline expression) - see oBtwService's
+               declaration comment for why. */
+            oPricingService = NEW PricingEngineBE().
+            hPricingTable   = oPricingService:BerekenPrijs(
+                pbOfflijn.artnr, bon.klnr, pbOfflijn.aantal, cTypeKortingPricing, pbOfferte.korting).
+            hPricingBuffer = hPricingTable:DEFAULT-BUFFER-HANDLE.
+            hPricingBuffer:FIND-FIRST().
+            ASSIGN
+                dVprijs  = hPricingBuffer:BUFFER-FIELD("vprijs":u):BUFFER-VALUE
+                dAprijs  = hPricingBuffer:BUFFER-FIELD("aprijs":u):BUFFER-VALUE
+                dKorting = hPricingBuffer:BUFFER-FIELD("korting":u):BUFFER-VALUE
+                .
+        END.
+
+        dOffAantal = (IF pdSubAantal GT 1 AND NOT plSplitsen THEN pdSubAantal ELSE 1).
+
+        ASSIGN
+            dAantalOpBonlijn = (IF pdSubAantal GT 1 AND NOT plSplitsen THEN pbOfflijn.aantal * pdSubAantal ELSE pbOfflijn.aantal)
+            dBedrag          = 0
+            iNewLijnnr       = VolgendeLijnnr()
+            .
+
+        IF lIsItemLijn THEN
+            dBedrag = ROUND(dAantalOpBonlijn * dVprijs * (1 - dKorting / 100), 2).
+
+        oBody = NEW JsonObject().
+        oBody:Add("artnr":u, pbOfflijn.artnr).
+        oBody:Add("omschrijving":u, pbOfflijn.omschr).
+        oBody:Add("aantal":u, dAantalOpBonlijn).
+        oBody:Add("teLeveren":u, pbOfflijn.te-leveren).
+        oBody:Add("vprijs":u, dVprijs).
+        oBody:Add("aprijs":u, dAprijs).
+        oBody:Add("korting":u, dKorting).
+        oBody:Add("btwKode":u, pbOfflijn.btw-kode).
+        oBody:Add("bedrag":u, dBedrag).
+        oBody:Add("klnr":u, bon.klnr).
+        oBody:Add("groepnr":u, piNieuwGroep).
+        oBody:Add("subgroepnr":u, NieuwSubgroepnr(pbOfflijn.subgroepnr)).
+        oBody:Add("hold":u, pbOfflijn.hold).
+        oBody:Add("opm":u, pbOfflijn.opm).
+        oBody:Add("kolomtitel":u, pbOfflijn.kolomtitel).
+        oBody:Add("infolijn":u, pbOfflijn.infolijn).
+        oBody:Add("subtotaal":u, FALSE).
+        oBody:Add("bestelDatum":u, bon.bestel-datum).
+        oBody:Add("levDatum":u, (IF pbOfflijn.montage THEN pbOfflijn.lev-dat ELSE bon.lev-dat)).
+        oBody:Add("stempel":u, "O":u).
+        oBody:Add("besteld":u, 0).
+        oBody:Add("offnr":u, pbOfferte.offnr).
+        oBody:Add("versie":u, pbOfferte.versie).
+        oBody:Add("olijnnr":u, pbOfflijn.lijnnr).
+        oBody:Add("swLed":u, pbOfflijn.swLed).
+        oBody:Add("swSikta":u, pbOfflijn.swSikta).
+        oBody:Add("montage":u, pbOfflijn.montage).
+        oBody:Add("ledmontage":u, pbOfflijn.ledmontage).
+        oBody:Add("circuit":u, pbOfflijn.circuit).
+        oBody:Add("recupel":u, pbOfflijn.recupel).
+        oBody:Add("meer_min":u, pbOfflijn.meer_min).
+        oBody:Add("off_aantal":u, dOffAantal).
+        oBody:Add("swStdPrijs":u, pbOfflijn.swStdPrijs).
+        oBody:Add("uitverkoop":u, pbOfflijn.uitverkoop).
+        oBody:Add("SiktaKleurKodes":u, pbOfflijn.SiktaKleurKodes[1]).
+
+        IF NOT lIsItemLijn THEN
+            oBody:Add("gereserv":u, pbOfflijn.te-leveren).
+
+        hResult = NEW BonLijnBE():CreateBonLijnInternal( iBonnr, oBody, iNewLijnnr ).
+
+        IF piCopyIndex EQ 1 AND NOT CAN-FIND(FIRST ttLijnnrMap WHERE ttLijnnrMap.offLijnnr EQ pbOfflijn.lijnnr) THEN
+        DO:
+            CREATE ttLijnnrMap.
+            ASSIGN
+                ttLijnnrMap.offLijnnr = pbOfflijn.lijnnr
+                ttLijnnrMap.bonLijnnr = iNewLijnnr
+                .
+        END.
+
+        VoegBtwInvoerlijnToe(pbOfflijn.btw-kode, dBedrag, 0.0).
+
+    END METHOD.
+
+    /*------------------------------------------------------------------------------
+        Purpose: Creates the bonlijn for a groepnr = 0 offlijn (item,
+                 kolomtitel or infolijn) - no groep-copy replication, no
+                 off_aantal scaling, groepnr stays 0. Body/pricing logic
+                 unchanged from the old Pass 2's "NOT lAnyCopyMade" branch.
+    ------------------------------------------------------------------------------*/
+    METHOD PRIVATE VOID CreateOngroepeerdeLijn( BUFFER pbOfferte FOR offerte, BUFFER pbOfflijn FOR offlijn ):
+
+        DEFINE VARIABLE cTypeKortingPricing AS CHARACTER       NO-UNDO.
+        DEFINE VARIABLE oPricingService     AS PricingEngineBE NO-UNDO.
+        DEFINE VARIABLE hPricingTable       AS HANDLE          NO-UNDO.
+        DEFINE VARIABLE hPricingBuffer      AS HANDLE          NO-UNDO.
+        DEFINE VARIABLE dVprijs             AS DECIMAL         NO-UNDO.
+        DEFINE VARIABLE dAprijs             AS DECIMAL         NO-UNDO.
+        DEFINE VARIABLE dKorting            AS DECIMAL         NO-UNDO.
+        DEFINE VARIABLE dBedrag             AS DECIMAL         NO-UNDO.
+        DEFINE VARIABLE lIsItemLijn         AS LOGICAL         NO-UNDO.
+        DEFINE VARIABLE iNewLijnnr          AS INTEGER         NO-UNDO.
+        DEFINE VARIABLE oBody               AS JsonObject      NO-UNDO.
+        DEFINE VARIABLE hResult             AS HANDLE          NO-UNDO.
+
+        lIsItemLijn = NOT pbOfflijn.kolomtitel AND NOT pbOfflijn.infolijn.
+
+        ASSIGN
+            dVprijs  = pbOfflijn.vprijs
+            dAprijs  = pbOfflijn.aprijs
+            dKorting = pbOfflijn.korting
+            .
+
+        IF lIsItemLijn THEN
+        DO:
+            cTypeKortingPricing = BepaalTypeKortingVoorPricing().
+
+            oPricingService = NEW PricingEngineBE().
+            hPricingTable   = oPricingService:BerekenPrijs(
+                pbOfflijn.artnr, bon.klnr, pbOfflijn.aantal, cTypeKortingPricing, pbOfferte.korting).
+            hPricingBuffer = hPricingTable:DEFAULT-BUFFER-HANDLE.
+            hPricingBuffer:FIND-FIRST().
+            ASSIGN
+                dVprijs  = hPricingBuffer:BUFFER-FIELD("vprijs":u):BUFFER-VALUE
+                dAprijs  = hPricingBuffer:BUFFER-FIELD("aprijs":u):BUFFER-VALUE
+                dKorting = hPricingBuffer:BUFFER-FIELD("korting":u):BUFFER-VALUE
+                .
+        END.
+
+        iNewLijnnr = VolgendeLijnnr().
+
+        dBedrag = 0.
+        IF lIsItemLijn THEN
+            dBedrag = ROUND(pbOfflijn.aantal * dVprijs * (1 - dKorting / 100), 2).
+
+        oBody = NEW JsonObject().
+        oBody:Add("artnr":u, pbOfflijn.artnr).
+        oBody:Add("omschrijving":u, pbOfflijn.omschr).
+        oBody:Add("aantal":u, pbOfflijn.aantal).
+        oBody:Add("teLeveren":u, pbOfflijn.te-leveren).
+        oBody:Add("vprijs":u, dVprijs).
+        oBody:Add("aprijs":u, dAprijs).
+        oBody:Add("korting":u, dKorting).
+        oBody:Add("btwKode":u, pbOfflijn.btw-kode).
+        oBody:Add("bedrag":u, dBedrag).
+        oBody:Add("klnr":u, bon.klnr).
+        oBody:Add("groepnr":u, 0).
+        oBody:Add("subgroepnr":u, NieuwSubgroepnr(pbOfflijn.subgroepnr)).
+        oBody:Add("hold":u, pbOfflijn.hold).
+        oBody:Add("opm":u, pbOfflijn.opm).
+        oBody:Add("kolomtitel":u, pbOfflijn.kolomtitel).
+        oBody:Add("infolijn":u, pbOfflijn.infolijn).
+        oBody:Add("subtotaal":u, FALSE).
+        oBody:Add("bestelDatum":u, bon.bestel-datum).
+        oBody:Add("levDatum":u, (IF pbOfflijn.montage THEN pbOfflijn.lev-dat ELSE bon.lev-dat)).
+        oBody:Add("stempel":u, "O":u).
+        oBody:Add("besteld":u, 0).
+        oBody:Add("offnr":u, pbOfferte.offnr).
+        oBody:Add("versie":u, pbOfferte.versie).
+        oBody:Add("olijnnr":u, pbOfflijn.lijnnr).
+        oBody:Add("swLed":u, pbOfflijn.swLed).
+        oBody:Add("swSikta":u, pbOfflijn.swSikta).
+        oBody:Add("montage":u, pbOfflijn.montage).
+        oBody:Add("ledmontage":u, pbOfflijn.ledmontage).
+        oBody:Add("circuit":u, pbOfflijn.circuit).
+        oBody:Add("recupel":u, pbOfflijn.recupel).
+        oBody:Add("meer_min":u, pbOfflijn.meer_min).
+        oBody:Add("off_aantal":u, 1).
+        oBody:Add("swStdPrijs":u, pbOfflijn.swStdPrijs).
+        oBody:Add("uitverkoop":u, pbOfflijn.uitverkoop).
+        oBody:Add("SiktaKleurKodes":u, pbOfflijn.SiktaKleurKodes[1]).
+
+        IF NOT lIsItemLijn THEN
+            oBody:Add("gereserv":u, pbOfflijn.te-leveren).
+
+        hResult = NEW BonLijnBE():CreateBonLijnInternal( iBonnr, oBody, iNewLijnnr ).
+
+        CREATE ttLijnnrMap.
+        ASSIGN
+            ttLijnnrMap.offLijnnr = pbOfflijn.lijnnr
+            ttLijnnrMap.bonLijnnr = iNewLijnnr
+            .
+
+        VoegBtwInvoerlijnToe(pbOfflijn.btw-kode, dBedrag, 0.0).
 
     END METHOD.
 
@@ -847,27 +996,58 @@ CLASS Luna.BusinessLogic.OfferteConversieBE:
         Purpose: LED-copy (design doc step 8). For every offerte groepnr
                  recorded in ttLedGroepMap, copies every off_led row under
                  that groepnr to a new bon_led row under the corresponding
-                 new bon groepnr, relinking doc-lijnnr via ttLijnnrMap and
-                 recalculating prijs/montage-prijs from the linked
-                 artikel's current vprijs/montage-prijs. Also handles the
-                 "deadline-lijn" exception (led_lijn = 0 AND lijnnr = 30):
-                 creates an extra kolomtitel bonlijn at
-                 (gekoppelde-bonlijn.lijnnr + 100).
+                 new bon groepnr, relinking the generic doc-lijnnr via
+                 ttLijnnrMap and recalculating prijs/montage-prijs from the
+                 linked artikel's current vprijs/montage-prijs (unchanged
+                 mechanism - not touched by this bugfix).
+
+                 Bugfix (deadline-lijn exception): the "deadline-lijn"
+                 marker row (led_lijn = 0 AND lijnnr = 30) does NOT carry a
+                 usable doc-lijnnr on off_led (that column is always 0 on
+                 this specific row - confirmed against a full-table scan
+                 and against the legacy source, Offerte.w line
+                 12118-12180) so the old `iDocLijnnr NE 0` guard on this
+                 row was permanently dead code and the extra kolomtitel
+                 bonlijn was never created. Matching legacy instead: every
+                 "gewone" led-regel (led_lijn = 0 AND lijnnr < 30) is
+                 text-matched against its sibling bonlijn via
+                 bonlijn.omschr = off_led.opm (NOT via doc-lijnnr - legacy
+                 Offerte.w line 12144-12156), and iVorigeLijnnrGewoneLedRegel
+                 is remembered per groep. The lijnnr = 30 deadline row then
+                 unconditionally creates an extra kolomtitel bonlijn at
+                 iVorigeLijnnrGewoneLedRegel + 100 - the only condition is
+                 led_lijn = 0 AND lijnnr = 30 (no doc-lijnnr guard at all,
+                 legacy has none either). The sibling bonlijn's
+                 lev-dat/bestel-dat/btw-kode are copied onto the new
+                 deadline bonlijn too (legacy w-levdat/w-besteldat/pcBtw).
     ------------------------------------------------------------------------------*/
     METHOD PRIVATE VOID CopyLedLijnen( BUFFER pbOfferte FOR offerte ):
 
-        DEFINE BUFFER bOffLed  FOR off_led.
-        DEFINE BUFFER bArtikel FOR artikel.
-        DEFINE VARIABLE iDocLijnnr AS INTEGER    NO-UNDO.
-        DEFINE VARIABLE oBody      AS JsonObject NO-UNDO.
-        DEFINE VARIABLE hResult    AS HANDLE     NO-UNDO.
+        DEFINE BUFFER bOffLed             FOR off_led.
+        DEFINE BUFFER bArtikel            FOR artikel.
+        DEFINE BUFFER bGewoneLedBonlijn   FOR bonlijn.
+        DEFINE VARIABLE iDocLijnnr                  AS INTEGER    NO-UNDO.
+        DEFINE VARIABLE oBody                       AS JsonObject NO-UNDO.
+        DEFINE VARIABLE hResult                     AS HANDLE     NO-UNDO.
+        DEFINE VARIABLE iVorigeLijnnrGewoneLedRegel AS INTEGER    NO-UNDO.
+        DEFINE VARIABLE dGewoneLedLevDat            AS DATE       NO-UNDO.
+        DEFINE VARIABLE dGewoneLedBestelDat         AS DATE       NO-UNDO.
+        DEFINE VARIABLE cGewoneLedBtwKode           AS CHARACTER  NO-UNDO.
 
         FOR EACH ttLedGroepMap:
+
+            ASSIGN
+                iVorigeLijnnrGewoneLedRegel = 0
+                dGewoneLedLevDat            = ?
+                dGewoneLedBestelDat         = ?
+                cGewoneLedBtwKode           = "":u
+                .
 
             FOR EACH bOffLed NO-LOCK
                 WHERE bOffLed.offnr   EQ pbOfferte.offnr
                   AND bOffLed.versie  EQ pbOfferte.versie
-                  AND bOffLed.groepnr EQ ttLedGroepMap.offGroepnr:
+                  AND bOffLed.groepnr EQ ttLedGroepMap.offGroepnr
+                BY bOffLed.led_lijn BY bOffLed.lijnnr:
 
                 iDocLijnnr = 0.
                 IF bOffLed.doc-lijnnr NE 0 THEN
@@ -927,17 +1107,40 @@ CLASS Luna.BusinessLogic.OfferteConversieBE:
 
                 iAantalLedLijnenOvergenomen = iAantalLedLijnenOvergenomen + 1.
 
-                IF bOffLed.led_lijn EQ 0 AND bOffLed.lijnnr EQ 30 AND iDocLijnnr NE 0 THEN
+                IF bOffLed.led_lijn EQ 0 AND bOffLed.lijnnr LT 30 THEN
                 DO:
+                    /* Text-match on omschrijving, NOT via doc-lijnnr -
+                       exact zoals legacy Offerte.w regel 12144-12156. */
+                    FIND FIRST bGewoneLedBonlijn NO-LOCK
+                        WHERE bGewoneLedBonlijn.bonnr   EQ iBonnr
+                          AND bGewoneLedBonlijn.groepnr EQ ttLedGroepMap.bonGroepnr
+                          AND bGewoneLedBonlijn.omschr  EQ bOffLed.opm NO-ERROR.
+                    IF AVAILABLE bGewoneLedBonlijn THEN
+                        ASSIGN
+                            iVorigeLijnnrGewoneLedRegel = bGewoneLedBonlijn.lijnnr
+                            dGewoneLedLevDat            = bGewoneLedBonlijn.lev-dat
+                            dGewoneLedBestelDat         = bGewoneLedBonlijn.bestel-dat
+                            cGewoneLedBtwKode           = bGewoneLedBonlijn.btw-kode
+                            .
+                END.
+                ELSE IF bOffLed.led_lijn EQ 0 AND bOffLed.lijnnr EQ 30 THEN
+                DO:
+                    /* Onvoorwaardelijk (enkel led_lijn=0 AND lijnnr=30 als
+                       voorwaarde) - de oude `iDocLijnnr NE 0`-guard was
+                       dode code, zie method header. */
                     oBody = NEW JsonObject().
                     oBody:Add("kolomtitel":u, TRUE).
                     oBody:Add("stempel":u, "O":u).
                     oBody:Add("klnr":u, bon.klnr).
-                    oBody:Add("bestelDatum":u, bon.bestel-datum).
+                    oBody:Add("bestelDatum":u, (IF dGewoneLedBestelDat NE ? THEN dGewoneLedBestelDat ELSE bon.bestel-datum)).
                     oBody:Add("offnr":u, pbOfferte.offnr).
                     oBody:Add("versie":u, pbOfferte.versie).
+                    IF dGewoneLedLevDat NE ? THEN
+                        oBody:Add("levDatum":u, dGewoneLedLevDat).
+                    IF cGewoneLedBtwKode NE "":u THEN
+                        oBody:Add("btwKode":u, cGewoneLedBtwKode).
 
-                    hResult = NEW BonLijnBE():CreateBonLijnInternal( iBonnr, oBody, iDocLijnnr + 100 ).
+                    hResult = NEW BonLijnBE():CreateBonLijnInternal( iBonnr, oBody, iVorigeLijnnrGewoneLedRegel + 100 ).
                 END.
 
             END.
