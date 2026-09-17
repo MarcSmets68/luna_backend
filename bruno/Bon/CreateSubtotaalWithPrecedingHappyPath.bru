@@ -1,0 +1,40 @@
+﻿meta {
+  name: CreateSubtotaalWithPrecedingHappyPath
+  type: http
+  seq: 45
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{flagsBonnr}}/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "subtotaal": true
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.subtotaal: eq true
+}
+
+script:post-response {
+  bru.setVar("flagsSubtotaalLijnnr", res.body.lijnnr);
+}
+
+docs {
+  Happy path: {{flagsBonnr}} already has a preceding plain line (created
+  by FlagsGuardCreatePlainLine), so creating a subtotaal line under it
+  must succeed with 201. Stores the new lijnnr into
+  {{flagsSubtotaalLijnnr}} for cleanup below. Requires
+  FlagsGuardCreatePlainLine to have run first under the same
+  {{flagsBonnr}}.
+}

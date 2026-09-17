@@ -1,0 +1,36 @@
+meta {
+  name: BerekenK4DocumentKorting
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/web/pricing/bereken
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "#CEILINGBOX or ROSETTE",
+    "klnr": 1,
+    "aantal": 3,
+    "typeKorting": "K4",
+    "documentKorting": 12.5
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.korting: eq 12.5
+}
+
+docs {
+  K4 passes pdDocumentKorting straight through unchanged (1:1 doorgeef
+  regel - see PricingEngineBE:BepaalKorting).
+}

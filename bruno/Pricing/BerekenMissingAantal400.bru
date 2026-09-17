@@ -1,0 +1,35 @@
+meta {
+  name: BerekenMissingAantal400
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/web/pricing/bereken
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "#CEILINGBOX or ROSETTE",
+    "klnr": 1,
+    "typeKorting": "K1"
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq Missing required field 'aantal'
+  res.body.error.code: eq 400
+}
+
+docs {
+  aantal missing from the request body -> AppError 400 raised in
+  PricingHandler:GetRequiredDecimal (thin parsing layer).
+}

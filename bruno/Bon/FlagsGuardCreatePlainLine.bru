@@ -1,0 +1,45 @@
+﻿meta {
+  name: FlagsGuardCreatePlainLine
+  type: http
+  seq: 42
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{flagsBonnr}}/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "TESTART",
+    "omschrijving": "Plain line",
+    "aantal": 1,
+    "vprijs": 10.0
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  bru.setVar("flagsPlainLijnnr", res.body.lijnnr);
+}
+
+docs {
+  Creates a plain (non-item-flag) bonlijn under {{flagsBonnr}} -
+  subtotaal/kolomtitel/infolijn all absent, so this is a normal item
+  line. Stores its server-assigned lijnnr into {{flagsPlainLijnnr}}.
+  This gives {{flagsBonnr}} a preceding plain line so
+  CreateSubtotaalWithPrecedingHappyPath below can legally create a
+  subtotaal line, and gives FlagsGuardSetKolomtitel/
+  UpdateConflictingFlags400/UpdateConflictingFlagsClearOk below a line to
+  update. Requires {{flagsBonnr}} to be set (run FlagsGuardCreateBon
+  first).
+}

@@ -721,7 +721,7 @@ CLASS Luna.BusinessLogic.AiSearchBE:
 
         IF GetFilter(poFilters, "naam":u, OUTPUT cOp, OUTPUT cVal) THEN cNaam = cVal.
 
-        RETURN oKlantBEInstance:GetKlanten(1, piPageSize, cNaam, OUTPUT plHasMore).
+        RETURN oKlantBEInstance:GetKlanten(1, piPageSize, cNaam, FALSE, OUTPUT plHasMore).
 
     END METHOD.
 
@@ -737,7 +737,7 @@ CLASS Luna.BusinessLogic.AiSearchBE:
 
         oArtikelBEInstance = NEW ArtikelBE().
 
-        RETURN oArtikelBEInstance:GetArtikelen(cArtnr, "":u, cGroep, 1, piPageSize, "":u, FALSE, OUTPUT plHasMore).
+        RETURN oArtikelBEInstance:GetArtikelen(cArtnr, "":u, cGroep, 1, piPageSize, "":u, FALSE, "":u, OUTPUT plHasMore).
 
     END METHOD.
 

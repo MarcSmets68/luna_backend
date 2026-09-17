@@ -364,7 +364,10 @@ CLASS Luna.BusinessLogic.KlantBE:
                  (every whitespace-separated word in the filter must occur,
                  case-insensitive, somewhere across naam + naam1 - see
                  MatchesNaamFilter() - so "Smets Marc" matches naam "Smets"
-                 / naam1 "Marc" regardless of word order).
+                 / naam1 "Marc" regardless of word order), AND-combined with
+                 plNomaledOnly which, when TRUE, restricts the result to
+                 Nomaled-dealer customers (klant.swNomaled = TRUE; unknown/?
+                 rows are excluded too).
         Notes  : NO-LOCK read-only. piPage/piPageSize are expected to already be
                  validated/clamped by the caller (page >= 1, 1 <= pageSize <= 200).
                  This deliberately does NOT compute an exact total count -
@@ -375,10 +378,11 @@ CLASS Luna.BusinessLogic.KlantBE:
                  tradeoff as Luna.BusinessLogic.FactuurBE:GetFacturen().
     ------------------------------------------------------------------------------*/
     METHOD PUBLIC HANDLE GetKlanten(
-        INPUT  piPage     AS INTEGER,
-        INPUT  piPageSize AS INTEGER,
-        INPUT  pcNaam     AS CHARACTER,
-        OUTPUT plHasMore  AS LOGICAL ):
+        INPUT  piPage        AS INTEGER,
+        INPUT  piPageSize    AS INTEGER,
+        INPUT  pcNaam        AS CHARACTER,
+        INPUT  plNomaledOnly AS LOGICAL,
+        OUTPUT plHasMore     AS LOGICAL ):
 
         DEFINE VARIABLE iSkip  AS INTEGER NO-UNDO.
         DEFINE VARIABLE iSeen  AS INTEGER NO-UNDO.
@@ -397,6 +401,13 @@ CLASS Luna.BusinessLogic.KlantBE:
         FOR EACH klant NO-LOCK BY klant.klnr:
 
             IF NOT MatchesNaamFilter(pcNaam, klant.naam, klant.naam1) THEN NEXT.
+
+            /* klant.swNomaled is a LOGICAL that can be unknown (?) - use an
+               explicit NE TRUE comparison (not "NOT klant.swNomaled") so
+               that both FALSE and unknown rows are excluded when the
+               dealer-only filter is active; this is a no-op when
+               plNomaledOnly is FALSE. */
+            IF plNomaledOnly AND klant.swNomaled NE TRUE THEN NEXT.
 
             iSeen = iSeen + 1.
 

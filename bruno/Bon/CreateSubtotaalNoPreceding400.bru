@@ -1,0 +1,36 @@
+﻿meta {
+  name: CreateSubtotaalNoPreceding400
+  type: http
+  seq: 44
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{flagsBonnr2}}/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "subtotaal": true
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.code: eq 400
+  res.body.error.message: eq Cannot create a subtotaal line with no preceding lines to sum
+}
+
+docs {
+  {{flagsBonnr2}} has zero lines, so creating a subtotaal line under it
+  must 400 - there is nothing preceding it to sum. Requires
+  {{flagsBonnr2}} to be set (run FlagsGuardCreateBon2 first) and to still
+  have zero lines (this must run before anything ever creates a line
+  under {{flagsBonnr2}}).
+}

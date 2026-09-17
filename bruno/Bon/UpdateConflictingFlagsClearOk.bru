@@ -1,0 +1,38 @@
+﻿meta {
+  name: UpdateConflictingFlagsClearOk
+  type: http
+  seq: 48
+}
+
+put {
+  url: {{baseUrl}}/web/bon/{{flagsBonnr}}/lijn/{{flagsPlainLijnnr}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "kolomtitel": false,
+    "infolijn": true
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.kolomtitel: eq false
+  res.body.infolijn: eq true
+}
+
+docs {
+  Same intent as UpdateConflictingFlags400 (switch the line from
+  kolomtitel to infolijn), but this time the body explicitly clears
+  kolomtitel in the same request - the merged state ends up with exactly
+  one flag set, so this must succeed with 200. Requires
+  UpdateConflictingFlags400 (or at least FlagsGuardSetKolomtitel) to have
+  run first.
+}

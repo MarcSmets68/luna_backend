@@ -1,0 +1,32 @@
+﻿meta {
+  name: ListNomaledOnly
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/web/klant?pageSize=10&nomaled=true
+  body: none
+  auth: none
+}
+
+params:query {
+  pageSize: 10
+  nomaled: true
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists klant rows filtered to Nomaled-dealer customers only
+  (klant.swNomaled = TRUE; rows where swNomaled is FALSE or unknown are
+  excluded). AND-combined with naam and pagination - see List.bru for the
+  full param table. Backed by Backend/src/Luna/Web/KlantHandler.cls +
+  Luna/BusinessLogic/KlantBE.cls (GetKlantens plNomaledOnly parameter).
+}
