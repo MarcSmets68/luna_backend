@@ -454,20 +454,32 @@ CLASS Luna.BusinessLogic.BonBE:
             FIND FIRST bfArtikel WHERE bfArtikel.artnr EQ artlijn.l-artnr EXCLUSIVE-LOCK NO-ERROR.
             IF AVAILABLE bfArtikel AND bfArtikel.stock THEN
             DO:
+                /* Clamped at 0 (MAX(0, ...)) rather than an unconditional
+                   subtraction - added for Iteratie C (automatische
+                   voorraadreservering, Luna.BusinessLogic.
+                   BonLijnAutoReserveringBE). That feature can reserve LESS
+                   than bonlijn.te-leveren when stock falls short at
+                   create-time, so releasing the FULL te-leveren quantity
+                   here (as the legacy annul-bon procedure always did,
+                   since it assumed reservation always matched te-leveren)
+                   can now push pbesteld-kl below 0 when cancelling a bon
+                   that was originally created with a shortfall. This was
+                   NOT a pre-existing clamp - do not assume it always
+                   worked this way. */
                 IF NOT bfArtikel.soort THEN
-                    bfArtikel.pbesteld-kl = bfArtikel.pbesteld-kl -
+                    bfArtikel.pbesteld-kl = MAX(0, bfArtikel.pbesteld-kl -
                         (IF artlijn.swVast THEN (artlijn.aantal * dOffAantal)
-                                           ELSE (pbBonlijn.te-leveren * artlijn.aantal)).
+                                           ELSE (pbBonlijn.te-leveren * artlijn.aantal))).
                 ELSE
                 DO:
-                    bfArtikel.pbesteld-kl = bfArtikel.pbesteld-kl - (pbBonlijn.te-leveren * artlijn.aantal).
+                    bfArtikel.pbesteld-kl = MAX(0, bfArtikel.pbesteld-kl - (pbBonlijn.te-leveren * artlijn.aantal)).
 
                     FOR EACH bfArtlijn OF bfArtikel NO-LOCK:
                         FIND FIRST bf2Artikel WHERE bf2Artikel.artnr EQ bfArtlijn.l-artnr EXCLUSIVE-LOCK NO-ERROR.
                         IF AVAILABLE bf2Artikel AND bf2Artikel.stock THEN
-                            bf2Artikel.pbesteld-kl = bf2Artikel.pbesteld-kl -
+                            bf2Artikel.pbesteld-kl = MAX(0, bf2Artikel.pbesteld-kl -
                                 (IF bfArtlijn.swVast THEN (bfArtlijn.aantal * (artlijn.aantal * dOffAantal))
-                                                     ELSE ((pbBonlijn.te-leveren * bfArtlijn.aantal) * artlijn.aantal)).
+                                                     ELSE ((pbBonlijn.te-leveren * bfArtlijn.aantal) * artlijn.aantal))).
                         RELEASE bf2Artikel.
                     END.
                 END.
@@ -497,7 +509,12 @@ CLASS Luna.BusinessLogic.BonBE:
             FIND artikel EXCLUSIVE-LOCK WHERE artikel.artnr EQ bonlijn.artnr AND artikel.stock NO-ERROR.
             IF AVAILABLE artikel THEN
             DO:
-                artikel.besteld-kl = artikel.besteld-kl - bonlijn.te-leveren.
+                /* Clamped at 0 - see the comment in ReleaseBomReservations
+                   above for why (Iteratie C automatische
+                   voorraadreservering can reserve less than te-leveren on
+                   a stock shortfall, so releasing the full te-leveren on
+                   cancel could otherwise push besteld-kl below 0). */
+                artikel.besteld-kl = MAX(0, artikel.besteld-kl - bonlijn.te-leveren).
 
                 IF artikel.soort THEN
                     ReleaseBomReservations( BUFFER artikel, BUFFER bonlijn, BUFFER pbBon ).

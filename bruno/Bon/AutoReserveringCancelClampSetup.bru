@@ -1,0 +1,44 @@
+meta {
+  name: AutoReserveringCancelClampSetup
+  type: http
+  seq: 63
+}
+
+post {
+  url: {{baseUrl}}/web/bon
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "type": "TEST",
+    "stempel": "V",
+    "klnr": 7629,
+    "naam": "ZTEST-AUTORESERVERING-CANCEL",
+    "munt": "EUR"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.stempel: eq V
+}
+
+script:post-response {
+  bru.setVar("autoresCancelBonnr", res.body.bonnr);
+}
+
+docs {
+  Creates a 2nd dedicated bon (separate from {{autoresBonnr}}, which
+  can't be cancelled twice) for the clamp-fix test sequence below:
+  create a shortfall bonlijn, then cancel the bon and confirm
+  Luna.BusinessLogic.BonBE:ReleaseReservationsForBon/
+  ReleaseBomReservations clamp besteld-kl/pbesteld-kl at 0 instead of
+  going negative. Stores the new bonnr into {{autoresCancelBonnr}}.
+}

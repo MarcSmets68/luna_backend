@@ -1,0 +1,52 @@
+meta {
+  name: AutoReserveringShortfall
+  type: http
+  seq: 62
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{autoresBonnr}}/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "100%.126397",
+    "aantal": 100,
+    "teLeveren": 100,
+    "vprijs": 5.0
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.bonnr: eq {{autoresBonnr}}
+}
+
+script:post-response {
+  bru.setVar("autoresShortfallOk", res.body.gereserv < res.body.teLeveren);
+}
+
+docs {
+  Iteratie C - automatische voorraadreservering, stock-shortfall path: a
+  plain (non-BOM) artikel with only 2 in stock (artikel.aantal = 2,
+  besteld-kl = 0, gereserveerd = 0 in the shared LunaNew test DB at the
+  time this test was written) against a requested teLeveren of 100. This
+  is deliberately NOT an error (201, no 4xx) - the design is "reserve
+  what you can" - bonlijn.gereserv ends up at 2 (< teLeveren). Bruno's
+  free-tier assert syntax can't do a field-to-field comparison, so the
+  post-response script stores the comparison result into
+  {{autoresShortfallOk}} for manual/CI inspection instead of a hard
+  assert; expected gereserv for this specific artnr at implementation
+  time was exactly 2. Requires {{autoresBonnr}} (run
+  "AutoReserveringSetupBon" first). NOTE: if artikel "100%.126397"'s
+  stock in the shared test DB has since changed (e.g. another test wrote
+  to it), gereserv will differ - the important invariant to check is
+  gereserv < teLeveren and res.status = 201, not the exact number 2.
+}
