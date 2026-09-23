@@ -37,7 +37,8 @@ docs {
       "lageVoorraadCount": n
     },
     "recentActivity": [ { "text": "...", "datum": "YYYY-MM-DD", "type": "offerte" | "bon" | "factuur" } ],
-    "productionThisWeek": [ { "bonnr": n, "klant": "...", "leverdatum": "YYYY-MM-DD", "bedrag": n, "geparkeerd": bool } ]
+    "productionThisWeek": [ { "bonnr": n, "klant": "...", "leverdatum": "YYYY-MM-DD", "bedrag": n, "geparkeerd": bool } ],
+    "omzetTrend": [ { "month": n, "year": n, "label": "mmm YYYY", "total": n, "isPartial": bool } ]
   }
 
   Notes:
@@ -51,4 +52,8 @@ docs {
     caches this endpoint for 60s (Next.js `revalidate`) to avoid paying that
     cost on every dashboard page load - expect the same latency here on a
     cold call from Bruno.
+  - "omzetTrend" has 12 monthly data points (the 11 full prior calendar
+    months plus the current month, capped at TODAY and flagged
+    isPartial: true for the current-month entry). Same revenue rule as
+    statCards.omzetDezeMaand (factuur.type EQ TRUE, sum factuur.totaal).
 }
