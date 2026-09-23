@@ -408,8 +408,8 @@ CLASS Luna.BusinessLogic.DashboardBE:
     END METHOD.
 
     /*------------------------------------------------------------------------------
-        Purpose: Returns 6 monthly invoice-total data points for the dashboard
-                 omzet trend: the 5 full prior calendar months plus the current
+        Purpose: Returns 12 monthly invoice-total data points for the dashboard
+                 omzet trend: the 11 full prior calendar months plus the current
                  month from the 1st through TODAY. Uses the same revenue rule as
                  GetStatCards (factuur.type EQ TRUE, sum factuur.totaal via
                  factuur-x4).
@@ -427,8 +427,8 @@ CLASS Luna.BusinessLogic.DashboardBE:
 
         EMPTY TEMP-TABLE ttOmzetTrend.
 
-        /* Build months 5..0 months ago (oldest -> newest). */
-        DO iOffset = 5 TO 0 BY -1:
+        /* Build months 11..0 months ago (oldest -> newest). */
+        DO iOffset = 11 TO 0 BY -1:
 
             iTargetMonth = MONTH(TODAY) - iOffset.
             iTargetYear  = YEAR(TODAY).
