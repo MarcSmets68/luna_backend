@@ -22,7 +22,10 @@ Backend/
 │       │   ├── AiSearchHandler.cls    AI-powered natural-language search (POST /web/ai-search) - see "AI Search" section below
 │       │   ├── RapportageHandler.cls  Rapportage section (GET /web/rapportage/verkoop-fur - Verkoop FUR dealer overview), see Luna.BusinessLogic.VerkoopFurBE
 │       │   ├── PricingHandler.cls     Iteratie A pricing engine (POST /web/pricing/bereken) - see "Pricing engine (Iteratie A, K1-K5)" section below
-│       │   └── BtwHandler.cls         Iteratie B BTW/VAT calculation engine (POST /web/btw/bereken) - see "BTW/VAT engine (Iteratie B)" section below
+│       │   ├── BtwHandler.cls         Iteratie B BTW/VAT calculation engine (POST /web/btw/bereken) - see "BTW/VAT engine (Iteratie B)" section below
+│       │   ├── LedRALHandler.cls      Read-only for led_RAL (GET /web/led-ral[/{ral}]) - see docs/backend/coating-reference-data.md
+│       │   ├── LedNCSHandler.cls      Read-only for led_NCS (GET /web/led-ncs[/{ncs}]) - see docs/backend/coating-reference-data.md
+│       │   └── LedKleurafwerkingHandler.cls  Full CRUD for led_kleurafwerking (GET/POST/PUT/DELETE /web/led-kleurafwerking[/{kleursoort}/{kode}]) - see docs/backend/coating-reference-data.md
 │       └── BusinessLogic/
 │           ├── LakproductieBE.cls          1:1 port of legacy ExportLakProductie.w (3 sources: lopende-orders / lopende-productielijnen / min-max-voorraad)
 │           ├── LakproductieVerkoopService.cls  Rolling 1/3/6/9/12-month verkoop totals per artnr, shared by LakproductieBE
@@ -49,7 +52,10 @@ Backend/
 │           ├── GeminiGateway.cls      Thin wrapper around the Google Gemini REST API, used only by AiSearchBE - see "AI Search" section below
 │           ├── VerkoopFurBE.cls       DB access for the Verkoop FUR rapportage overview (read-only, NO-LOCK) - Nomaled dealers who ordered a NOMALED.FUR* article in the rolling 12 months
 │           ├── PricingEngineBE.cls    Iteratie A pure read-only pricing engine (K1-K5) - 1:1 port of legacy Include/Prijs.i - see "Pricing engine (Iteratie A, K1-K5)" section below
-│           └── BtwBerekeningBE.cls    Iteratie B pure read-only BTW/VAT calculation engine (max 2 btw-kode groups, K3/K5 document discount) - see "BTW/VAT engine (Iteratie B)" section below
+│           ├── BtwBerekeningBE.cls    Iteratie B pure read-only BTW/VAT calculation engine (max 2 btw-kode groups, K3/K5 document discount) - see "BTW/VAT engine (Iteratie B)" section below
+│           ├── LedRALBE.cls           Read-only DB access for led_RAL (216 rows, RAL color reference) - see docs/backend/coating-reference-data.md
+│           ├── LedNCSBE.cls           Read-only DB access for led_NCS (1950 rows, NCS color reference) - see docs/backend/coating-reference-data.md
+│           └── LedKleurafwerkingBE.cls  Full CRUD DB access for led_kleurafwerking (15 rows, exposes pre-existing `standaard`/standaardkleur flag) - see docs/backend/coating-reference-data.md
 ├── build/                Compiled r-code (generated, not source of truth - safe to delete/regenerate)
 ├── scripts/
 │   ├── compile.p         CLI compile-all procedure
@@ -199,6 +205,17 @@ required.
   the BTW/VAT calculation engine WebHandler (see "BTW/VAT engine
   (Iteratie B)" section below). Also added to that same live
   `openedge.properties` and the PASOE instance restarted to pick it up.
+- `handler28=Luna.Web.LedRALHandler: /led-ral`,
+  `handler29=Luna.Web.LedNCSHandler: /led-ncs`,
+  `handler30=Luna.Web.LedKleurafwerkingHandler: /led-kleurafwerking` — 3
+  new coating-module reference-data handlers (see
+  `docs/backend/coating-reference-data.md`). **Not yet added to the live
+  `openedge.properties`, not yet compiled, PASOE not yet restarted** — the
+  session that wrote this code ran in a sandbox that denied every command
+  needed to do so (spawning `_progres.exe`/`tcman.bat`, creating new
+  directories, editing files outside this git workspace). See "Known gap"
+  in `docs/backend/coating-reference-data.md` for the exact remaining
+  steps before this can be considered done per `AGENTS.md`.
 
 Restart the instance after changing `openedge.properties`:
 ```powershell
