@@ -1,0 +1,23 @@
+meta {
+  name: Get
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/web/led-kleurafwerking/TQ/BRUNO_TEST
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Single lookup by kleursoort/kode - run after Create.
+}

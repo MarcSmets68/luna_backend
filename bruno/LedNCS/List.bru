@@ -1,0 +1,31 @@
+meta {
+  name: List
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/led-ncs?pageSize=5
+  body: none
+  auth: none
+}
+
+params:query {
+  pageSize: 5
+  ~page:
+  ~omschrijvingPrefix:
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists led_NCS rows (paged, read-only). Backed by
+  Backend/src/Luna/Web/LedNCSHandler.cls + Luna/BusinessLogic/LedNCSBE.cls.
+  See docs/backend/coating-reference-data.md.
+}

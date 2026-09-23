@@ -1,0 +1,23 @@
+meta {
+  name: GetNotFound
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/web/led-ral/999999
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 404
+}
+
+docs {
+  Non-existent ral code -> 404.
+}
