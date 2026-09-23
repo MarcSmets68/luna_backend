@@ -343,6 +343,7 @@ CLASS Luna.Web.KlantHandler INHERITS WebHandler:
         DEFINE VARIABLE iPageSize       AS INTEGER        NO-UNDO.
         DEFINE VARIABLE cNaam           AS CHARACTER      NO-UNDO.
         DEFINE VARIABLE lHasMore        AS LOGICAL        NO-UNDO.
+        DEFINE VARIABLE lNomaledOnly    AS LOGICAL        NO-UNDO.
 
         cRemainder = GetPathRemainder(poRequest).
         iSegCount  = SegmentCount(cRemainder).
@@ -366,7 +367,13 @@ CLASS Luna.Web.KlantHandler INHERITS WebHandler:
             cNaam = poRequest:URI:GetQueryValue("naam":u).
             IF cNaam EQ ? THEN cNaam = "":u.
 
-            hResult = oService:GetKlanten(iPage, iPageSize, cNaam, OUTPUT lHasMore).
+            /* Same permissive parse style as page/pageSize above - invalid
+               or missing "nomaled" query param means "no filter" (FALSE),
+               never a 400. */
+            lNomaledOnly = LOGICAL(poRequest:URI:GetQueryValue("nomaled":u)) NO-ERROR.
+            IF lNomaledOnly EQ ? THEN lNomaledOnly = FALSE.
+
+            hResult = oService:GetKlanten(iPage, iPageSize, cNaam, lNomaledOnly, OUTPUT lHasMore).
             oBody   = ResultHandleToJson(hResult).
 
             oBody:Add("page":u, iPage).

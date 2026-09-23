@@ -4,6 +4,7 @@ meta {
   seq: 1
 }
 
+
 get {
   url: {{baseUrl}}/web/klant?pageSize=10
   body: none
@@ -14,6 +15,7 @@ params:query {
   pageSize: 10
   ~naam:
   ~page:
+  ~nomaled:
 }
 
 headers {
@@ -28,7 +30,10 @@ docs {
   Lists klant rows (paged). Query params: naam (space-separated words,
   case-insensitive - every word must occur somewhere across naam/naam1
   combined, in any order, e.g. "Smets Marc" matches naam "Smets" / naam1
-  "Marc"), page (default 1), pageSize (default 25, max 200). Response
+  "Marc"), page (default 1), pageSize (default 25, max 200), nomaled
+  (boolean, default false - when true restricts to Nomaled-dealer
+  customers, klant.swNomaled = TRUE; AND-combined with naam/pagination;
+  invalid/missing falls back to false, never a 400). Response
   includes hasMore instead of an exact totalCount - see Backend/README.md
   for why. Backed by Backend/src/Luna/Web/KlantHandler.cls +
   Luna/BusinessLogic/KlantBE.cls.

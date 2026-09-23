@@ -25,9 +25,15 @@
                     reliable status field is identified. Bedrag = sum of
                     b-bedrag over those rows.
                   - "Orders in productie": bon rows where geparkeerd = FALSE
-                    AND verzonden = FALSE (same "open order" rule as
-                    Luna.BusinessLogic.LakproductieBE). "Leveren deze week"
-                    is the subset of those with lev-dat in the current
+                    AND verzonden = FALSE - a bon-level "open order" proxy
+                    (there is no production-stage field on bon itself; see
+                    the note above). This is NOT the same rule as
+                    Luna.BusinessLogic.LakproductieBE, which works at the
+                    bonlijn level (te-leveren NE 0, excluding lines already
+                    fully Gereserveerd/Besteld) - the two happen to serve a
+                    similar "still open" purpose but are separate,
+                    independently-confirmed business rules. "Leveren deze
+                    week" is the subset of those with lev-dat in the current
                     Monday-Sunday week.
                   - "Omzet deze maand": sum of factuur.totaal (type EQ TRUE,
                     i.e. invoices only - credit notes excluded, same rule as

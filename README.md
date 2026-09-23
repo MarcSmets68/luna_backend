@@ -178,6 +178,37 @@ $env:DLC = "C:\Progress\OpenEdge"
 & "C:\OpenEdge\MarcOepas\bin\tcman.bat" start
 ```
 
+## MarcDev instance (CI/CD target)
+A second PASOE instance, `MarcDev` (`C:\OpenEdge\WRK\MarcDev`, Tomcat ports
+8081/8444, same host `PC-MICHEL-17` as `MarcTest`), exists so CI can
+compile/restart/smoke-test without touching `MarcTest` while someone is
+manually testing against it. Its `openedge.properties` (outside this
+workspace) mirrors `MarcTest`'s: same `Backend/build`/`Backend/src` PROPATH
+entries, the same `agentStartupParam` pointing at the shared `LunaNew`
+database on `lhdc01:4500` (user `ABNA`, `-cpinternal`/`-cpstream UTF-8`), and
+the same `handler1..handler25` mappings under `[MarcDev.ROOT.WEB]`.
+
+**MarcDev intentionally shares the same `lhdc01` database as `MarcTest`** —
+this was a deliberate choice over an isolated local copy, so CI exercises
+the real shared test data. This means a CI run and a manual `MarcTest`
+session can in principle race on the same rows (e.g. `bonnr` allocation);
+no isolation has been added for that. Whenever `MarcTest`'s
+`openedge.properties` handler list changes, mirror the same change into
+`MarcDev`'s.
+
+CI (`Backend/.github/workflows/ci.yml`) requires a **self-hosted GitHub
+Actions runner** registered with the label `pasoe-windows` on a machine with
+OpenEdge installed (currently `PC-MICHEL-17`, the same machine both
+instances run on) — GitHub-hosted runners can't compile/run ABL. On every
+PR/push it runs `scripts/compile.ps1`; on push to `main`/`development` it
+also restarts `MarcDev` (`scripts/RestartMarcDev.ps1`) and smoke-tests it
+(`scripts/SmokeTestMarcDev.ps1`, polls `GET /web/test` until
+`databaseConnected: true`). A `concurrency` group serializes runs so two
+pushes never restart `MarcDev` at the same time. This automates the
+"compile clean + PASOE restarted + smoke-tested" part of `AGENTS.md`'s
+Definition of Done — it does not replace backend-tester's contract-level
+verification.
+
 ## Database
 PASOE agents connect to the shared `LunaNew` test database on `lhdc01:4500`
 (client/server, `-N TCP`, user `ABNA`, no password) — the same broker the
