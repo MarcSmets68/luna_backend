@@ -1,0 +1,37 @@
+meta {
+  name: CreateMissingColor400
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{bonnr}}/led
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "groepnr": 2,
+    "ledLijn": 1,
+    "kode": "TESTKODE"
+  }
+}
+
+assert {
+  res.status: eq 400
+}
+
+docs {
+  Verifies the RAL/SC color-code validation: siktaKleurKodes is absent
+  entirely (so slot 1 is blank) -> 400. This is an assumption-based rule
+  (SiktaKleurKodes[1] non-blank) documented in the handoff note as not
+  independently verified against the legacy check-configuratie routine -
+  see Luna.BusinessLogic.BonLedBE:ValidateSiktaKleurKode.
+}
+

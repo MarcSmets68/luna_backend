@@ -20,6 +20,7 @@ Backend/
 │       │   ├── LoginHandler.cls       Auth-MVP login (POST /web/login) - see "Auth-MVP (login/logout)" section below
 │       │   ├── LogoutHandler.cls      Auth-MVP logout (POST /web/logout, X-Auth-Token header) - see "Auth-MVP (login/logout)" section below
 │       │   ├── AiSearchHandler.cls    AI-powered natural-language search (POST /web/ai-search) - see "AI Search" section below
+│       │   ├── RapportageHandler.cls  Rapportage section (GET /web/rapportage/verkoop-fur - Verkoop FUR dealer overview), see Luna.BusinessLogic.VerkoopFurBE
 │       │   ├── PricingHandler.cls     Iteratie A pricing engine (POST /web/pricing/bereken) - see "Pricing engine (Iteratie A, K1-K5)" section below
 │       │   └── BtwHandler.cls         Iteratie B BTW/VAT calculation engine (POST /web/btw/bereken) - see "BTW/VAT engine (Iteratie B)" section below
 │       └── BusinessLogic/
@@ -46,6 +47,7 @@ Backend/
 │           ├── AuthBE.cls             Auth-MVP login/logout/session validation - see "Auth-MVP (login/logout)" section below
 │           ├── AiSearchBE.cls         AI-search orchestration + hardcoded entity/field/operator whitelist - see "AI Search" section below
 │           ├── GeminiGateway.cls      Thin wrapper around the Google Gemini REST API, used only by AiSearchBE - see "AI Search" section below
+│           ├── VerkoopFurBE.cls       DB access for the Verkoop FUR rapportage overview (read-only, NO-LOCK) - Nomaled dealers who ordered a NOMALED.FUR* article in the rolling 12 months
 │           ├── PricingEngineBE.cls    Iteratie A pure read-only pricing engine (K1-K5) - 1:1 port of legacy Include/Prijs.i - see "Pricing engine (Iteratie A, K1-K5)" section below
 │           └── BtwBerekeningBE.cls    Iteratie B pure read-only BTW/VAT calculation engine (max 2 btw-kode groups, K3/K5 document discount) - see "BTW/VAT engine (Iteratie B)" section below
 ├── build/                Compiled r-code (generated, not source of truth - safe to delete/regenerate)
@@ -174,11 +176,21 @@ required.
   `Luna.Web.LakproductieHandler` mapping already in place for
   `GET /web/lakproduktie`, via that mount point's implicit trailing
   wildcard (same approach as handler5/handler7 above).
-- Several other feature branches added `handler15`..`handler25` directly
-  to the live `openedge.properties` (rapportage, LED reference-data
-  endpoints, pakbon) ahead of this README being updated for them - not
-  documented here, see the live file at `C:\OpenEdge\MarcOepas\conf` for
-  the current full list. `handler26=Luna.Web.PricingHandler: /pricing` —
+- `handler15=Luna.Web.RapportageHandler: /rapportage` — maps
+  `/web/rapportage` (and, via the implicit trailing wildcard,
+  `/web/rapportage/{report}`) to the new Rapportage WebHandler. Today
+  only the literal 1st path segment `verkoop-fur` is valid
+  (`GET /web/rapportage/verkoop-fur` — Verkoop FUR dealer overview, see
+  `Luna.BusinessLogic.VerkoopFurBE` and
+  `docs/architecture/verkoop-fur-ontwerp.md`); any other segment is a
+  400, any method other than GET is a 405. Added to the actual
+  `openedge.properties` at `C:\OpenEdge\MarcOepas\conf` (outside this
+  workspace) and the PASOE instance has been restarted to pick it up.
+- Several other feature branches added `handler16`..`handler25` directly
+  to the live `openedge.properties` (LED reference-data endpoints, pakbon)
+  ahead of this README being updated for them - not documented here, see
+  the live file at `C:\OpenEdge\MarcOepas\conf` for the current full list.
+  `handler26=Luna.Web.PricingHandler: /pricing` —
   maps `POST /web/pricing/bereken` to the pricing-engine WebHandler (see
   "Pricing engine (Iteratie A, K1-K5)" section below). Added to the actual
   `openedge.properties` at `C:\OpenEdge\MarcOepas\conf` (outside this
@@ -194,6 +206,37 @@ $env:DLC = "C:\Progress\OpenEdge"
 & "C:\OpenEdge\MarcOepas\bin\tcman.bat" stop
 & "C:\OpenEdge\MarcOepas\bin\tcman.bat" start
 ```
+
+## MarcDev instance (CI/CD target)
+A second PASOE instance, `MarcDev` (`C:\OpenEdge\WRK\MarcDev`, Tomcat ports
+8081/8444, same host `PC-MICHEL-17` as `MarcTest`), exists so CI can
+compile/restart/smoke-test without touching `MarcTest` while someone is
+manually testing against it. Its `openedge.properties` (outside this
+workspace) mirrors `MarcTest`'s: same `Backend/build`/`Backend/src` PROPATH
+entries, the same `agentStartupParam` pointing at the shared `LunaNew`
+database on `lhdc01:4500` (user `ABNA`, `-cpinternal`/`-cpstream UTF-8`), and
+the same `handler1..handler25` mappings under `[MarcDev.ROOT.WEB]`.
+
+**MarcDev intentionally shares the same `lhdc01` database as `MarcTest`** —
+this was a deliberate choice over an isolated local copy, so CI exercises
+the real shared test data. This means a CI run and a manual `MarcTest`
+session can in principle race on the same rows (e.g. `bonnr` allocation);
+no isolation has been added for that. Whenever `MarcTest`'s
+`openedge.properties` handler list changes, mirror the same change into
+`MarcDev`'s.
+
+CI (`Backend/.github/workflows/ci.yml`) requires a **self-hosted GitHub
+Actions runner** registered with the label `pasoe-windows` on a machine with
+OpenEdge installed (currently `PC-MICHEL-17`, the same machine both
+instances run on) — GitHub-hosted runners can't compile/run ABL. On every
+PR/push it runs `scripts/compile.ps1`; on push to `main`/`development` it
+also restarts `MarcDev` (`scripts/RestartMarcDev.ps1`) and smoke-tests it
+(`scripts/SmokeTestMarcDev.ps1`, polls `GET /web/test` until
+`databaseConnected: true`). A `concurrency` group serializes runs so two
+pushes never restart `MarcDev` at the same time. This automates the
+"compile clean + PASOE restarted + smoke-tested" part of `AGENTS.md`'s
+Definition of Done — it does not replace backend-tester's contract-level
+verification.
 
 ## Database
 PASOE agents connect to the shared `LunaNew` test database on `lhdc01:4500`

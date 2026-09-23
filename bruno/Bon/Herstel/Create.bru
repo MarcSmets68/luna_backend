@@ -1,0 +1,38 @@
+meta {
+  name: Create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{herstelBonnr}}/herstel
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "TESTART",
+    "omschr": "Test toestel",
+    "probleem": "Werkt niet meer",
+    "technieker": "MARC"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.bonnr: eq {{herstelBonnr}}
+  res.body.stempel: eq ONTVANGST
+}
+
+docs {
+  Creates the bon_herstel record for {{herstelBonnr}}. `stempel` defaults
+  to ONTVANGST (db default). Requires "CreateHerstellingBon" to have run
+  first.
+}
+

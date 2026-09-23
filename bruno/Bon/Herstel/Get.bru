@@ -1,0 +1,24 @@
+meta {
+  name: Get
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/web/bon/{{herstelBonnr}}/herstel
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Gets the bon_herstel record for {{herstelBonnr}}.
+}
+

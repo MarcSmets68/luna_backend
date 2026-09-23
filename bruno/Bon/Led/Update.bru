@@ -1,0 +1,33 @@
+meta {
+  name: Update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/web/bon/{{bonnr}}/led/{{ledGroepnr}}/{{ledLijn}}/{{ledLijnnr}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "aantal": 2,
+    "siktaKleurKodes": ["RAL9010", "", "", "", ""]
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Partial update of a bon_led row. 400 if siktaKleurKodes[1] would end up
+  blank. 409 if the linked bonlijn (via docLijnnr) has stempel = "D".
+}
+

@@ -1,0 +1,26 @@
+meta {
+  name: WrongTypeBlocked
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/web/bon/{{bonnr}}/herstel
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 409
+}
+
+docs {
+  {{bonnr}} (from the main Bon/Create.bru chain) is type ORDERBEVESTIGING,
+  not HERSTELLING - every bon_herstel endpoint 409s in that case. Proves
+  the EnsureBonIsHerstelling guard in Luna.BusinessLogic.BonHerstelBE.cls.
+}
+

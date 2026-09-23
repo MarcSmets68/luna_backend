@@ -1,0 +1,26 @@
+meta {
+  name: Delete
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/web/bon/{{bonnr}}/lijn/{{lijnnr}}/productie/{{plijnnr}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Deletes the productie sublijn created above. Run last in this folder.
+  Note: DeleteLijn.bru (in Bon/) will 409 if this sublijn still has
+  besteld <> 0 - see BonLijnBE:DeleteBonLijn's new guard.
+}
+

@@ -1,0 +1,24 @@
+meta {
+  name: Delete
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/web/bon/{{bonnr}}/led/{{ledGroepnr}}/{{ledLijn}}/{{ledLijnnr}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Deletes the bon_led row created above. Run last in this folder.
+}
+

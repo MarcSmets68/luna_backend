@@ -1,0 +1,33 @@
+meta {
+  name: Update
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/web/bon/{{bonnr}}/led-qc/{{qcGroepnr}}/{{qcVolgnr}}/{{qcLijnnr}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "controle": "NOK",
+    "info": "Herzien"
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Partial update of a bon_led_qc row. No extra validation on this
+  resource per the design.
+}
+

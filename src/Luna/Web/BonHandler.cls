@@ -49,6 +49,12 @@ USING Progress.Json.ObjectModel.JsonArray.
 USING Progress.Json.ObjectModel.ObjectModelParser. 
 USING Luna.BusinessLogic.BonBE. 
 USING Luna.BusinessLogic.BonLijnBE.
+USING Luna.BusinessLogic.BonLijnProductieBE.
+USING Luna.BusinessLogic.BonLedBE.
+USING Luna.BusinessLogic.BonLedQcBE.
+USING Luna.BusinessLogic.BonHerstelBE.
+USING Luna.BusinessLogic.BonLijnReserveringBE.
+USING Luna.BusinessLogic.PakLijnBE.
  
 BLOCK-LEVEL ON ERROR UNDO, THROW. 
  
@@ -143,6 +149,25 @@ CLASS Luna.Web.BonHandler INHERITS WebHandler:
         IF ENTRY(2, pcRemainder, "/":u) NE "lijn":u THEN
             UNDO, THROW NEW Progress.Lang.AppError(
                 SUBSTITUTE("Expected /bon/[bonnr]/lijn[/[lijnnr]], got &1":u, pcRemainder), 400).
+
+    END METHOD.
+
+    /*------------------------------------------------------------------------------
+        Purpose: Parses the Nth path segment into an integer.
+        Errors : Throws AppError 400 if the segment is not numeric.
+    ------------------------------------------------------------------------------*/
+    METHOD PRIVATE INTEGER ParseEntryInt( INPUT pcRemainder AS CHARACTER, INPUT piEntryNum AS INTEGER, INPUT pcLabel AS CHARACTER ):
+
+        DEFINE VARIABLE cValue AS CHARACTER NO-UNDO.
+        DEFINE VARIABLE iValue AS INTEGER   NO-UNDO.
+
+        cValue = ENTRY(piEntryNum, pcRemainder, "/":u).
+
+        iValue = INTEGER(cValue) NO-ERROR.
+        IF ERROR-STATUS:ERROR THEN
+            UNDO, THROW NEW Progress.Lang.AppError(SUBSTITUTE("Invalid &1 &2":u, pcLabel, cValue), 400).
+
+        RETURN iValue.
 
     END METHOD.
 
@@ -287,49 +312,214 @@ CLASS Luna.Web.BonHandler INHERITS WebHandler:
         DEFINE VARIABLE hResult    AS HANDLE     NO-UNDO. 
         DEFINE VARIABLE oBody      AS JsonObject NO-UNDO. 
         DEFINE VARIABLE lHasMore   AS LOGICAL    NO-UNDO. 
+        DEFINE VARIABLE cEntry2    AS CHARACTER  NO-UNDO.
+        DEFINE VARIABLE cEntry4    AS CHARACTER  NO-UNDO.
+        DEFINE VARIABLE iPLijnnr   AS INTEGER    NO-UNDO.
+        DEFINE VARIABLE iGroepnr   AS INTEGER    NO-UNDO.
+        DEFINE VARIABLE iLedLijn   AS INTEGER    NO-UNDO.
+        DEFINE VARIABLE iVolgnr    AS INTEGER    NO-UNDO.
+        DEFINE VARIABLE cGroepnrQ  AS CHARACTER  NO-UNDO.
+        DEFINE VARIABLE iGroepnrFilter AS INTEGER NO-UNDO.
+        DEFINE VARIABLE oProdBE    AS BonLijnProductieBE NO-UNDO.
+        DEFINE VARIABLE oLedBE     AS BonLedBE           NO-UNDO.
+        DEFINE VARIABLE oLedQcBE   AS BonLedQcBE         NO-UNDO.
+        DEFINE VARIABLE oHerstelBE AS BonHerstelBE       NO-UNDO.
+        DEFINE VARIABLE oPakLijnBE AS PakLijnBE          NO-UNDO.
  
         cRemainder = GetPathRemainder(poRequest).
         iSegCount  = SegmentCount(cRemainder).
 
         IF iSegCount GE 2 THEN
         DO:
-            /* GET /bon/{bonnr}/lijn[/{lijnnr}] */
-            ValidateLijnSegment(cRemainder).
-            iBonnr     = ParseBonnr(cRemainder).
-            oBonLijnBE = NEW BonLijnBE().
+            iBonnr  = ParseBonnr(cRemainder).
+            cEntry2 = ENTRY(2, cRemainder, "/":u).
 
-            IF iSegCount EQ 3 THEN
-            DO:
-                iLijnnr = ParseLijnnr(cRemainder).
+            CASE cEntry2:
+                WHEN "lijn":u THEN
+                DO:
+                    IF iSegCount EQ 2 THEN
+                    DO:
+                        /* GET /bon/{bonnr}/lijn (list, no paging - a bon
+                           typically has a bounded number of lines). */
+                        oBonLijnBE = NEW BonLijnBE().
+                        hResult    = oBonLijnBE:GetBonLijnen(iBonnr).
+                        oBody      = ResultHandleToJson(hResult).
 
-                hResult = oBonLijnBE:GetBonLijn(iBonnr, iLijnnr).
-                oBody   = ResultHandleToJson(hResult).
-                oItems  = oBody:GetJsonArray("items":u).
+                        WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oBody).
+                        RETURN 0.
+                    END.
 
-                IF oItems:Length EQ 0 THEN
-                    WriteErrorResponse(INTEGER(StatusCodeEnum:NotFound),
-                        SUBSTITUTE("Bonlijn &1/&2 not found":u, iBonnr, iLijnnr)).
-                ELSE
-                    WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oItems:GetJsonObject(1)).
+                    iLijnnr = ParseEntryInt(cRemainder, 3, "lijnnr":u).
 
-                RETURN 0.
-            END.
+                    IF iSegCount EQ 3 THEN
+                    DO:
+                        /* GET /bon/{bonnr}/lijn/{lijnnr} */
+                        oBonLijnBE = NEW BonLijnBE().
+                        hResult    = oBonLijnBE:GetBonLijn(iBonnr, iLijnnr).
+                        oBody      = ResultHandleToJson(hResult).
+                        oItems     = oBody:GetJsonArray("items":u).
 
-            IF iSegCount NE 2 THEN
-            DO:
-                WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest),
-                    SUBSTITUTE("Expected /bon/[bonnr]/lijn[/[lijnnr]], got &1":u, cRemainder)).
-                RETURN 0.
-            END.
+                        IF oItems:Length EQ 0 THEN
+                            WriteErrorResponse(INTEGER(StatusCodeEnum:NotFound),
+                                SUBSTITUTE("Bonlijn &1/&2 not found":u, iBonnr, iLijnnr)).
+                        ELSE
+                            WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oItems:GetJsonObject(1)).
 
-            /* GET /bon/{bonnr}/lijn (list, no paging - a bon typically has
-               a bounded number of lines). */
-            hResult = oBonLijnBE:GetBonLijnen(iBonnr).
-            oBody   = ResultHandleToJson(hResult).
+                        RETURN 0.
+                    END.
 
-            WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oBody).
+                    /* iSegCount >= 4: /lijn/{lijnnr}/productie[/{lijnnr}]
+                       or /lijn/{lijnnr}/pakbonnen */
+                    cEntry4 = ENTRY(4, cRemainder, "/":u).
 
-            RETURN 0.
+                    IF cEntry4 EQ "productie":u THEN
+                    DO:
+                        oProdBE = NEW BonLijnProductieBE().
+
+                        IF iSegCount EQ 4 THEN
+                        DO:
+                            hResult = oProdBE:GetProductieLijnen(iBonnr, iLijnnr).
+                            oBody   = ResultHandleToJson(hResult).
+                            WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oBody).
+                            RETURN 0.
+                        END.
+
+                        iPLijnnr = ParseEntryInt(cRemainder, 5, "lijnnr":u).
+
+                        hResult = oProdBE:GetProductieLijn(iBonnr, iLijnnr, iPLijnnr).
+                        oBody   = ResultHandleToJson(hResult).
+                        oItems  = oBody:GetJsonArray("items":u).
+
+                        IF oItems:Length EQ 0 THEN
+                            WriteErrorResponse(INTEGER(StatusCodeEnum:NotFound),
+                                SUBSTITUTE("Productie sublijn &1/&2/&3 not found":u, iBonnr, iLijnnr, iPLijnnr)).
+                        ELSE
+                            WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oItems:GetJsonObject(1)).
+
+                        RETURN 0.
+                    END.
+
+                    IF cEntry4 EQ "pakbonnen":u AND iSegCount EQ 4 THEN
+                    DO:
+                        oPakLijnBE = NEW PakLijnBE().
+                        hResult    = oPakLijnBE:GetPakLijnenForBonlijn(iBonnr, iLijnnr).
+                        oBody      = ResultHandleToJson(hResult).
+                        WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oBody).
+                        RETURN 0.
+                    END.
+
+                    WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest),
+                        SUBSTITUTE("Unknown /bon/[bonnr]/lijn/[lijnnr]/... sub-resource, got &1":u, cRemainder)).
+                    RETURN 0.
+                END.
+
+                WHEN "led":u THEN
+                DO:
+                    oLedBE = NEW BonLedBE().
+
+                    IF iSegCount EQ 2 THEN
+                    DO:
+                        cGroepnrQ = poRequest:URI:GetQueryValue("groepnr":u).
+                        iGroepnrFilter = 0.
+                        IF cGroepnrQ NE ? THEN
+                        DO:
+                            iGroepnrFilter = INTEGER(cGroepnrQ) NO-ERROR.
+                            IF ERROR-STATUS:ERROR THEN
+                            DO:
+                                WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest),
+                                    SUBSTITUTE("Invalid groepnr &1":u, cGroepnrQ)).
+                                RETURN 0.
+                            END.
+                        END.
+
+                        hResult = oLedBE:GetBonLedLijnen(iBonnr, iGroepnrFilter).
+                        oBody   = ResultHandleToJson(hResult).
+                        WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oBody).
+                        RETURN 0.
+                    END.
+
+                    iGroepnr = ParseEntryInt(cRemainder, 3, "groepnr":u).
+                    iLedLijn = ParseEntryInt(cRemainder, 4, "ledLijn":u).
+                    iLijnnr  = ParseEntryInt(cRemainder, 5, "lijnnr":u).
+
+                    hResult = oLedBE:GetBonLedLijn(iBonnr, iGroepnr, iLedLijn, iLijnnr).
+                    oBody   = ResultHandleToJson(hResult).
+                    oItems  = oBody:GetJsonArray("items":u).
+
+                    IF oItems:Length EQ 0 THEN
+                        WriteErrorResponse(INTEGER(StatusCodeEnum:NotFound),
+                            SUBSTITUTE("LED-lijn &1/&2/&3/&4 not found":u, iBonnr, iGroepnr, iLedLijn, iLijnnr)).
+                    ELSE
+                        WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oItems:GetJsonObject(1)).
+
+                    RETURN 0.
+                END.
+
+                WHEN "led-qc":u THEN
+                DO:
+                    oLedQcBE = NEW BonLedQcBE().
+
+                    IF iSegCount EQ 2 THEN
+                    DO:
+                        cGroepnrQ = poRequest:URI:GetQueryValue("groepnr":u).
+                        iGroepnrFilter = 0.
+                        IF cGroepnrQ NE ? THEN
+                        DO:
+                            iGroepnrFilter = INTEGER(cGroepnrQ) NO-ERROR.
+                            IF ERROR-STATUS:ERROR THEN
+                            DO:
+                                WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest),
+                                    SUBSTITUTE("Invalid groepnr &1":u, cGroepnrQ)).
+                                RETURN 0.
+                            END.
+                        END.
+
+                        hResult = oLedQcBE:GetBonLedQcLijnen(iBonnr, iGroepnrFilter).
+                        oBody   = ResultHandleToJson(hResult).
+                        WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oBody).
+                        RETURN 0.
+                    END.
+
+                    iGroepnr = ParseEntryInt(cRemainder, 3, "groepnr":u).
+                    iVolgnr  = ParseEntryInt(cRemainder, 4, "volgnr":u).
+                    iLijnnr  = ParseEntryInt(cRemainder, 5, "lijnnr":u).
+
+                    hResult = oLedQcBE:GetBonLedQcLijn(iBonnr, iGroepnr, iVolgnr, iLijnnr).
+                    oBody   = ResultHandleToJson(hResult).
+                    oItems  = oBody:GetJsonArray("items":u).
+
+                    IF oItems:Length EQ 0 THEN
+                        WriteErrorResponse(INTEGER(StatusCodeEnum:NotFound),
+                            SUBSTITUTE("LED-QC-lijn &1/&2/&3/&4 not found":u, iBonnr, iGroepnr, iVolgnr, iLijnnr)).
+                    ELSE
+                        WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oItems:GetJsonObject(1)).
+
+                    RETURN 0.
+                END.
+
+                WHEN "herstel":u THEN
+                DO:
+                    oHerstelBE = NEW BonHerstelBE().
+                    hResult    = oHerstelBE:GetBonHerstel(iBonnr).
+                    oBody      = ResultHandleToJson(hResult).
+                    oItems     = oBody:GetJsonArray("items":u).
+
+                    IF oItems:Length EQ 0 THEN
+                        WriteErrorResponse(INTEGER(StatusCodeEnum:NotFound),
+                            SUBSTITUTE("Bon &1 has no bon_herstel record":u, iBonnr)).
+                    ELSE
+                        WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oItems:GetJsonObject(1)).
+
+                    RETURN 0.
+                END.
+
+                OTHERWISE
+                DO:
+                    WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest),
+                        SUBSTITUTE("Unknown /bon/[bonnr]/... sub-resource, got &1":u, cRemainder)).
+                    RETURN 0.
+                END.
+            END CASE.
         END.
 
         oService = NEW BonBE(). 
@@ -435,15 +625,25 @@ CLASS Luna.Web.BonHandler INHERITS WebHandler:
     ------------------------------------------------------------------------------*/
     METHOD OVERRIDE PROTECTED INTEGER HandlePost( INPUT poRequest AS IWebRequest ):
 
-        DEFINE VARIABLE oService    AS BonBE      NO-UNDO.
-        DEFINE VARIABLE oBonLijnBE  AS BonLijnBE  NO-UNDO.
-        DEFINE VARIABLE cRemainder  AS CHARACTER  NO-UNDO.
-        DEFINE VARIABLE iSegCount   AS INTEGER    NO-UNDO.
-        DEFINE VARIABLE iBonnr      AS INTEGER    NO-UNDO.
-        DEFINE VARIABLE oReqBody    AS JsonObject NO-UNDO.
-        DEFINE VARIABLE hResult     AS HANDLE     NO-UNDO.
-        DEFINE VARIABLE oBody       AS JsonObject NO-UNDO.
-        DEFINE VARIABLE oItems      AS JsonArray  NO-UNDO.
+        DEFINE VARIABLE oService     AS BonBE      NO-UNDO.
+        DEFINE VARIABLE oBonLijnBE   AS BonLijnBE  NO-UNDO.
+        DEFINE VARIABLE cRemainder   AS CHARACTER  NO-UNDO.
+        DEFINE VARIABLE iSegCount    AS INTEGER    NO-UNDO.
+        DEFINE VARIABLE iBonnr       AS INTEGER    NO-UNDO.
+        DEFINE VARIABLE iLijnnr      AS INTEGER    NO-UNDO.
+        DEFINE VARIABLE oReqBody     AS JsonObject NO-UNDO.
+        DEFINE VARIABLE hResult      AS HANDLE     NO-UNDO.
+        DEFINE VARIABLE oBody        AS JsonObject NO-UNDO.
+        DEFINE VARIABLE oItems       AS JsonArray  NO-UNDO.
+        DEFINE VARIABLE cEntry2      AS CHARACTER  NO-UNDO.
+        DEFINE VARIABLE cEntry3      AS CHARACTER  NO-UNDO.
+        DEFINE VARIABLE cEntry4      AS CHARACTER  NO-UNDO.
+        DEFINE VARIABLE oProdBE      AS BonLijnProductieBE     NO-UNDO.
+        DEFINE VARIABLE oLedBE       AS BonLedBE               NO-UNDO.
+        DEFINE VARIABLE oLedQcBE     AS BonLedQcBE             NO-UNDO.
+        DEFINE VARIABLE oHerstelBE   AS BonHerstelBE           NO-UNDO.
+        DEFINE VARIABLE oReserveBE   AS BonLijnReserveringBE   NO-UNDO.
+        DEFINE VARIABLE dDelta       AS DECIMAL                NO-UNDO.
 
         cRemainder = GetPathRemainder(poRequest).
         iSegCount  = SegmentCount(cRemainder).
@@ -462,12 +662,13 @@ CLASS Luna.Web.BonHandler INHERITS WebHandler:
             RETURN 0.
         END.
 
-        IF iSegCount EQ 2 AND ENTRY(2, cRemainder, "/":u) EQ "annuleer":u THEN
+        iBonnr  = ParseBonnr(cRemainder).
+        cEntry2 = ENTRY(2, cRemainder, "/":u).
+
+        IF iSegCount EQ 2 AND cEntry2 EQ "annuleer":u THEN
         DO:
             /* POST /bon/{bonnr}/annuleer (cancel bon). Request body is
                ignored - nothing is read from oReqBody here. */
-            iBonnr = ParseBonnr(cRemainder).
-
             oService = NEW BonBE().
             hResult  = oService:AnnuleerBon(iBonnr).
             oBody    = ResultHandleToJson(hResult).
@@ -478,24 +679,132 @@ CLASS Luna.Web.BonHandler INHERITS WebHandler:
             RETURN 0.
         END.
 
-        IF iSegCount EQ 2 THEN
+        IF cEntry2 EQ "lijn":u THEN
         DO:
-            /* POST /bon/{bonnr}/lijn (create bonlijn) */
-            ValidateLijnSegment(cRemainder).
-            iBonnr = ParseBonnr(cRemainder).
+            IF iSegCount EQ 2 THEN
+            DO:
+                /* POST /bon/{bonnr}/lijn (create bonlijn) */
+                oBonLijnBE = NEW BonLijnBE().
+                hResult    = oBonLijnBE:CreateBonLijn(iBonnr, oReqBody).
+                oBody      = ResultHandleToJson(hResult).
+                oItems     = oBody:GetJsonArray("items":u).
 
-            oBonLijnBE = NEW BonLijnBE().
-            hResult    = oBonLijnBE:CreateBonLijn(iBonnr, oReqBody).
-            oBody      = ResultHandleToJson(hResult).
-            oItems     = oBody:GetJsonArray("items":u).
+                WriteJsonResponse(INTEGER(StatusCodeEnum:Created), oItems:GetJsonObject(1)).
+
+                RETURN 0.
+            END.
+
+            iLijnnr = ParseEntryInt(cRemainder, 3, "lijnnr":u).
+            cEntry4 = ENTRY(4, cRemainder, "/":u).
+
+            IF cEntry4 EQ "productie":u AND iSegCount EQ 4 THEN
+            DO:
+                /* POST /bon/{bonnr}/lijn/{lijnnr}/productie */
+                oProdBE = NEW BonLijnProductieBE().
+                hResult = oProdBE:CreateProductieLijn(iBonnr, iLijnnr, oReqBody).
+                oBody   = ResultHandleToJson(hResult).
+                oItems  = oBody:GetJsonArray("items":u).
+
+                WriteJsonResponse(INTEGER(StatusCodeEnum:Created), oItems:GetJsonObject(1)).
+
+                RETURN 0.
+            END.
+
+            IF cEntry4 EQ "reservering":u AND iSegCount EQ 4 THEN
+            DO:
+                /* POST /bon/{bonnr}/lijn/{lijnnr}/reservering */
+                IF NOT oReqBody:Has("delta":u) THEN
+                    UNDO, THROW NEW Progress.Lang.AppError("delta is required":u, 400).
+
+                dDelta = oReqBody:GetDecimal("delta":u).
+
+                oReserveBE = NEW BonLijnReserveringBE().
+                hResult    = oReserveBE:ApplyReservering(iBonnr, iLijnnr, dDelta).
+                oBody      = ResultHandleToJson(hResult).
+                oItems     = oBody:GetJsonArray("items":u).
+
+                WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oItems:GetJsonObject(1)).
+
+                RETURN 0.
+            END.
+
+            WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest),
+                SUBSTITUTE("Unknown /bon/[bonnr]/lijn/[lijnnr]/... sub-resource, got &1":u, cRemainder)).
+            RETURN 0.
+        END.
+
+        IF cEntry2 EQ "led":u AND iSegCount EQ 2 THEN
+        DO:
+            /* POST /bon/{bonnr}/led (create bon_led) */
+            oLedBE  = NEW BonLedBE().
+            hResult = oLedBE:CreateBonLedLijn(iBonnr, oReqBody).
+            oBody   = ResultHandleToJson(hResult).
+            oItems  = oBody:GetJsonArray("items":u).
 
             WriteJsonResponse(INTEGER(StatusCodeEnum:Created), oItems:GetJsonObject(1)).
 
             RETURN 0.
         END.
 
+        IF cEntry2 EQ "led-qc":u AND iSegCount EQ 2 THEN
+        DO:
+            /* POST /bon/{bonnr}/led-qc (create bon_led_qc) */
+            oLedQcBE = NEW BonLedQcBE().
+            hResult  = oLedQcBE:CreateBonLedQcLijn(iBonnr, oReqBody).
+            oBody    = ResultHandleToJson(hResult).
+            oItems   = oBody:GetJsonArray("items":u).
+
+            WriteJsonResponse(INTEGER(StatusCodeEnum:Created), oItems:GetJsonObject(1)).
+
+            RETURN 0.
+        END.
+
+        IF cEntry2 EQ "herstel":u THEN
+        DO:
+            IF iSegCount EQ 2 THEN
+            DO:
+                /* POST /bon/{bonnr}/herstel (create bon_herstel) */
+                oHerstelBE = NEW BonHerstelBE().
+                hResult    = oHerstelBE:CreateBonHerstel(iBonnr, oReqBody).
+                oBody      = ResultHandleToJson(hResult).
+                oItems     = oBody:GetJsonArray("items":u).
+
+                WriteJsonResponse(INTEGER(StatusCodeEnum:Created), oItems:GetJsonObject(1)).
+
+                RETURN 0.
+            END.
+
+            IF iSegCount EQ 3 THEN
+            DO:
+                cEntry3    = ENTRY(3, cRemainder, "/":u).
+                oHerstelBE = NEW BonHerstelBE().
+
+                CASE cEntry3:
+                    WHEN "diagnose":u THEN
+                        hResult = oHerstelBE:TransitionToDiagnose(iBonnr).
+                    WHEN "bestellen":u THEN
+                        hResult = oHerstelBE:TransitionToBesteld(iBonnr).
+                    WHEN "hersteld":u THEN
+                        hResult = oHerstelBE:TransitionToHersteld(iBonnr).
+                    OTHERWISE
+                    DO:
+                        WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest),
+                            SUBSTITUTE("Unknown /bon/[bonnr]/herstel/... action, got &1":u, cRemainder)).
+                        RETURN 0.
+                    END.
+                END CASE.
+
+                oBody  = ResultHandleToJson(hResult).
+                oItems = oBody:GetJsonArray("items":u).
+
+                WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oItems:GetJsonObject(1)).
+
+                RETURN 0.
+            END.
+        END.
+
         WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest),
-            SUBSTITUTE("Expected /bon or /bon/[bonnr]/lijn, got &1":u, cRemainder)).
+            SUBSTITUTE("Expected /bon or /bon/[bonnr]/..., got &1":u, cRemainder)).
         RETURN 0.
 
         CATCH oAppError AS Progress.Lang.AppError:
@@ -524,25 +833,64 @@ CLASS Luna.Web.BonHandler INHERITS WebHandler:
         DEFINE VARIABLE hResult     AS HANDLE     NO-UNDO.
         DEFINE VARIABLE oBody       AS JsonObject NO-UNDO.
         DEFINE VARIABLE oItems      AS JsonArray  NO-UNDO.
+        DEFINE VARIABLE cEntry2     AS CHARACTER  NO-UNDO.
+        DEFINE VARIABLE cEntry4     AS CHARACTER  NO-UNDO.
+        DEFINE VARIABLE iPLijnnr    AS INTEGER    NO-UNDO.
+        DEFINE VARIABLE iGroepnr    AS INTEGER    NO-UNDO.
+        DEFINE VARIABLE iLedLijn    AS INTEGER    NO-UNDO.
+        DEFINE VARIABLE iVolgnr     AS INTEGER    NO-UNDO.
+        DEFINE VARIABLE oProdBE     AS BonLijnProductieBE NO-UNDO.
+        DEFINE VARIABLE oLedBE      AS BonLedBE           NO-UNDO.
+        DEFINE VARIABLE oLedQcBE    AS BonLedQcBE         NO-UNDO.
+        DEFINE VARIABLE oHerstelBE  AS BonHerstelBE       NO-UNDO.
 
         cRemainder = GetPathRemainder(poRequest).
         iSegCount  = SegmentCount(cRemainder).
 
-        IF LOOKUP(STRING(iSegCount), "1,3":u) EQ 0 THEN
+        IF LOOKUP(STRING(iSegCount), "1,2,3,5":u) EQ 0 THEN
         DO:
             WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest),
-                SUBSTITUTE("Expected /bon/[bonnr] or /bon/[bonnr]/lijn/[lijnnr], got &1":u, cRemainder)).
+                SUBSTITUTE("Unsupported PUT path /bon/&1":u, cRemainder)).
             RETURN 0.
         END.
 
         oReqBody = GetJsonBody(poRequest).
 
-        IF iSegCount EQ 3 THEN
+        IF iSegCount EQ 1 THEN
+        DO:
+            /* PUT /bon/{bonnr} (update bon) */
+            iBonnr = ParseBonnr(cRemainder).
+
+            oService = NEW BonBE().
+            hResult  = oService:UpdateBon(iBonnr, oReqBody).
+            oBody    = ResultHandleToJson(hResult).
+            oItems   = oBody:GetJsonArray("items":u).
+
+            WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oItems:GetJsonObject(1)).
+
+            RETURN 0.
+        END.
+
+        iBonnr  = ParseBonnr(cRemainder).
+        cEntry2 = ENTRY(2, cRemainder, "/":u).
+
+        IF iSegCount EQ 2 AND cEntry2 EQ "herstel":u THEN
+        DO:
+            /* PUT /bon/{bonnr}/herstel (update non-status fields) */
+            oHerstelBE = NEW BonHerstelBE().
+            hResult    = oHerstelBE:UpdateBonHerstel(iBonnr, oReqBody).
+            oBody      = ResultHandleToJson(hResult).
+            oItems     = oBody:GetJsonArray("items":u).
+
+            WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oItems:GetJsonObject(1)).
+
+            RETURN 0.
+        END.
+
+        IF iSegCount EQ 3 AND cEntry2 EQ "lijn":u THEN
         DO:
             /* PUT /bon/{bonnr}/lijn/{lijnnr} (update bonlijn) */
-            ValidateLijnSegment(cRemainder).
-            iBonnr  = ParseBonnr(cRemainder).
-            iLijnnr = ParseLijnnr(cRemainder).
+            iLijnnr = ParseEntryInt(cRemainder, 3, "lijnnr":u).
 
             oBonLijnBE = NEW BonLijnBE().
             hResult    = oBonLijnBE:UpdateBonLijn(iBonnr, iLijnnr, oReqBody).
@@ -554,16 +902,67 @@ CLASS Luna.Web.BonHandler INHERITS WebHandler:
             RETURN 0.
         END.
 
-        /* PUT /bon/{bonnr} (update bon) */
-        iBonnr = ParseBonnr(cRemainder).
+        IF iSegCount EQ 5 AND cEntry2 EQ "lijn":u THEN
+        DO:
+            /* PUT /bon/{bonnr}/lijn/{lijnnr}/productie/{lijnnr} */
+            iLijnnr = ParseEntryInt(cRemainder, 3, "lijnnr":u).
+            cEntry4 = ENTRY(4, cRemainder, "/":u).
 
-        oService = NEW BonBE().
-        hResult  = oService:UpdateBon(iBonnr, oReqBody).
-        oBody    = ResultHandleToJson(hResult).
-        oItems   = oBody:GetJsonArray("items":u).
+            IF cEntry4 NE "productie":u THEN
+            DO:
+                WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest),
+                    SUBSTITUTE("Unsupported PUT path /bon/&1":u, cRemainder)).
+                RETURN 0.
+            END.
 
-        WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oItems:GetJsonObject(1)).
+            iPLijnnr = ParseEntryInt(cRemainder, 5, "lijnnr":u).
 
+            oProdBE = NEW BonLijnProductieBE().
+            hResult = oProdBE:UpdateProductieLijn(iBonnr, iLijnnr, iPLijnnr, oReqBody).
+            oBody   = ResultHandleToJson(hResult).
+            oItems  = oBody:GetJsonArray("items":u).
+
+            WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oItems:GetJsonObject(1)).
+
+            RETURN 0.
+        END.
+
+        IF iSegCount EQ 5 AND cEntry2 EQ "led":u THEN
+        DO:
+            /* PUT /bon/{bonnr}/led/{groepnr}/{ledLijn}/{lijnnr} */
+            iGroepnr = ParseEntryInt(cRemainder, 3, "groepnr":u).
+            iLedLijn = ParseEntryInt(cRemainder, 4, "ledLijn":u).
+            iLijnnr  = ParseEntryInt(cRemainder, 5, "lijnnr":u).
+
+            oLedBE  = NEW BonLedBE().
+            hResult = oLedBE:UpdateBonLedLijn(iBonnr, iGroepnr, iLedLijn, iLijnnr, oReqBody).
+            oBody   = ResultHandleToJson(hResult).
+            oItems  = oBody:GetJsonArray("items":u).
+
+            WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oItems:GetJsonObject(1)).
+
+            RETURN 0.
+        END.
+
+        IF iSegCount EQ 5 AND cEntry2 EQ "led-qc":u THEN
+        DO:
+            /* PUT /bon/{bonnr}/led-qc/{groepnr}/{volgnr}/{lijnnr} */
+            iGroepnr = ParseEntryInt(cRemainder, 3, "groepnr":u).
+            iVolgnr  = ParseEntryInt(cRemainder, 4, "volgnr":u).
+            iLijnnr  = ParseEntryInt(cRemainder, 5, "lijnnr":u).
+
+            oLedQcBE = NEW BonLedQcBE().
+            hResult  = oLedQcBE:UpdateBonLedQcLijn(iBonnr, iGroepnr, iVolgnr, iLijnnr, oReqBody).
+            oBody    = ResultHandleToJson(hResult).
+            oItems   = oBody:GetJsonArray("items":u).
+
+            WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oItems:GetJsonObject(1)).
+
+            RETURN 0.
+        END.
+
+        WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest),
+            SUBSTITUTE("Unsupported PUT path /bon/&1":u, cRemainder)).
         RETURN 0.
 
         CATCH oAppError AS Progress.Lang.AppError:
@@ -589,23 +988,50 @@ CLASS Luna.Web.BonHandler INHERITS WebHandler:
         DEFINE VARIABLE iBonnr      AS INTEGER    NO-UNDO.
         DEFINE VARIABLE iLijnnr     AS INTEGER    NO-UNDO.
         DEFINE VARIABLE oBody       AS JsonObject NO-UNDO.
+        DEFINE VARIABLE cEntry2     AS CHARACTER  NO-UNDO.
+        DEFINE VARIABLE cEntry4     AS CHARACTER  NO-UNDO.
+        DEFINE VARIABLE iPLijnnr    AS INTEGER    NO-UNDO.
+        DEFINE VARIABLE iGroepnr    AS INTEGER    NO-UNDO.
+        DEFINE VARIABLE iLedLijn    AS INTEGER    NO-UNDO.
+        DEFINE VARIABLE iVolgnr     AS INTEGER    NO-UNDO.
+        DEFINE VARIABLE oProdBE     AS BonLijnProductieBE NO-UNDO.
+        DEFINE VARIABLE oLedBE      AS BonLedBE           NO-UNDO.
+        DEFINE VARIABLE oLedQcBE    AS BonLedQcBE         NO-UNDO.
 
         cRemainder = GetPathRemainder(poRequest).
         iSegCount  = SegmentCount(cRemainder).
 
-        IF LOOKUP(STRING(iSegCount), "1,3":u) EQ 0 THEN
+        IF LOOKUP(STRING(iSegCount), "1,3,5":u) EQ 0 THEN
         DO:
             WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest),
-                SUBSTITUTE("Expected /bon/[bonnr] or /bon/[bonnr]/lijn/[lijnnr], got &1":u, cRemainder)).
+                SUBSTITUTE("Unsupported DELETE path /bon/&1":u, cRemainder)).
             RETURN 0.
         END.
 
-        IF iSegCount EQ 3 THEN
+        IF iSegCount EQ 1 THEN
+        DO:
+            /* DELETE /bon/{bonnr} */
+            iBonnr = ParseBonnr(cRemainder).
+
+            oService = NEW BonBE().
+            oService:DeleteBon(iBonnr).
+
+            oBody = NEW JsonObject().
+            oBody:Add("status":u, "deleted":u).
+            oBody:Add("bonnr":u, iBonnr).
+
+            WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oBody).
+
+            RETURN 0.
+        END.
+
+        iBonnr  = ParseBonnr(cRemainder).
+        cEntry2 = ENTRY(2, cRemainder, "/":u).
+
+        IF iSegCount EQ 3 AND cEntry2 EQ "lijn":u THEN
         DO:
             /* DELETE /bon/{bonnr}/lijn/{lijnnr} */
-            ValidateLijnSegment(cRemainder).
-            iBonnr  = ParseBonnr(cRemainder).
-            iLijnnr = ParseLijnnr(cRemainder).
+            iLijnnr = ParseEntryInt(cRemainder, 3, "lijnnr":u).
 
             oBonLijnBE = NEW BonLijnBE().
             oBonLijnBE:DeleteBonLijn(iBonnr, iLijnnr).
@@ -620,18 +1046,81 @@ CLASS Luna.Web.BonHandler INHERITS WebHandler:
             RETURN 0.
         END.
 
-        /* DELETE /bon/{bonnr} */
-        iBonnr = ParseBonnr(cRemainder).
+        IF iSegCount EQ 5 AND cEntry2 EQ "lijn":u THEN
+        DO:
+            /* DELETE /bon/{bonnr}/lijn/{lijnnr}/productie/{lijnnr} */
+            iLijnnr = ParseEntryInt(cRemainder, 3, "lijnnr":u).
+            cEntry4 = ENTRY(4, cRemainder, "/":u).
 
-        oService = NEW BonBE().
-        oService:DeleteBon(iBonnr).
+            IF cEntry4 NE "productie":u THEN
+            DO:
+                WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest),
+                    SUBSTITUTE("Unsupported DELETE path /bon/&1":u, cRemainder)).
+                RETURN 0.
+            END.
 
-        oBody = NEW JsonObject().
-        oBody:Add("status":u, "deleted":u).
-        oBody:Add("bonnr":u, iBonnr).
+            iPLijnnr = ParseEntryInt(cRemainder, 5, "lijnnr":u).
 
-        WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oBody).
+            oProdBE = NEW BonLijnProductieBE().
+            oProdBE:DeleteProductieLijn(iBonnr, iLijnnr, iPLijnnr).
 
+            oBody = NEW JsonObject().
+            oBody:Add("status":u, "deleted":u).
+            oBody:Add("bonnr":u, iBonnr).
+            oBody:Add("blijnnr":u, iLijnnr).
+            oBody:Add("lijnnr":u, iPLijnnr).
+
+            WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oBody).
+
+            RETURN 0.
+        END.
+
+        IF iSegCount EQ 5 AND cEntry2 EQ "led":u THEN
+        DO:
+            /* DELETE /bon/{bonnr}/led/{groepnr}/{ledLijn}/{lijnnr} */
+            iGroepnr = ParseEntryInt(cRemainder, 3, "groepnr":u).
+            iLedLijn = ParseEntryInt(cRemainder, 4, "ledLijn":u).
+            iLijnnr  = ParseEntryInt(cRemainder, 5, "lijnnr":u).
+
+            oLedBE = NEW BonLedBE().
+            oLedBE:DeleteBonLedLijn(iBonnr, iGroepnr, iLedLijn, iLijnnr).
+
+            oBody = NEW JsonObject().
+            oBody:Add("status":u, "deleted":u).
+            oBody:Add("bonnr":u, iBonnr).
+            oBody:Add("groepnr":u, iGroepnr).
+            oBody:Add("ledLijn":u, iLedLijn).
+            oBody:Add("lijnnr":u, iLijnnr).
+
+            WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oBody).
+
+            RETURN 0.
+        END.
+
+        IF iSegCount EQ 5 AND cEntry2 EQ "led-qc":u THEN
+        DO:
+            /* DELETE /bon/{bonnr}/led-qc/{groepnr}/{volgnr}/{lijnnr} */
+            iGroepnr = ParseEntryInt(cRemainder, 3, "groepnr":u).
+            iVolgnr  = ParseEntryInt(cRemainder, 4, "volgnr":u).
+            iLijnnr  = ParseEntryInt(cRemainder, 5, "lijnnr":u).
+
+            oLedQcBE = NEW BonLedQcBE().
+            oLedQcBE:DeleteBonLedQcLijn(iBonnr, iGroepnr, iVolgnr, iLijnnr).
+
+            oBody = NEW JsonObject().
+            oBody:Add("status":u, "deleted":u).
+            oBody:Add("bonnr":u, iBonnr).
+            oBody:Add("groepnr":u, iGroepnr).
+            oBody:Add("volgnr":u, iVolgnr).
+            oBody:Add("lijnnr":u, iLijnnr).
+
+            WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oBody).
+
+            RETURN 0.
+        END.
+
+        WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest),
+            SUBSTITUTE("Unsupported DELETE path /bon/&1":u, cRemainder)).
         RETURN 0.
 
         CATCH oAppError AS Progress.Lang.AppError:

@@ -1,0 +1,26 @@
+meta {
+  name: Diagnose
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{herstelBonnr}}/herstel/diagnose
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.stempel: eq DIAGNOSE
+}
+
+docs {
+  Transitions ONTVANGST -> DIAGNOSE. 409 if stempel isn't currently
+  ONTVANGST.
+}
+

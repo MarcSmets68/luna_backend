@@ -404,6 +404,18 @@ CLASS Luna.BusinessLogic.BonLijnBE:
                 END.
             END.
 
+            IF lSubtotaal THEN
+            DO:
+                IF NOT CAN-FIND(FIRST bonlijn
+                    WHERE bonlijn.bonnr EQ piBonnr
+                      AND bonlijn.lijnnr LT iNewLijnnr
+                      AND bonlijn.subtotaal EQ FALSE
+                      AND bonlijn.kolomtitel EQ FALSE
+                      AND bonlijn.infolijn EQ FALSE) THEN
+                    UNDO, THROW NEW Progress.Lang.AppError(
+                        "Cannot create a subtotaal line with no preceding lines to sum":u, 400).
+            END.
+
             CREATE bonlijn.
             ASSIGN
                 bonlijn.bonnr  = piBonnr
@@ -505,6 +517,14 @@ CLASS Luna.BusinessLogic.BonLijnBE:
 
         EnsureBonExists( piBonnr ).
 
+        IF CAN-FIND(FIRST bonlijn_productie
+            WHERE bonlijn_productie.bonnr  EQ piBonnr
+              AND bonlijn_productie.blijnnr EQ piLijnnr
+              AND bonlijn_productie.besteld NE 0) THEN
+            UNDO, THROW NEW Progress.Lang.AppError(
+                SUBSTITUTE("Bonlijn &1/&2 has a productie sublijn with besteld <> 0 and cannot be deleted":u,
+                    piBonnr, piLijnnr), 409).
+
         DO TRANSACTION:
             FIND FIRST bonlijn EXCLUSIVE-LOCK
                 WHERE bonlijn.bonnr EQ piBonnr
@@ -519,3 +539,4 @@ CLASS Luna.BusinessLogic.BonLijnBE:
     END METHOD.
 
 END CLASS.
+

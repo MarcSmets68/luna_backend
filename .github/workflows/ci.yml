@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+      - development
+  push:
+    branches:
+      - main
+      - development
+
+concurrency:
+  # MarcDev is a single shared PASOE instance - never let two runs restart it
+  # or hit LunaNew at the same time.
+  group: pasoe-marcdev
+  cancel-in-progress: false
+
+jobs:
+  compile:
+    name: Compile (all branches/PRs)
+    runs-on: [self-hosted, pasoe-windows]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Compile ABL sources
+        shell: powershell
+        run: ./scripts/compile.ps1
+
+  deploy-marcdev:
+    name: Restart MarcDev & smoke test
+    needs: compile
+    if: github.event_name == 'push'
+    runs-on: [self-hosted, pasoe-windows]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Compile ABL sources
+        shell: powershell
+        run: ./scripts/compile.ps1
+
+      - name: Restart MarcDev PASOE instance
+        shell: powershell
+        run: ./scripts/RestartMarcDev.ps1
+
+      - name: Smoke test MarcDev
+        shell: powershell
+        run: ./scripts/SmokeTestMarcDev.ps1
