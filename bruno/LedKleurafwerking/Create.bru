@@ -12,7 +12,7 @@ post {
 
 body:json {
   {
-    "kleursoort": "TQ",
+    "kleursoort": "RAL",
     "kode": "BRUNO_TEST",
     "omschr": "Bruno test kleurafwerking",
     "standaard": false
@@ -31,6 +31,7 @@ assert {
 docs {
   Creates a led_kleurafwerking row. kleursoort must exist in
   led_kleursoort (404 otherwise), key (kleursoort/kode) must not already
-  exist (409 otherwise). Adjust "kleursoort" above to a real
-  led_kleursoort.kode value in the target environment before running.
+  exist (409 otherwise). "RAL" is a real led_kleursoort.kode value in
+  LunaNew (confirmed via live smoke test - other real values seen:
+  "NCS", "SC", "SP").
 }
