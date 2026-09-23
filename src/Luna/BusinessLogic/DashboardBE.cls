@@ -52,6 +52,14 @@
                     factuur rows (by date) across all three tables, newest
                     first. There is no activity-log table, so this reflects
                     row creation/status dates, not literal user actions.
+                  - "Omzet 6 maanden trend": 6 monthly data points - the 5
+                    full prior calendar months plus the current month from
+                    the 1st through today - using the same revenue rule as
+                    "Omzet deze maand" above (factuur.type EQ TRUE, sum
+                    factuur.totaal). The last (current-month) point is
+                    flagged isPartial since it doesn't cover a full month.
+                    Months with no matching invoices return total 0.00, not
+                    null.
     Syntax      : Called from Luna.Web.DashboardHandler (GET /web/dashboard)
     Description : Owns all DB access for this feature - no direct DB access
                   is allowed from the WebHandler layer. NO-LOCK reads only.
@@ -93,6 +101,21 @@ CLASS Luna.BusinessLogic.DashboardBE:
         FIELD bedrag     AS DECIMAL   SERIALIZE-NAME "bedrag":u
         FIELD geparkeerd AS LOGICAL   SERIALIZE-NAME "geparkeerd":u.
 
+    /* NOTE: the field holding the display label is named labelText, not
+       label - LABEL is an ABL reserved word (used by the FIELD phrase
+       itself) and cannot be used as a temp-table field name; confirmed by
+       isolating a minimal COMPILE of "FIELD label AS CHARACTER ..." which
+       fails with "Could not understand line N. (198)" even fully
+       buffer-qualified. SERIALIZE-NAME keeps the JSON contract as
+       "label" per the approved design - this is a purely internal ABL
+       identifier rename forced by the reserved word, not an API change. */
+    DEFINE TEMP-TABLE ttOmzetTrend NO-UNDO SERIALIZE-NAME "omzetTrend":u
+        FIELD maand     AS INTEGER   SERIALIZE-NAME "month":u
+        FIELD jaar      AS INTEGER   SERIALIZE-NAME "year":u
+        FIELD labelText AS CHARACTER SERIALIZE-NAME "label":u
+        FIELD totaal    AS DECIMAL   SERIALIZE-NAME "total":u
+        FIELD isPartial AS LOGICAL   SERIALIZE-NAME "isPartial":u.
+
     /*------------------------------------------------------------------------------
         Purpose: Returns the Monday (output 1) and Sunday (output 2) of the
                  week containing pdDate.
@@ -107,6 +130,28 @@ CLASS Luna.BusinessLogic.DashboardBE:
 
         pdMonday = pdDate - iDaysSinceMonday.
         pdSunday = pdMonday + 6.
+
+    END METHOD.
+
+    /*------------------------------------------------------------------------------
+        Purpose: Returns the first (output 1) and last (output 2) date of
+                 the calendar month identified by piMonth/piYear.
+    ------------------------------------------------------------------------------*/
+    METHOD PRIVATE VOID GetMonthBounds( INPUT piMonth AS INTEGER, INPUT piYear AS INTEGER, OUTPUT pdStart AS DATE, OUTPUT pdEnd AS DATE ):
+
+        DEFINE VARIABLE iNextMonth AS INTEGER NO-UNDO.
+        DEFINE VARIABLE iNextYear  AS INTEGER NO-UNDO.
+
+        pdStart = DATE(piMonth, 1, piYear).
+
+        iNextMonth = piMonth + 1.
+        iNextYear  = piYear.
+        IF iNextMonth GT 12 THEN
+            ASSIGN
+                iNextMonth = 1
+                iNextYear  = iNextYear + 1.
+
+        pdEnd = DATE(iNextMonth, 1, iNextYear) - 1.
 
     END METHOD.
 
@@ -359,6 +404,67 @@ CLASS Luna.BusinessLogic.DashboardBE:
         END.
 
         RETURN TEMP-TABLE ttProduction:HANDLE.
+
+    END METHOD.
+
+    /*------------------------------------------------------------------------------
+        Purpose: Returns 6 monthly invoice-total data points for the dashboard
+                 omzet trend: the 5 full prior calendar months plus the current
+                 month from the 1st through TODAY. Uses the same revenue rule as
+                 GetStatCards (factuur.type EQ TRUE, sum factuur.totaal via
+                 factuur-x4).
+    ------------------------------------------------------------------------------*/
+    METHOD PUBLIC HANDLE GetOmzetTrend():
+
+        DEFINE VARIABLE iOffset      AS INTEGER   NO-UNDO.
+        DEFINE VARIABLE iTargetMonth AS INTEGER   NO-UNDO.
+        DEFINE VARIABLE iTargetYear  AS INTEGER   NO-UNDO.
+        DEFINE VARIABLE dStart       AS DATE      NO-UNDO.
+        DEFINE VARIABLE dEnd         AS DATE      NO-UNDO.
+        DEFINE VARIABLE dTotal       AS DECIMAL   NO-UNDO.
+        DEFINE VARIABLE cLabel       AS CHARACTER NO-UNDO.
+        DEFINE VARIABLE cMaandNamen  AS CHARACTER NO-UNDO INITIAL "jan,feb,mrt,apr,mei,jun,jul,aug,sep,okt,nov,dec":u.
+
+        EMPTY TEMP-TABLE ttOmzetTrend.
+
+        /* Build months 5..0 months ago (oldest -> newest). */
+        DO iOffset = 5 TO 0 BY -1:
+
+            iTargetMonth = MONTH(TODAY) - iOffset.
+            iTargetYear  = YEAR(TODAY).
+
+            IF iTargetMonth LE 0 THEN
+                ASSIGN
+                    iTargetMonth = iTargetMonth + 12
+                    iTargetYear  = iTargetYear - 1.
+
+            GetMonthBounds(iTargetMonth, iTargetYear, OUTPUT dStart, OUTPUT dEnd).
+
+            /* Current month is capped at TODAY and flagged as partial. */
+            IF iOffset EQ 0 THEN
+                dEnd = TODAY.
+
+            dTotal = 0.
+            FOR EACH factuur NO-LOCK USE-INDEX factuur-x4
+                WHERE factuur.datum GE dStart
+                  AND factuur.datum LE dEnd
+                  AND factuur.type  EQ TRUE:
+                dTotal = dTotal + factuur.totaal.
+            END.
+
+            cLabel = ENTRY(iTargetMonth, cMaandNamen) + " " + STRING(iTargetYear).
+
+            CREATE ttOmzetTrend.
+            ASSIGN
+                ttOmzetTrend.maand     = iTargetMonth
+                ttOmzetTrend.jaar      = iTargetYear
+                ttOmzetTrend.labelText = cLabel
+                ttOmzetTrend.totaal    = dTotal
+                ttOmzetTrend.isPartial = (iOffset EQ 0)
+                .
+        END.
+
+        RETURN TEMP-TABLE ttOmzetTrend:HANDLE.
 
     END METHOD.
 

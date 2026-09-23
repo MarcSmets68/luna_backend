@@ -1,0 +1,36 @@
+meta {
+  name: BerekenNonNumericKlnr400
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/web/pricing/bereken
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "#CEILINGBOX or ROSETTE",
+    "klnr": "abc",
+    "aantal": 3,
+    "typeKorting": "K1"
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq Field 'klnr' must be numeric
+  res.body.error.code: eq 400
+}
+
+docs {
+  klnr present but non-numeric -> AppError 400 raised in
+  PricingHandler:GetRequiredInteger.
+}

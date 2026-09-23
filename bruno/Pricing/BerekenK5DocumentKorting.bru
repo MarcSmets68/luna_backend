@@ -1,0 +1,36 @@
+meta {
+  name: BerekenK5DocumentKorting
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/web/pricing/bereken
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "#CEILINGBOX or ROSETTE",
+    "klnr": 1,
+    "aantal": 3,
+    "typeKorting": "K5",
+    "documentKorting": 7.25
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.korting: eq 7.25
+}
+
+docs {
+  K5 passes pdDocumentKorting straight through unchanged, same as K4 (see
+  PricingEngineBE:BepaalKorting).
+}

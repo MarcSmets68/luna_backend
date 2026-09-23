@@ -18,8 +18,9 @@
                   GET    /web/artikel/{artnr}/artlog           - bewegingshistoriek, gepagineerd (FR-5)
 
                   GET /web/artikel supports optional
-                  ?onderMinimum=intern|extern|beide and
-                  ?externInBewerking=true|false filters alongside the
+                  ?onderMinimum=intern|extern|beide,
+                  ?externInBewerking=true|false and
+                  ?geblokkeerd=true|false filters alongside the
                   existing artnr/omschrijving/groep/page/pageSize ones.
     Description : Thin WebHandler only - routing, request parsing, response
                   formatting and HTTP status/error mapping. No business logic
@@ -311,6 +312,7 @@ CLASS Luna.Web.ArtikelHandler INHERITS WebHandler:
         DEFINE VARIABLE cOmschrijving AS CHARACTER   NO-UNDO.
         DEFINE VARIABLE cGroep        AS CHARACTER   NO-UNDO.
         DEFINE VARIABLE cOnderMinimum AS CHARACTER   NO-UNDO.
+        DEFINE VARIABLE cGeblokkeerd  AS CHARACTER   NO-UNDO.
         DEFINE VARIABLE cExternInBew  AS CHARACTER   NO-UNDO.
         DEFINE VARIABLE lExternInBew  AS LOGICAL     NO-UNDO.
         DEFINE VARIABLE iPage         AS INTEGER     NO-UNDO.
@@ -368,6 +370,13 @@ CLASS Luna.Web.ArtikelHandler INHERITS WebHandler:
         cGroep        = QueryParamHelper:GetQueryValue(poRequest, "groep":u).
         cOnderMinimum = QueryParamHelper:GetQueryValue(poRequest, "onderMinimum":u).
         cExternInBew  = QueryParamHelper:GetQueryValue(poRequest, "externInBewerking":u).
+        cGeblokkeerd  = QueryParamHelper:GetQueryValue(poRequest, "geblokkeerd":u).
+
+        IF cGeblokkeerd NE "":u AND LOOKUP(cGeblokkeerd, "true,false":u) EQ 0 THEN
+        DO:
+            WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest), SUBSTITUTE("Invalid geblokkeerd &1":u, cGeblokkeerd)).
+            RETURN 0.
+        END.
 
         IF cExternInBew NE "":u AND LOOKUP(cExternInBew, "true,false":u) EQ 0 THEN
         DO:
@@ -384,7 +393,7 @@ CLASS Luna.Web.ArtikelHandler INHERITS WebHandler:
         IF iPageSize GT 200 THEN iPageSize = 200.
 
         hResult = oService:GetArtikelen(cArtnrFilter, cOmschrijving, cGroep, iPage, iPageSize,
-                                         cOnderMinimum, lExternInBew, OUTPUT lHasMore).
+                                         cOnderMinimum, lExternInBew, cGeblokkeerd, OUTPUT lHasMore).
         oBody   = ResultHandleToJson(hResult).
 
         oBody:Add("page":u, iPage).

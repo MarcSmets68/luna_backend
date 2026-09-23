@@ -1,0 +1,32 @@
+meta {
+  name: ListGeblokkeerd
+  type: http
+  seq: 22
+}
+
+get {
+  url: {{baseUrl}}/web/artikel?geblokkeerd=false&pageSize=3
+  body: none
+  auth: none
+}
+
+params:query {
+  geblokkeerd: false
+  pageSize: 3
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  `geblokkeerd`-filter op de artikellijst: `true` = enkel geblokkeerde
+  artikelen (artikel.blokkeren = TRUE), `false` = enkel niet-geblokkeerde,
+  weggelaten = geen filter. Per-rij geëvalueerd, dezelfde aanpak als
+  `onderMinimum`/`externInBewerking`. Ongeldige waarden (buiten
+  true/false) geven 400.
+}

@@ -277,12 +277,30 @@ CLASS Luna.BusinessLogic.BonBE:
     END METHOD.
 
     /*------------------------------------------------------------------------------
-        Purpose: Creates a new bon. `bonnr` is computed server-side as
-                 (last bonnr, via the bon-x1 index) + 1, held under the same
-                 EXCLUSIVE-LOCK/transaction as the CREATE so there is no race
-                 between the FIND LAST and the CREATE. `bonnr`, `bedrag` and
-                 `btw` in the request body (if any) are ignored - see
-                 ApplyFields.
+        Purpose: Allocates the next bonnr as (last bonnr, via the bon-x1
+                 index) + 1. Extracted from CreateBon (Iteratie D -
+                 Offerte->Order conversie) so OfferteConversieBE can obtain a
+                 new bonnr through the same allocation logic instead of
+                 duplicating it. MUST be called from within a transaction
+                 that holds the resulting CREATE bon under the same
+                 EXCLUSIVE-LOCK scope, so there is no race between the FIND
+                 LAST and the CREATE - same contract as before extraction.
+    ------------------------------------------------------------------------------*/
+    METHOD PUBLIC INTEGER AllocateBonnr():
+
+        FIND LAST bon USE-INDEX bon-x1 EXCLUSIVE-LOCK NO-ERROR.
+
+        RETURN (IF AVAILABLE bon THEN bon.bonnr ELSE 0) + 1.
+
+    END METHOD.
+
+    /*------------------------------------------------------------------------------
+        Purpose: Creates a new bon. `bonnr` is computed server-side via
+                 AllocateBonnr() (last bonnr, via the bon-x1 index, + 1),
+                 held under the same EXCLUSIVE-LOCK/transaction as the
+                 CREATE so there is no race between the FIND LAST and the
+                 CREATE. `bonnr`, `bedrag` and `btw` in the request body (if
+                 any) are ignored - see ApplyFields.
     ------------------------------------------------------------------------------*/
     METHOD PUBLIC HANDLE CreateBon( INPUT poBody AS JsonObject ):
 
@@ -291,9 +309,7 @@ CLASS Luna.BusinessLogic.BonBE:
         EMPTY TEMP-TABLE ttBon.
 
         DO TRANSACTION:
-            FIND LAST bon USE-INDEX bon-x1 EXCLUSIVE-LOCK NO-ERROR.
-
-            iNewBonnr = (IF AVAILABLE bon THEN bon.bonnr ELSE 0) + 1.
+            iNewBonnr = AllocateBonnr().
 
             CREATE bon.
             ASSIGN bon.bonnr = iNewBonnr.
@@ -488,20 +504,32 @@ CLASS Luna.BusinessLogic.BonBE:
             FIND FIRST bfArtikel WHERE bfArtikel.artnr EQ artlijn.l-artnr EXCLUSIVE-LOCK NO-ERROR.
             IF AVAILABLE bfArtikel AND bfArtikel.stock THEN
             DO:
+                /* Clamped at 0 (MAX(0, ...)) rather than an unconditional
+                   subtraction - added for Iteratie C (automatische
+                   voorraadreservering, Luna.BusinessLogic.
+                   BonLijnAutoReserveringBE). That feature can reserve LESS
+                   than bonlijn.te-leveren when stock falls short at
+                   create-time, so releasing the FULL te-leveren quantity
+                   here (as the legacy annul-bon procedure always did,
+                   since it assumed reservation always matched te-leveren)
+                   can now push pbesteld-kl below 0 when cancelling a bon
+                   that was originally created with a shortfall. This was
+                   NOT a pre-existing clamp - do not assume it always
+                   worked this way. */
                 IF NOT bfArtikel.soort THEN
-                    bfArtikel.pbesteld-kl = bfArtikel.pbesteld-kl +
+                    bfArtikel.pbesteld-kl = MAX(0, bfArtikel.pbesteld-kl +
                         (IF artlijn.swVast THEN dSign * (artlijn.aantal * dOffAantal)
-                                           ELSE (pdQtyDelta * artlijn.aantal)).
+                                           ELSE (pdQtyDelta * artlijn.aantal))).
                 ELSE
                 DO:
-                    bfArtikel.pbesteld-kl = bfArtikel.pbesteld-kl + (pdQtyDelta * artlijn.aantal).
+                    bfArtikel.pbesteld-kl = MAX(0, bfArtikel.pbesteld-kl + (pdQtyDelta * artlijn.aantal)).
 
                     FOR EACH bfArtlijn OF bfArtikel NO-LOCK:
                         FIND FIRST bf2Artikel WHERE bf2Artikel.artnr EQ bfArtlijn.l-artnr EXCLUSIVE-LOCK NO-ERROR.
                         IF AVAILABLE bf2Artikel AND bf2Artikel.stock THEN
-                            bf2Artikel.pbesteld-kl = bf2Artikel.pbesteld-kl +
+                            bf2Artikel.pbesteld-kl = MAX(0, bf2Artikel.pbesteld-kl +
                                 (IF bfArtlijn.swVast THEN dSign * (bfArtlijn.aantal * (artlijn.aantal * dOffAantal))
-                                                     ELSE ((pdQtyDelta * bfArtlijn.aantal) * artlijn.aantal)).
+                                                     ELSE ((pdQtyDelta * bfArtlijn.aantal) * artlijn.aantal))).
                         RELEASE bf2Artikel.
                     END.
                 END.
@@ -531,7 +559,12 @@ CLASS Luna.BusinessLogic.BonBE:
             FIND artikel EXCLUSIVE-LOCK WHERE artikel.artnr EQ bonlijn.artnr AND artikel.stock NO-ERROR.
             IF AVAILABLE artikel THEN
             DO:
-                artikel.besteld-kl = artikel.besteld-kl - bonlijn.te-leveren.
+                /* Clamped at 0 - see the comment in ReleaseBomReservations
+                   above for why (Iteratie C automatische
+                   voorraadreservering can reserve less than te-leveren on
+                   a stock shortfall, so releasing the full te-leveren on
+                   cancel could otherwise push besteld-kl below 0). */
+                artikel.besteld-kl = MAX(0, artikel.besteld-kl - bonlijn.te-leveren).
 
                 IF artikel.soort THEN
                     ReleaseBomReservations( BUFFER artikel, BUFFER bonlijn, BUFFER pbBon ).

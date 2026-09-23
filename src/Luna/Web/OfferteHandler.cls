@@ -45,6 +45,7 @@ USING Progress.Json.ObjectModel.JsonArray.
 USING Progress.Json.ObjectModel.ObjectModelParser.
 USING Luna.BusinessLogic.OfferteBE.
 USING Luna.BusinessLogic.OfflijnBE.
+USING Luna.BusinessLogic.OfferteConversieBE.
 
 BLOCK-LEVEL ON ERROR UNDO, THROW.
 
@@ -411,8 +412,9 @@ CLASS Luna.Web.OfferteHandler INHERITS WebHandler:
     ------------------------------------------------------------------------------*/
     METHOD OVERRIDE PROTECTED INTEGER HandlePost( INPUT poRequest AS IWebRequest ):
 
-        DEFINE VARIABLE oOfferteService AS OfferteBE   NO-UNDO.
-        DEFINE VARIABLE oOfflijnService AS OfflijnBE   NO-UNDO.
+        DEFINE VARIABLE oOfferteService          AS OfferteBE          NO-UNDO.
+        DEFINE VARIABLE oOfflijnService          AS OfflijnBE          NO-UNDO.
+        DEFINE VARIABLE oOfferteConversieService AS OfferteConversieBE NO-UNDO.
         DEFINE VARIABLE cRemainder      AS CHARACTER  NO-UNDO.
         DEFINE VARIABLE iSegCount       AS INTEGER    NO-UNDO.
         DEFINE VARIABLE iOffnr          AS INTEGER    NO-UNDO.
@@ -438,6 +440,23 @@ CLASS Luna.Web.OfferteHandler INHERITS WebHandler:
             oItems  = oBody:GetJsonArray("items":u).
 
             WriteJsonResponse(INTEGER(StatusCodeEnum:Created), oItems:GetJsonObject(1)).
+
+            RETURN 0.
+        END.
+
+        IF iSegCount EQ 3 AND ENTRY(3, cRemainder, "/":u) EQ "omzetten-naar-order":u THEN
+        DO:
+            /* POST /offerte/{offnr}/{versie}/omzetten-naar-order (Iteratie
+               D - Offerte->Order conversie). Body is not read - the
+               conversion takes no parameters. */
+            ParseOffnrVersie(cRemainder, OUTPUT iOffnr, OUTPUT iVersie).
+
+            oOfferteConversieService = NEW OfferteConversieBE().
+            hResult = oOfferteConversieService:OmzettenNaarOrder(iOffnr, iVersie).
+            oBody   = ResultHandleToJson(hResult).
+            oItems  = oBody:GetJsonArray("resultaat":u).
+
+            WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oItems:GetJsonObject(1)).
 
             RETURN 0.
         END.

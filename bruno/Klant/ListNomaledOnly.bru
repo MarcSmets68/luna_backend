@@ -1,7 +1,7 @@
-meta {
+﻿meta {
   name: ListNomaledOnly
   type: http
-  seq: 9
+  seq: 2
 }
 
 get {
@@ -28,5 +28,5 @@ docs {
   (klant.swNomaled = TRUE; rows where swNomaled is FALSE or unknown are
   excluded). AND-combined with naam and pagination - see List.bru for the
   full param table. Backed by Backend/src/Luna/Web/KlantHandler.cls +
-  Luna/BusinessLogic/KlantBE.cls (GetKlanten's plNomaledOnly parameter).
+  Luna/BusinessLogic/KlantBE.cls (GetKlantens plNomaledOnly parameter).
 }

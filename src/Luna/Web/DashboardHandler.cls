@@ -95,9 +95,11 @@ CLASS Luna.Web.DashboardHandler INHERITS WebHandler:
         DEFINE VARIABLE hStatCards      AS HANDLE      NO-UNDO.
         DEFINE VARIABLE hActivity       AS HANDLE      NO-UNDO.
         DEFINE VARIABLE hProduction     AS HANDLE      NO-UNDO.
+        DEFINE VARIABLE hOmzetTrend     AS HANDLE      NO-UNDO.
         DEFINE VARIABLE oStatCardsBody  AS JsonObject  NO-UNDO.
         DEFINE VARIABLE oActivityBody   AS JsonObject  NO-UNDO.
         DEFINE VARIABLE oProductionBody AS JsonObject  NO-UNDO.
+        DEFINE VARIABLE oOmzetTrendBody AS JsonObject  NO-UNDO.
         DEFINE VARIABLE oBody           AS JsonObject  NO-UNDO.
 
         oService = NEW DashboardBE().
@@ -105,15 +107,18 @@ CLASS Luna.Web.DashboardHandler INHERITS WebHandler:
         hStatCards  = oService:GetStatCards().
         hActivity   = oService:GetRecentActivity(5).
         hProduction = oService:GetProductionThisWeek().
+        hOmzetTrend = oService:GetOmzetTrend().
 
         oStatCardsBody  = ResultHandleToJson(hStatCards).
         oActivityBody   = ResultHandleToJson(hActivity).
         oProductionBody = ResultHandleToJson(hProduction).
+        oOmzetTrendBody = ResultHandleToJson(hOmzetTrend).
 
         oBody = NEW JsonObject().
         oBody:Add("statCards":u, oStatCardsBody:GetJsonArray("items":u):GetJsonObject(1)).
         oBody:Add("recentActivity":u, oActivityBody:GetJsonArray("recentActivity":u)).
         oBody:Add("productionThisWeek":u, oProductionBody:GetJsonArray("productionThisWeek":u)).
+        oBody:Add("omzetTrend":u, oOmzetTrendBody:GetJsonArray("omzetTrend":u)).
 
         WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oBody).
 

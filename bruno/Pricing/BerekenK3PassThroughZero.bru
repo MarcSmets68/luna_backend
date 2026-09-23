@@ -1,0 +1,38 @@
+meta {
+  name: BerekenK3PassThroughZero
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/web/pricing/bereken
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "#CEILINGBOX or ROSETTE",
+    "klnr": 1,
+    "aantal": 3,
+    "typeKorting": "K3",
+    "documentKorting": 99
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.korting: eq 0
+}
+
+docs {
+  K3 always returns korting = 0 from BepaalKorting - the fixed
+  document-level amount itself is out of scope for this iteration (see
+  Luna.BusinessLogic.PricingEngineBE:BepaalKorting). documentKorting=99
+  in the body is deliberately ignored for K3, unlike K4/K5.
+}
