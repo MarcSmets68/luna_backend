@@ -1,0 +1,33 @@
+meta {
+  name: CreateUnknownKleursoort
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/web/led-kleurafwerking
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "kleursoort": "DOESNOTEXIST",
+    "kode": "BRUNO_TEST2",
+    "omschr": "should fail FK validation",
+    "standaard": false
+  }
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+assert {
+  res.status: eq 404
+}
+
+docs {
+  kleursoort not found in led_kleursoort -> 404.
+}

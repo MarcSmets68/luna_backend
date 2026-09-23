@@ -1,0 +1,31 @@
+meta {
+  name: List
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/led-ral?pageSize=5
+  body: none
+  auth: none
+}
+
+params:query {
+  pageSize: 5
+  ~page:
+  ~omschrijvingPrefix:
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists led_RAL rows (paged, read-only). Backed by
+  Backend/src/Luna/Web/LedRALHandler.cls + Luna/BusinessLogic/LedRALBE.cls.
+  See docs/backend/coating-reference-data.md.
+}

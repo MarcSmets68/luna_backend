@@ -1,0 +1,36 @@
+meta {
+  name: Create
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/web/led-kleurafwerking
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "kleursoort": "TQ",
+    "kode": "BRUNO_TEST",
+    "omschr": "Bruno test kleurafwerking",
+    "standaard": false
+  }
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+assert {
+  res.status: eq 201
+}
+
+docs {
+  Creates a led_kleurafwerking row. kleursoort must exist in
+  led_kleursoort (404 otherwise), key (kleursoort/kode) must not already
+  exist (409 otherwise). Adjust "kleursoort" above to a real
+  led_kleursoort.kode value in the target environment before running.
+}
