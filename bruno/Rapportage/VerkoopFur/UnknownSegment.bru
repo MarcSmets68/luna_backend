@@ -1,0 +1,29 @@
+meta {
+  name: UnknownSegment
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/web/rapportage/foo
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.code: eq 400
+}
+
+docs {
+  The 1st path segment after /rapportage/ must be a known literal report
+  name - today only "verkoop-fur" is valid. Any other value (here "foo")
+  -> 400 with the standard error envelope
+  {"error":{"message":"...","code":400}}.
+
+  See Luna.Web.RapportageHandler:HandleGet.
+}

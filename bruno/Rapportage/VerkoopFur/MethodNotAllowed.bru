@@ -1,0 +1,28 @@
+meta {
+  name: MethodNotAllowed
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/web/rapportage/verkoop-fur
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 405
+  res.body.error.code: eq 405
+}
+
+docs {
+  Only GET is supported on /rapportage/verkoop-fur (and on /rapportage in
+  general) - any other HTTP method (here POST) -> 405 with the standard
+  error envelope {"error":{"message":"...","code":405}}.
+
+  See Luna.Web.RapportageHandler:HandleNotAllowedMethod.
+}
