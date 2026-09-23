@@ -1,0 +1,32 @@
+meta {
+  name: Update
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{baseUrl}}/web/led-kleurafwerking/RAL/BRUNO_TEST
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "omschr": "Bruno test kleurafwerking (updated)",
+    "standaard": true
+  }
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Updates omschr/standaard only - key (kleursoort/kode) is immutable even
+  if resubmitted in the body. Run after Create.
+}

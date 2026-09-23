@@ -1,0 +1,47 @@
+meta {
+  name: AutoReserveringHappyPathBom
+  type: http
+  seq: 61
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{autoresBonnr}}/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "NOMALED.FUR1.2700.M.AB",
+    "aantal": 1,
+    "teLeveren": 1,
+    "vprijs": 10.0
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.bonnr: eq {{autoresBonnr}}
+  res.body.gereserv: eq 1
+}
+
+docs {
+  Iteratie C - automatische voorraadreservering, happy path on a BOM/
+  "gemengd" article (artikel.soort = TRUE) that has enough stock at the
+  top level and on every artlijn component in the shared LunaNew test DB
+  at the time this test was written (verified via direct DB query during
+  backend-coder implementation - see the handoff note for the exact
+  before/after values). Asserts gereserv = teLeveren (full reservation).
+  The resulting artikel.besteld-kl increment and the created
+  bonlijn_productie rows (one per artlijn component, with their
+  artikel.pbesteld-kl incremented) are NOT independently observable
+  through the HTTP contract (no GET endpoint exposes besteld-kl/
+  pbesteld-kl or bonlijn_productie) - they were confirmed via direct
+  ABL/DB query during implementation, not by this Bruno request.
+  Requires {{autoresBonnr}} (run "AutoReserveringSetupBon" first).
+}

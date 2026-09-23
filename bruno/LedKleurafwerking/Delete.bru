@@ -1,0 +1,24 @@
+meta {
+  name: Delete
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/web/led-kleurafwerking/RAL/BRUNO_TEST
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Deletes the test row created by Create/updated by Update - run last to
+  clean up. Response: {"status":"deleted","kleursoort":"TQ","kode":"BRUNO_TEST"}.
+}

@@ -1,0 +1,35 @@
+meta {
+  name: BerekenMissingRegels400
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/web/btw/bereken
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "swRegime": true,
+    "swPrijsRecup": false
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq Missing/invalid required field 'regels' (must be a non-empty array)
+  res.body.error.code: eq 400
+}
+
+docs {
+  "regels" missing entirely -> AppError 400 raised inside
+  BtwHandler:GetRegelsArray (thin parsing layer, before BtwBerekeningBE
+  is even called). Confirmed live against MarcTest 2026-09-27.
+}

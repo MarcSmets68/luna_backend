@@ -1,0 +1,26 @@
+meta {
+  name: List
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/web/pakbon?pageSize=5
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists pakbon rows, paged/filtered (klnr exact, stempel exact, paknr
+  prefix, naam substring case-insensitive, projectnr exact, page,
+  pageSize). Non-numeric filter on a numeric field -> 400.
+}
+

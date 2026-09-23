@@ -1,0 +1,28 @@
+meta {
+  name: ListStandaard
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/web/led-kleurafwerking?standaard=true
+  body: none
+  auth: none
+}
+
+params:query {
+  standaard: true
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Dedicated "standaardkleur" overview (FR-16) - every kleurafwerking
+  flagged as standaard.
+}

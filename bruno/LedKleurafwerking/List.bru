@@ -1,0 +1,35 @@
+meta {
+  name: List
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/led-kleurafwerking?pageSize=25
+  body: none
+  auth: none
+}
+
+params:query {
+  pageSize: 25
+  ~page:
+  ~kleursoort:
+  ~standaard:
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists led_kleurafwerking rows (paged). Optional filters: kleursoort
+  (exact), standaard (true/false). Backed by
+  Backend/src/Luna/Web/LedKleurafwerkingHandler.cls +
+  Luna/BusinessLogic/LedKleurafwerkingBE.cls. Exposes the pre-existing
+  `standaard` flag - Punt 6/FR-15-17 (standaardkleur), see
+  docs/architecture/coating-fase1-afronding-ontwerp.md sectie 7.
+}

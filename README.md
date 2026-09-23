@@ -20,7 +20,12 @@ Backend/
 │       │   ├── LoginHandler.cls       Auth-MVP login (POST /web/login) - see "Auth-MVP (login/logout)" section below
 │       │   ├── LogoutHandler.cls      Auth-MVP logout (POST /web/logout, X-Auth-Token header) - see "Auth-MVP (login/logout)" section below
 │       │   ├── AiSearchHandler.cls    AI-powered natural-language search (POST /web/ai-search) - see "AI Search" section below
-│       │   └── PricingHandler.cls     Iteratie A pricing engine (POST /web/pricing/bereken) - see "Pricing engine (Iteratie A, K1-K5)" section below
+│       │   ├── RapportageHandler.cls  Rapportage section (GET /web/rapportage/verkoop-fur - Verkoop FUR dealer overview), see Luna.BusinessLogic.VerkoopFurBE
+│       │   ├── PricingHandler.cls     Iteratie A pricing engine (POST /web/pricing/bereken) - see "Pricing engine (Iteratie A, K1-K5)" section below
+│       │   ├── BtwHandler.cls         Iteratie B BTW/VAT calculation engine (POST /web/btw/bereken) - see "BTW/VAT engine (Iteratie B)" section below
+│       │   ├── LedRALHandler.cls      Read-only for led_RAL (GET /web/led-ral[/{ral}]) - see docs/backend/coating-reference-data.md
+│       │   ├── LedNCSHandler.cls      Read-only for led_NCS (GET /web/led-ncs[/{ncs}]) - see docs/backend/coating-reference-data.md
+│       │   └── LedKleurafwerkingHandler.cls  Full CRUD for led_kleurafwerking (GET/POST/PUT/DELETE /web/led-kleurafwerking[/{kleursoort}/{kode}]) - see docs/backend/coating-reference-data.md
 │       └── BusinessLogic/
 │           ├── LakproductieBE.cls          1:1 port of legacy ExportLakProductie.w (3 sources: lopende-orders / lopende-productielijnen / min-max-voorraad)
 │           ├── LakproductieVerkoopService.cls  Rolling 1/3/6/9/12-month verkoop totals per artnr, shared by LakproductieBE
@@ -45,7 +50,12 @@ Backend/
 │           ├── AuthBE.cls             Auth-MVP login/logout/session validation - see "Auth-MVP (login/logout)" section below
 │           ├── AiSearchBE.cls         AI-search orchestration + hardcoded entity/field/operator whitelist - see "AI Search" section below
 │           ├── GeminiGateway.cls      Thin wrapper around the Google Gemini REST API, used only by AiSearchBE - see "AI Search" section below
-│           └── PricingEngineBE.cls    Iteratie A pure read-only pricing engine (K1-K5) - 1:1 port of legacy Include/Prijs.i - see "Pricing engine (Iteratie A, K1-K5)" section below
+│           ├── VerkoopFurBE.cls       DB access for the Verkoop FUR rapportage overview (read-only, NO-LOCK) - Nomaled dealers who ordered a NOMALED.FUR* article in the rolling 12 months
+│           ├── PricingEngineBE.cls    Iteratie A pure read-only pricing engine (K1-K5) - 1:1 port of legacy Include/Prijs.i - see "Pricing engine (Iteratie A, K1-K5)" section below
+│           ├── BtwBerekeningBE.cls    Iteratie B pure read-only BTW/VAT calculation engine (max 2 btw-kode groups, K3/K5 document discount) - see "BTW/VAT engine (Iteratie B)" section below
+│           ├── LedRALBE.cls           Read-only DB access for led_RAL (216 rows, RAL color reference) - see docs/backend/coating-reference-data.md
+│           ├── LedNCSBE.cls           Read-only DB access for led_NCS (1950 rows, NCS color reference) - see docs/backend/coating-reference-data.md
+│           └── LedKleurafwerkingBE.cls  Full CRUD DB access for led_kleurafwerking (15 rows, exposes pre-existing `standaard`/standaardkleur flag) - see docs/backend/coating-reference-data.md
 ├── build/                Compiled r-code (generated, not source of truth - safe to delete/regenerate)
 ├── scripts/
 │   ├── compile.p         CLI compile-all procedure
@@ -172,15 +182,40 @@ required.
   `Luna.Web.LakproductieHandler` mapping already in place for
   `GET /web/lakproduktie`, via that mount point's implicit trailing
   wildcard (same approach as handler5/handler7 above).
-- Several other feature branches added `handler15`..`handler25` directly
-  to the live `openedge.properties` (rapportage, LED reference-data
-  endpoints, pakbon) ahead of this README being updated for them - not
-  documented here, see the live file at `C:\OpenEdge\MarcOepas\conf` for
-  the current full list. `handler26=Luna.Web.PricingHandler: /pricing` —
+- `handler15=Luna.Web.RapportageHandler: /rapportage` — maps
+  `/web/rapportage` (and, via the implicit trailing wildcard,
+  `/web/rapportage/{report}`) to the new Rapportage WebHandler. Today
+  only the literal 1st path segment `verkoop-fur` is valid
+  (`GET /web/rapportage/verkoop-fur` — Verkoop FUR dealer overview, see
+  `Luna.BusinessLogic.VerkoopFurBE` and
+  `docs/architecture/verkoop-fur-ontwerp.md`); any other segment is a
+  400, any method other than GET is a 405. Added to the actual
+  `openedge.properties` at `C:\OpenEdge\MarcOepas\conf` (outside this
+  workspace) and the PASOE instance has been restarted to pick it up.
+- Several other feature branches added `handler16`..`handler25` directly
+  to the live `openedge.properties` (LED reference-data endpoints, pakbon)
+  ahead of this README being updated for them - not documented here, see
+  the live file at `C:\OpenEdge\MarcOepas\conf` for the current full list.
+  `handler26=Luna.Web.PricingHandler: /pricing` —
   maps `POST /web/pricing/bereken` to the pricing-engine WebHandler (see
   "Pricing engine (Iteratie A, K1-K5)" section below). Added to the actual
   `openedge.properties` at `C:\OpenEdge\MarcOepas\conf` (outside this
   workspace) and the PASOE instance has been restarted to pick it up.
+  `handler27=Luna.Web.BtwHandler: /btw` — maps `POST /web/btw/bereken` to
+  the BTW/VAT calculation engine WebHandler (see "BTW/VAT engine
+  (Iteratie B)" section below). Also added to that same live
+  `openedge.properties` and the PASOE instance restarted to pick it up.
+- `handler28=Luna.Web.LedRALHandler: /led-ral`,
+  `handler29=Luna.Web.LedNCSHandler: /led-ncs`,
+  `handler30=Luna.Web.LedKleurafwerkingHandler: /led-kleurafwerking` — 3
+  new coating-module reference-data handlers (see
+  `docs/backend/coating-reference-data.md`). **Not yet added to the live
+  `openedge.properties`, not yet compiled, PASOE not yet restarted** — the
+  session that wrote this code ran in a sandbox that denied every command
+  needed to do so (spawning `_progres.exe`/`tcman.bat`, creating new
+  directories, editing files outside this git workspace). See "Known gap"
+  in `docs/backend/coating-reference-data.md` for the exact remaining
+  steps before this can be considered done per `AGENTS.md`.
 
 Restart the instance after changing `openedge.properties`:
 ```powershell
@@ -188,6 +223,37 @@ $env:DLC = "C:\Progress\OpenEdge"
 & "C:\OpenEdge\MarcOepas\bin\tcman.bat" stop
 & "C:\OpenEdge\MarcOepas\bin\tcman.bat" start
 ```
+
+## MarcDev instance (CI/CD target)
+A second PASOE instance, `MarcDev` (`C:\OpenEdge\WRK\MarcDev`, Tomcat ports
+8081/8444, same host `PC-MICHEL-17` as `MarcTest`), exists so CI can
+compile/restart/smoke-test without touching `MarcTest` while someone is
+manually testing against it. Its `openedge.properties` (outside this
+workspace) mirrors `MarcTest`'s: same `Backend/build`/`Backend/src` PROPATH
+entries, the same `agentStartupParam` pointing at the shared `LunaNew`
+database on `lhdc01:4500` (user `ABNA`, `-cpinternal`/`-cpstream UTF-8`), and
+the same `handler1..handler25` mappings under `[MarcDev.ROOT.WEB]`.
+
+**MarcDev intentionally shares the same `lhdc01` database as `MarcTest`** —
+this was a deliberate choice over an isolated local copy, so CI exercises
+the real shared test data. This means a CI run and a manual `MarcTest`
+session can in principle race on the same rows (e.g. `bonnr` allocation);
+no isolation has been added for that. Whenever `MarcTest`'s
+`openedge.properties` handler list changes, mirror the same change into
+`MarcDev`'s.
+
+CI (`Backend/.github/workflows/ci.yml`) requires a **self-hosted GitHub
+Actions runner** registered with the label `pasoe-windows` on a machine with
+OpenEdge installed (currently `PC-MICHEL-17`, the same machine both
+instances run on) — GitHub-hosted runners can't compile/run ABL. On every
+PR/push it runs `scripts/compile.ps1`; on push to `main`/`development` it
+also restarts `MarcDev` (`scripts/RestartMarcDev.ps1`) and smoke-tests it
+(`scripts/SmokeTestMarcDev.ps1`, polls `GET /web/test` until
+`databaseConnected: true`). A `concurrency` group serializes runs so two
+pushes never restart `MarcDev` at the same time. This automates the
+"compile clean + PASOE restarted + smoke-tested" part of `AGENTS.md`'s
+Definition of Done — it does not replace backend-tester's contract-level
+verification.
 
 ## Database
 PASOE agents connect to the shared `LunaNew` test database on `lhdc01:4500`
@@ -520,6 +586,7 @@ offerte and every method 404s if that offnr+versie doesn't exist.
 | PUT    | `/web/offerte/{offnr}/{versie}/lijn/{lijnnr}`     | Update. Partial - only fields present in the body are changed. 404 if not found. 400 if the resulting merged state (existing row + body) would leave more than one of `subtotaal`/`kolomtitel`/`infolijn` `true`. |
 | DELETE | `/web/offerte/{offnr}/{versie}/lijn/{lijnnr}`     | Delete. 404 if not found. |
 | POST   | `/web/offerte/{offnr}/{versie}/lijn/{lijnnr}/reorder` | Moves the line one position `up` or `down` (body: `{"direction": "up"|"down"}`) by swapping `lijnnr` with its immediate neighbor in that direction. 404 if the line or the neighbor doesn't exist. 400 if the swap would decrease a `subtotaal` line's `lijnnr` (moving a subtotaal line down/away from its group is allowed). Returns `200` with the full refreshed `{"items": [...]}` line list, ordered by `lijnnr` - see `Luna.BusinessLogic.OfflijnBE:ReorderOfflijn`. |
+| POST   | `/web/offerte/{offnr}/{versie}/omzetten-naar-order` | Iteratie D - converts an open (`stempel = "O"`) offerte into a new `bon` (order). Body not read (send `{}`). 404 if not found, 409 if not `stempel = "O"`, 400 if no overdraagbare (transferable) lines. See `docs/backend/offerte.md`'s "Iteratie D" section and `Luna.BusinessLogic.OfferteConversieBE` for the full algorithm. |
 
 Errors are returned as `{"error": {"message": "...", "code": <status>}}`.
 Deleting the parent offerte (`DELETE /web/offerte/{offnr}/{versie}`)
@@ -1022,6 +1089,71 @@ path, K3 (always 0, documentKorting ignored), K4/K5 (documentKorting
 passthrough), unknown `typeKorting` (400), unknown `artnr` (404), and
 missing/non-numeric `klnr`/`aantal` (400) - see `Backend/bruno/Pricing/`
 for the exact requests/assertions.
+
+## BTW/VAT engine (Iteratie B) (`/web/btw/bereken`)
+Pure read-only VAT calculation service - the only DB access is a
+`NO-LOCK FIND` on `btw-kode` to resolve a group's percentage. Does not
+write to any table. See `Luna.BusinessLogic.BtwBerekeningBE`'s class
+header for the full algorithm.
+
+| Method | Path                | Purpose |
+|--------|---------------------|---------|
+| POST   | `/web/btw/bereken`  | Body `{"regels", "swRegime", "swPrijsRecup", "typeKorting", "documentKortingBedrag", "documentKortingPercentage"}` - groups `regels` by `btwKode` (max 2 unique), applies a document-level discount (K3 fixed amount pro-rata by group share, K5 uniform percentage, or none), then applies each group's btw-kode percentage. |
+
+**Request body:**
+```json
+{
+  "regels": [
+    { "btwKode": "21", "bedrag": 100.00, "totaalRecupel": 0 },
+    { "btwKode": "6", "bedrag": 50.00, "totaalRecupel": 5.00 }
+  ],
+  "swRegime": true,
+  "swPrijsRecup": true,
+  "typeKorting": "K5",
+  "documentKortingPercentage": 10,
+  "documentKortingBedrag": 0
+}
+```
+`typeKorting` is optional, one of `""` (no discount, default), `"K3"`
+(fixed `documentKortingBedrag`, distributed pro-rata over each group's raw
+basis share) or `"K5"` (uniform `documentKortingPercentage"` applied per
+group - already pro-rata by construction). When `swRegime` is `false`,
+the btw-kode grouping/lookup is skipped entirely: the discount is applied
+to the flat sum of all `regels[].bedrag` (recupel is **not** included in
+that path), `groepen` comes back empty, and `totBtw` is always `0`.
+
+**Response 200** (matches the worked example above - 100 @ 21% + 55
+(50 + 5 recupel) @ 6% raw basis, 10% K5 discount distributed pro-rata):
+```json
+{
+  "totaal": { "regimeToegepast": true, "totaalBasis": 139.50, "totBtw": 21.87, "totaalInclBtw": 161.37 },
+  "groepen": [
+    { "btwKode": "21", "percentage": 21, "basis": 90.00, "btwBedrag": 18.90 },
+    { "btwKode": "6", "percentage": 6, "basis": 49.50, "btwBedrag": 2.97 }
+  ]
+}
+```
+
+**Errors** (same `{"error":{"message","code"}}` envelope as the other
+handlers):
+- `400` - malformed JSON body, missing/empty `regels`, `swRegime`/
+  `swPrijsRecup` missing or not boolean (checked in `BtwHandler`, the
+  thin parsing layer).
+- `400` - unrecognized `typeKorting` (not `""`/`K3`/`K5`), or more than 2
+  unique `btwKode` values across `regels` (both raised in
+  `BtwBerekeningBE:BerekenBtw`).
+- `404` - a `btwKode` used by a group does not exist in `btw-kode`
+  (raised in `BtwBerekeningBE:FindBtwKodeGroep`).
+- `500` - fallback for anything unexpected (no ABL stack trace ever
+  reaches the client).
+
+Confirmed live against `MarcTest` 2026-09-27: the worked happy-path
+example above (139.50/21.87/161.37), `swRegime: false` flat-totals path,
+more than 2 unique `btwKode` values (400), unknown `btwKode` (404), and
+an unrecognized `typeKorting` (400) - see `Backend/bruno/Btw/` for the
+exact requests/assertions. Standard `btw-kode` rows for `"21"` and `"6"`
+already exist in the shared `LunaNew` test database (confirmed via the
+live smoke test, not assumed).
 
 **Not yet exercised live in this environment** (no matching test data
 found in `LunaNew` at the time of writing - flagging for backend-tester

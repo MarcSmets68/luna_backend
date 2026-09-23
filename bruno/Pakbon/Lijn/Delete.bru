@@ -1,0 +1,25 @@
+meta {
+  name: Delete
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/web/pakbon/{{paknr}}/lijn/{{paklijnnr}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Deletes the paklijn created above. Run before Pakbon/Delete.bru (which
+  409s while any paklijn row still exists for the pakbon).
+}
+

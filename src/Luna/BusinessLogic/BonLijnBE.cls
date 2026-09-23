@@ -163,7 +163,12 @@ CLASS Luna.BusinessLogic.BonLijnBE:
                  left untouched, so this also works for partial updates.
                  `bonnr`/`lijnnr` are never read from the body at all - they
                  are set once on create (from the parent path segment and
-                 server-generated respectively) and are immutable.
+                 server-generated respectively) and are immutable. This is
+                 the field set exposed via the public POST/PUT
+                 /web/bon/{bonnr}/lijn JSON contract - do NOT add fields
+                 here that should only be settable internally (see
+                 ApplyFieldsExtended for those, used only by
+                 CreateBonLijnInternal's internal-only callers).
     ------------------------------------------------------------------------------*/
     METHOD PRIVATE VOID ApplyFields( INPUT poBody AS JsonObject, BUFFER pbBonLijn FOR bonlijn ):
 
@@ -188,6 +193,44 @@ CLASS Luna.BusinessLogic.BonLijnBE:
         IF poBody:Has("subtotaal":u)    THEN pbBonLijn.subtotaal   = poBody:GetLogical("subtotaal":u).
         IF poBody:Has("kolomtitel":u)   THEN pbBonLijn.kolomtitel  = poBody:GetLogical("kolomtitel":u).
         IF poBody:Has("infolijn":u)     THEN pbBonLijn.infolijn    = poBody:GetLogical("infolijn":u).
+
+    END METHOD.
+
+    /*------------------------------------------------------------------------------
+        Purpose: Applies the extra fields that are ONLY settable via the
+                 internal CreateBonLijnInternal path (Iteratie D - Offerte->
+                 Order conversie) - offnr/versie/olijnnr (offerte-link),
+                 swLed/swSikta/montage/ledmontage/circuit/recupel/meer_min/
+                 off_aantal/swStdPrijs/uitverkoop/SiktaKleurKodes. These are
+                 deliberately NOT part of ApplyFields/the public POST/PUT
+                 /web/bon/{bonnr}/lijn JSON contract - a request body sent
+                 to that public endpoint containing any of these keys has
+                 them silently ignored (proven by
+                 bruno/Bon/CreateIgnoresInternalFields.bru).
+    ------------------------------------------------------------------------------*/
+    METHOD PRIVATE VOID ApplyFieldsExtended( INPUT poBody AS JsonObject, BUFFER pbBonLijn FOR bonlijn ):
+
+        IF poBody:Has("offnr":u)          THEN pbBonLijn.offnr          = poBody:GetInteger("offnr":u).
+        IF poBody:Has("versie":u)         THEN pbBonLijn.versie         = poBody:GetInteger("versie":u).
+        IF poBody:Has("olijnnr":u)        THEN pbBonLijn.olijnnr        = poBody:GetInteger("olijnnr":u).
+        IF poBody:Has("swLed":u)          THEN pbBonLijn.swLed          = poBody:GetLogical("swLed":u).
+        IF poBody:Has("swSikta":u)        THEN pbBonLijn.swSikta        = poBody:GetLogical("swSikta":u).
+        IF poBody:Has("montage":u)        THEN pbBonLijn.montage        = poBody:GetLogical("montage":u).
+        IF poBody:Has("ledmontage":u)     THEN pbBonLijn.ledmontage     = poBody:GetLogical("ledmontage":u).
+        IF poBody:Has("circuit":u)        THEN pbBonLijn.circuit        = poBody:GetInteger("circuit":u).
+        IF poBody:Has("recupel":u)        THEN pbBonLijn.recupel        = poBody:GetDecimal("recupel":u).
+        IF poBody:Has("meer_min":u)       THEN pbBonLijn.meer_min       = poBody:GetDecimal("meer_min":u).
+        IF poBody:Has("off_aantal":u)     THEN pbBonLijn.off_aantal     = poBody:GetDecimal("off_aantal":u).
+        IF poBody:Has("swStdPrijs":u)     THEN pbBonLijn.swStdPrijs     = poBody:GetLogical("swStdPrijs":u).
+        IF poBody:Has("uitverkoop":u)     THEN pbBonLijn.uitverkoop     = poBody:GetLogical("uitverkoop":u).
+        IF poBody:Has("SiktaKleurKodes":u) THEN pbBonLijn.SiktaKleurKodes = poBody:GetCharacter("SiktaKleurKodes":u).
+        /* Iteratie D addition beyond the design doc's literal field list -
+           see Luna.BusinessLogic.OfferteConversieBE class header, decision
+           5: bonlijn.gereserv is otherwise read-only/computed (by the
+           Iteratie C auto-reservation hook), but the offerte conversion
+           needs to set it directly for kolomtitel/infolijn lines (which
+           never go through that hook). */
+        IF poBody:Has("gereserv":u)       THEN pbBonLijn.gereserv       = poBody:GetDecimal("gereserv":u).
 
     END METHOD.
 
@@ -264,24 +307,62 @@ CLASS Luna.BusinessLogic.BonLijnBE:
     END METHOD.
 
     /*------------------------------------------------------------------------------
-        Purpose: Creates a new bonlijn under the given bonnr. `lijnnr` is
-                 computed server-side as (last lijnnr for this bonnr, via
-                 the bonlijn-x1 index) + 1, held under the same
-                 EXCLUSIVE-LOCK/transaction as the CREATE so there is no
-                 race between the FIND LAST and the CREATE. `lijnnr` sent
-                 in the request body (if any) is ignored - it is never read
-                 from poBody. A line can be at most one of subtotaal/
-                 kolomtitel/infolijn (checked against the request body
-                 up front); a subtotaal line additionally requires at least
-                 one preceding normal (item) line under the same bonnr to
-                 sum, checked inside the transaction right before the
-                 CREATE.
+        Purpose: Creates a new bonlijn under the given bonnr via the public
+                 POST /web/bon/{bonnr}/lijn contract. Thin wrapper around
+                 CreateBonLijnInternal with piExplicitLijnnr = 0 (server
+                 auto-allocates lijnnr as (last lijnnr for this bonnr) + 1 -
+                 unchanged behaviour from before this method was split out).
+                 `lijnnr` sent in the request body (if any) is still ignored
+                 - see CreateBonLijnInternal.
         Errors : AppError code 404 - the parent bonnr doesn't exist.
                  AppError code 400 - more than one of subtotaal/kolomtitel/
                  infolijn set, or a subtotaal line with no preceding
                  normal line to sum.
     ------------------------------------------------------------------------------*/
     METHOD PUBLIC HANDLE CreateBonLijn( INPUT piBonnr AS INTEGER, INPUT poBody AS JsonObject ):
+
+        RETURN CreateBonLijnInternal( piBonnr, poBody, 0 ).
+
+    END METHOD.
+
+    /*------------------------------------------------------------------------------
+        Purpose: Internal (non-public-contract) create path shared by
+                 CreateBonLijn (public, piExplicitLijnnr = 0 -> auto-
+                 allocate, exactly as before this method existed) and
+                 Luna.BusinessLogic.OfferteConversieBE (Iteratie D -
+                 Offerte->Order conversie, piExplicitLijnnr > 0 -> use that
+                 lijnnr verbatim, e.g. the 5000-per-line numbering scheme or
+                 the "vorige doc-lijnnr + 100" deadline-lijn exception).
+                 Accepts the extra offerte-conversion-only fields via
+                 ApplyFieldsExtended (offnr/versie/olijnnr/swLed/swSikta/
+                 montage/ledmontage/circuit/recupel/meer_min/off_aantal/
+                 swStdPrijs/uitverkoop/SiktaKleurKodes) IN ADDITION TO the
+                 normal ApplyFields set - poBody may contain both sets, but
+                 only ApplyFieldsExtended's fields are new/internal-only.
+                 Still shares HasConflictingFlags and the Iteratie C
+                 automatic-reservation hook with the original CreateBonLijn
+                 behaviour.
+        Notes  : The "a subtotaal line needs at least one preceding normal
+                 line to sum" guard is only enforced on the auto-allocate
+                 path (piExplicitLijnnr = 0). It is deliberately skipped
+                 when piExplicitLijnnr > 0: OfferteConversieBE's Pass 1
+                 creates subtotaal bonlijn rows for a group BEFORE that
+                 group's item lines physically exist as bonlijn rows (Pass
+                 2 creates those afterwards) - by design, not a bug - so
+                 the guard would incorrectly reject every subtotaal line
+                 coming from the conversion. The internal caller is
+                 trusted to only ever create a subtotaal line that
+                 legitimately sums a to-be-created (or already created)
+                 block.
+        Errors : AppError code 404 - the parent bonnr doesn't exist.
+                 AppError code 400 - more than one of subtotaal/kolomtitel/
+                 infolijn set, or (piExplicitLijnnr = 0 only) a subtotaal
+                 line with no preceding normal line to sum.
+    ------------------------------------------------------------------------------*/
+    METHOD PUBLIC HANDLE CreateBonLijnInternal(
+        INPUT piBonnr          AS INTEGER,
+        INPUT poBody           AS JsonObject,
+        INPUT piExplicitLijnnr AS INTEGER ):
 
         DEFINE VARIABLE iNewLijnnr  AS INTEGER NO-UNDO.
         DEFINE VARIABLE lSubtotaal  AS LOGICAL NO-UNDO.
@@ -301,10 +382,27 @@ CLASS Luna.BusinessLogic.BonLijnBE:
                 "A line can be at most one of subtotaal/kolomtitel/infolijn":u, 400).
 
         DO TRANSACTION:
-            FIND LAST bonlijn USE-INDEX bonlijn-x1 EXCLUSIVE-LOCK
-                WHERE bonlijn.bonnr EQ piBonnr NO-ERROR.
+            IF piExplicitLijnnr GT 0 THEN
+                iNewLijnnr = piExplicitLijnnr.
+            ELSE
+            DO:
+                FIND LAST bonlijn USE-INDEX bonlijn-x1 EXCLUSIVE-LOCK
+                    WHERE bonlijn.bonnr EQ piBonnr NO-ERROR.
 
-            iNewLijnnr = (IF AVAILABLE bonlijn THEN bonlijn.lijnnr ELSE 0) + 1.
+                iNewLijnnr = (IF AVAILABLE bonlijn THEN bonlijn.lijnnr ELSE 0) + 1.
+
+                IF lSubtotaal THEN
+                DO:
+                    IF NOT CAN-FIND(FIRST bonlijn
+                        WHERE bonlijn.bonnr EQ piBonnr
+                          AND bonlijn.lijnnr LT iNewLijnnr
+                          AND bonlijn.subtotaal EQ FALSE
+                          AND bonlijn.kolomtitel EQ FALSE
+                          AND bonlijn.infolijn EQ FALSE) THEN
+                        UNDO, THROW NEW Progress.Lang.AppError(
+                            "Cannot create a subtotaal line with no preceding lines to sum":u, 400).
+                END.
+            END.
 
             IF lSubtotaal THEN
             DO:
@@ -325,6 +423,30 @@ CLASS Luna.BusinessLogic.BonLijnBE:
                 .
 
             ApplyFields( INPUT poBody, BUFFER bonlijn ).
+
+            /* Internal-only fields (Iteratie D) - gated on
+               piExplicitLijnnr > 0 (the internal-caller path; the public
+               CreateBonLijn wrapper always passes 0), NOT merely on
+               whether poBody happens to contain these keys. This is what
+               actually keeps the public POST/PUT /web/bon/{bonnr}/lijn
+               contract from accepting offnr/versie/olijnnr/swLed/swSikta/
+               montage/ledmontage/circuit/recupel/meer_min/off_aantal/
+               swStdPrijs/uitverkoop/SiktaKleurKodes - see
+               ApplyFieldsExtended header and
+               bruno/Bon/CreateIgnoresInternalFields.bru. */
+            IF piExplicitLijnnr GT 0 THEN
+                ApplyFieldsExtended( INPUT poBody, BUFFER bonlijn ).
+
+            /* Iteratie C - automatische voorraadreservering: reserves
+               stock (and, for a BOM article, its artlijn components) for
+               the newly created line. Runs inside this same transaction
+               (no own DO TRANSACTION - see Luna.BusinessLogic.
+               BonLijnAutoReserveringBE) and is called before the ttBonLijn
+               snapshot copy below so bonlijn.gereserv (set by
+               ReserveerBijCreate) is included in the response. The `bon`
+               buffer used here was already populated (NO-LOCK) by
+               EnsureBonExists above - reused as-is, no new lookup. */
+            NEW Luna.BusinessLogic.BonLijnAutoReserveringBE():ReserveerBijCreate( BUFFER bonlijn, BUFFER bon ).
 
             CREATE ttBonLijn.
             CopyToTt( BUFFER bonlijn, BUFFER ttBonLijn ).
@@ -395,6 +517,14 @@ CLASS Luna.BusinessLogic.BonLijnBE:
 
         EnsureBonExists( piBonnr ).
 
+        IF CAN-FIND(FIRST bonlijn_productie
+            WHERE bonlijn_productie.bonnr  EQ piBonnr
+              AND bonlijn_productie.blijnnr EQ piLijnnr
+              AND bonlijn_productie.besteld NE 0) THEN
+            UNDO, THROW NEW Progress.Lang.AppError(
+                SUBSTITUTE("Bonlijn &1/&2 has a productie sublijn with besteld <> 0 and cannot be deleted":u,
+                    piBonnr, piLijnnr), 409).
+
         DO TRANSACTION:
             FIND FIRST bonlijn EXCLUSIVE-LOCK
                 WHERE bonlijn.bonnr EQ piBonnr
@@ -409,3 +539,4 @@ CLASS Luna.BusinessLogic.BonLijnBE:
     END METHOD.
 
 END CLASS.
+

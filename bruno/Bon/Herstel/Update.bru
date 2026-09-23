@@ -1,0 +1,33 @@
+meta {
+  name: Update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/web/bon/{{herstelBonnr}}/herstel
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "probleem": "Bijgewerkte probleembeschrijving",
+    "technieker": "JORIS"
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Partial update of non-status bon_herstel fields. `stempel` is not
+  writable via this endpoint - only via diagnose/bestellen/hersteld.
+}
+

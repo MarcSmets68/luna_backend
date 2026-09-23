@@ -1,0 +1,21 @@
+meta {
+  name: DeleteIgnoresInternalFieldsLijn
+  type: http
+  seq: 11
+}
+
+delete {
+  url: {{baseUrl}}/web/bon/{{bonnr}}/lijn/{{internalFieldsLijnnr}}
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Cleans up the line created by CreateIgnoresInternalFields.bru, so
+  Delete.bru (which requires zero remaining bonlijn rows under {{bonnr}})
+  still passes.
+}

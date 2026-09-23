@@ -25,9 +25,15 @@
                     reliable status field is identified. Bedrag = sum of
                     b-bedrag over those rows.
                   - "Orders in productie": bon rows where geparkeerd = FALSE
-                    AND verzonden = FALSE (same "open order" rule as
-                    Luna.BusinessLogic.LakproductieBE). "Leveren deze week"
-                    is the subset of those with lev-dat in the current
+                    AND verzonden = FALSE - a bon-level "open order" proxy
+                    (there is no production-stage field on bon itself; see
+                    the note above). This is NOT the same rule as
+                    Luna.BusinessLogic.LakproductieBE, which works at the
+                    bonlijn level (te-leveren NE 0, excluding lines already
+                    fully Gereserveerd/Besteld) - the two happen to serve a
+                    similar "still open" purpose but are separate,
+                    independently-confirmed business rules. "Leveren deze
+                    week" is the subset of those with lev-dat in the current
                     Monday-Sunday week.
                   - "Omzet deze maand": sum of factuur.totaal (type EQ TRUE,
                     i.e. invoices only - credit notes excluded, same rule as
@@ -402,8 +408,8 @@ CLASS Luna.BusinessLogic.DashboardBE:
     END METHOD.
 
     /*------------------------------------------------------------------------------
-        Purpose: Returns 6 monthly invoice-total data points for the dashboard
-                 omzet trend: the 5 full prior calendar months plus the current
+        Purpose: Returns 12 monthly invoice-total data points for the dashboard
+                 omzet trend: the 11 full prior calendar months plus the current
                  month from the 1st through TODAY. Uses the same revenue rule as
                  GetStatCards (factuur.type EQ TRUE, sum factuur.totaal via
                  factuur-x4).
@@ -421,8 +427,8 @@ CLASS Luna.BusinessLogic.DashboardBE:
 
         EMPTY TEMP-TABLE ttOmzetTrend.
 
-        /* Build months 5..0 months ago (oldest -> newest). */
-        DO iOffset = 5 TO 0 BY -1:
+        /* Build months 11..0 months ago (oldest -> newest). */
+        DO iOffset = 11 TO 0 BY -1:
 
             iTargetMonth = MONTH(TODAY) - iOffset.
             iTargetYear  = YEAR(TODAY).

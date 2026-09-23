@@ -1,0 +1,24 @@
+meta {
+  name: Get
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/web/pakbon/{{paknr}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Gets a single pakbon. 400 if paknr is non-numeric, 404 if not found.
+}
+

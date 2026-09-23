@@ -1,0 +1,24 @@
+meta {
+  name: List
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/web/pakbon/{{paknr}}/lijn
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists paklijn rows for pakbon {{paknr}}, ordered by lijnnr.
+}
+

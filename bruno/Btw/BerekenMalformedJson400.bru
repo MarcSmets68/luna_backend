@@ -1,0 +1,32 @@
+meta {
+  name: BerekenMalformedJson400
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/web/btw/bereken
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {invalid
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.code: eq 400
+}
+
+docs {
+  Malformed JSON body -> AppError 400 raised inside
+  BtwHandler:GetJsonBody's CATCH block (converts the raw JSON-parser
+  lexical error into a clean 400 instead of an uncaught framework 500).
+  Confirmed live against MarcTest 2026-09-27.
+}

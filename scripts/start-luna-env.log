@@ -69,3 +69,50 @@
 [2026-09-01 08:31:42] Starting MarcTest PASOE instance...
 [2026-09-01 08:39:03] Server is already running - startup action aborted
 [2026-09-01 08:39:04] start-luna-env.ps1 completed.
+[2026-09-11 08:50:27] LunaNew reachable on lhdc01:4500 - proceeding.
+[2026-09-11 08:50:27] Starting MarcTest PASOE instance...
+[2026-09-11 08:50:31] Using CATALINA_BASE:   "C:\OpenEdge\MARCOE~1"
+[2026-09-11 08:50:31] Using CATALINA_HOME:   "C:\Progress\OpenEdge\servers\pasoe"
+[2026-09-11 08:50:31] Using CATALINA_TMPDIR: "C:\OpenEdge\MARCOE~1\temp"
+[2026-09-11 08:50:31] Using JRE_HOME:        "C:/PROGRA~1/Java/jdk-17"
+[2026-09-11 08:50:31] Using CLASSPATH:       ";C:\Progress\OpenEdge\servers\pasoe\bin\bootstrap.jar;C:\Progress\OpenEdge\servers\pasoe\bin\tomcat-juli.jar;C:\Progress\OpenEdge\servers\pasoe\bin\tomcat-juli.jar"
+[2026-09-11 08:50:31] PAS started with process IDs: 18872
+[2026-09-11 08:50:31] start-luna-env.ps1 completed.
+[2026-09-11 08:58:00] LunaNew reachable on lhdc01:4500 - proceeding.
+[2026-09-11 08:58:00] Starting MarcTest PASOE instance...
+[2026-09-11 08:58:14] Server is already running - startup action aborted
+[2026-09-11 08:58:14] start-luna-env.ps1 completed.
+[2026-09-14 13:05:18] LunaNew reachable on lhdc01:4500 - proceeding.
+[2026-09-14 13:05:18] Starting MarcTest PASOE instance...
+[2026-09-14 13:05:24] Server is already running - startup action aborted
+[2026-09-14 13:05:24] start-luna-env.ps1 completed.
+[2026-09-16 08:47:25] LunaNew reachable on lhdc01:4500 - proceeding.
+[2026-09-16 08:47:25] Starting MarcTest PASOE instance...
+[2026-09-16 08:47:28] Using CATALINA_BASE:   "C:\OpenEdge\MARCOE~1"
+[2026-09-16 08:47:28] Using CATALINA_HOME:   "C:\Progress\OpenEdge\servers\pasoe"
+[2026-09-16 08:47:28] Using CATALINA_TMPDIR: "C:\OpenEdge\MARCOE~1\temp"
+[2026-09-16 08:47:28] Using JRE_HOME:        "C:/PROGRA~1/Java/jdk-17"
+[2026-09-16 08:47:28] Using CLASSPATH:       ";C:\Progress\OpenEdge\servers\pasoe\bin\bootstrap.jar;C:\Progress\OpenEdge\servers\pasoe\bin\tomcat-juli.jar;C:\Progress\OpenEdge\servers\pasoe\bin\tomcat-juli.jar"
+[2026-09-16 08:47:28] PAS started with process IDs: 1120
+[2026-09-16 08:47:28] start-luna-env.ps1 completed.
+[2026-09-16 08:47:32] LunaNew reachable on lhdc01:4500 - proceeding.
+[2026-09-16 08:47:32] Starting MarcTest PASOE instance...
+[2026-09-16 08:47:40] Server is already running - startup action aborted
+[2026-09-16 08:47:40] start-luna-env.ps1 completed.
+[2026-09-18 12:28:48] LunaNew reachable on lhdc01:4500 - proceeding.
+[2026-09-18 12:28:48] Starting MarcTest PASOE instance...
+[2026-09-18 12:29:57] Using CATALINA_BASE:   "C:\OpenEdge\MARCOE~1"
+[2026-09-18 12:29:57] Using CATALINA_HOME:   "C:\Progress\OpenEdge\servers\pasoe"
+[2026-09-18 12:29:57] Using CATALINA_TMPDIR: "C:\OpenEdge\MARCOE~1\temp"
+[2026-09-18 12:29:57] Using JRE_HOME:        "C:/PROGRA~1/Java/jdk-17"
+[2026-09-18 12:29:57] Using CLASSPATH:       ";C:\Progress\OpenEdge\servers\pasoe\bin\bootstrap.jar;C:\Progress\OpenEdge\servers\pasoe\bin\tomcat-juli.jar;C:\Progress\OpenEdge\servers\pasoe\bin\tomcat-juli.jar"
+[2026-09-18 12:29:57] PAS started with process IDs: 19332
+[2026-09-18 12:29:57] start-luna-env.ps1 completed.
+[2026-09-23 07:56:31] LunaNew reachable on lhdc01:4500 - proceeding.
+[2026-09-23 07:56:31] Starting MarcTest PASOE instance...
+[2026-09-23 07:56:32] Server is already running - startup action aborted
+[2026-09-23 07:56:32] start-luna-env.ps1 completed.
+[2026-09-23 07:59:24] LunaNew reachable on lhdc01:4500 - proceeding.
+[2026-09-23 07:59:24] Starting MarcTest PASOE instance...
+[2026-09-23 07:59:34] Server is already running - startup action aborted
+[2026-09-23 07:59:34] start-luna-env.ps1 completed.

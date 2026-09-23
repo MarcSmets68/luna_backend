@@ -1,0 +1,27 @@
+meta {
+  name: PostNotAllowed
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/web/led-ral
+  body: json
+  auth: none
+}
+
+body:json {
+  { "ral": 1, "omschrijving": "test" }
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 405
+}
+
+docs {
+  led_RAL is read-only - POST must return 405.
+}

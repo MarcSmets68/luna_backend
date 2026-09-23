@@ -1,0 +1,23 @@
+meta {
+  name: GetNotFound
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/web/led-ncs/DOESNOTEXIST
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 404
+}
+
+docs {
+  Non-existent ncs code -> 404.
+}

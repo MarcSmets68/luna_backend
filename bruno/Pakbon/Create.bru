@@ -1,0 +1,45 @@
+meta {
+  name: Create
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/web/pakbon
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "paknr": 99999999,
+    "klnr": 7629,
+    "naam": "ZTEST-CRUD Klant",
+    "adres": "Teststraat 1",
+    "postnr": "9000",
+    "stad": "Gent",
+    "munt": "EUR",
+    "opm": "Bruno CRUD test pakbon"
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  bru.setVar("paknr", res.body.paknr);
+}
+
+docs {
+  Creates a pakbon. `paknr` is server-generated (last paknr via
+  pakbon-x1 + 1) - the `paknr` value in this body is intentionally
+  ignored (shown here to prove that). Mirrors Bon/Create.bru's pattern.
+  Backed by Luna.BusinessLogic.PakbonBE.cls.
+}
+

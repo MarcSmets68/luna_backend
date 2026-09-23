@@ -1,0 +1,49 @@
+meta {
+  name: BerekenSwRegimeFalse
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/web/btw/bereken
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "regels": [
+      { "btwKode": "3", "bedrag": 100.00, "totaalRecupel": 0 },
+      { "btwKode": "1", "bedrag": 50.00, "totaalRecupel": 5.00 }
+    ],
+    "swRegime": false,
+    "swPrijsRecup": true,
+    "typeKorting": "K3",
+    "documentKortingPercentage": 0,
+    "documentKortingBedrag": 15
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.totaal.regimeToegepast: eq false
+  res.body.totaal.totaalBasis: eq 135
+  res.body.totaal.totBtw: eq 0
+  res.body.totaal.totaalInclBtw: eq 135
+  res.body.groepen: length 0
+}
+
+docs {
+  swRegime = false skips the btw-kode grouping/lookup entirely: flat sum
+  of bedrag over all regels = 100 + 50 = 150 (recupel NOT included in
+  this path, per design doc step 8), minus the fixed K3
+  documentKortingBedrag (15) = 135. groepen stays empty, totBtw is
+  always 0. Also regression-covers the "WRITE-JSON omits an empty child
+  temp-table's property" fix in BtwHandler:ResultHandleToJson (without
+  it this request 500s). Confirmed live against MarcTest 2026-09-27.
+}

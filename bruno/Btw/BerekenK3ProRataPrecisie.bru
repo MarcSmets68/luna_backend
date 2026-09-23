@@ -1,0 +1,66 @@
+meta {
+  name: BerekenK3ProRataPrecisie
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/web/btw/bereken
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "regels": [
+      { "btwKode": "3", "bedrag": 100.00, "totaalRecupel": 0 },
+      { "btwKode": "1", "bedrag": 50.00, "totaalRecupel": 0 }
+    ],
+    "swRegime": true,
+    "swPrijsRecup": false,
+    "typeKorting": "K3",
+    "documentKortingPercentage": 0,
+    "documentKortingBedrag": 15
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.totaal.regimeToegepast: eq true
+  res.body.totaal.totaalBasis: eq 135
+  res.body.totaal.totBtw: eq 21.6
+  res.body.totaal.totaalInclBtw: eq 156.6
+  res.body.groepen: length 2
+  res.body.groepen[0].btwKode: eq '1'
+  res.body.groepen[0].basis: eq 45
+  res.body.groepen[0].btwBedrag: eq 2.7
+  res.body.groepen[1].btwKode: eq '3'
+  res.body.groepen[1].basis: eq 90
+  res.body.groepen[1].btwBedrag: eq 18.9
+}
+
+docs {
+  Regression test for bug fixed 2026-09-28: the K3 pro-rata split used to
+  leave ttBtwGroep.basis/btwBedrag fully unrounded, so this exact payload
+  used to come back with floating-point noise on the group rows
+  (basis 89.9999999995/45.0000000005, btwBedrag 18.8999999999/2.7 instead
+  of clean values) even though totaal.* (already ROUND(...,2)) looked
+  fine. FindBtwKodeGroep now rounds basis/btwBedrag to 4 decimals before
+  writing the temp-table row.
+
+  Raw basis: 100 (btw-kode "3" = 21%) + 50 (btw-kode "1" = 6%) = 150.
+  K3 documentKortingBedrag=15 split pro-rata by group share:
+  reductie_3 = 15 * (100/150) = 10 -> basis_3 = 90.00, btwBedrag_3 = 18.90
+  reductie_1 = 15 * (50/150)  = 5  -> basis_1 = 45.00, btwBedrag_1 = 2.70
+  totaalBasis = 90 + 45 = 135, totBtw = 18.90 + 2.70 = 21.60,
+  totaalInclBtw = 156.60. groepen is ordered by ttGroepAgg's unique index
+  on btwKode (alphabetical "1" before "3"), not input/insertion order -
+  confirmed live against MarcTest 2026-09-28. The per-group assertions
+  above confirm no floating-point noise leaks through (exactly 90/18.9,
+  not 89.9999999995/18.8999999999).
+}

@@ -1,0 +1,32 @@
+meta {
+  name: Bestellen
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{herstelBonnr}}/herstel/bestellen
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.stempel: eq OND.BESTELD
+}
+
+docs {
+  Transitions DIAGNOSE -> OND.BESTELD. 409 if stempel isn't currently
+  DIAGNOSE. Run "Diagnose" first. Note: "Hersteld" further down requires
+  stempel IN HERSTELLING, which only happens via the auto-transition in
+  Luna.BusinessLogic.BonHerstelBE:CheckAutoTransitionToInHerstelling
+  (triggered by Bon/Reservering/Apply.bru bringing every bonlijn's
+  gereserv up to te-leveren on a HERSTELLING-type bon) - not directly
+  reachable from this folder alone without also creating/reserving a
+  bonlijn on {{herstelBonnr}}.
+}
+
