@@ -1,0 +1,42 @@
+﻿meta {
+  name: AnnuleerCleansUpProductieRowsCreateLijn
+  type: http
+  seq: 93
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{annuleerProductieBonnr}}/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "NOMALED.FUR1.2700.M.AB",
+    "aantal": 1,
+    "teLeveren": 1,
+    "vprijs": 10.0
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.gereserv: eq 1
+}
+
+script:post-response {
+  bru.setVar("annuleerProductieLijnnr", res.body.lijnnr);
+}
+
+docs {
+  Creates a BOM/"gemengd" bonlijn under {{annuleerProductieBonnr}},
+  which creates one bonlijn_productie row per artlijn component (see
+  AutoReserveringHappyPathBom.bru for the same artnr/mechanism). Requires
+  {{annuleerProductieBonnr}} (run "AnnuleerCleansUpProductieRowsSetupBon"
+  first).
+}

@@ -1,0 +1,41 @@
+﻿meta {
+  name: AutoReserveringGeparkeerdSetupBon
+  type: http
+  seq: 66
+}
+
+post {
+  url: {{baseUrl}}/web/bon
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "type": "TEST",
+    "klnr": 7629,
+    "naam": "ZTEST-GEPARKEERD",
+    "munt": "EUR",
+    "geparkeerd": true
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.geparkeerd: eq true
+}
+
+script:post-response {
+  bru.setVar("parkedBonnr", res.body.bonnr);
+}
+
+docs {
+  bon-auto-reservering design doc section 4 - creates a bon with geparkeerd =
+  true, dedicated for the "ReserveerBijCreate must skip when bon.geparkeerd"
+  regression test below. Stores bonnr into {{parkedBonnr}}.
+}

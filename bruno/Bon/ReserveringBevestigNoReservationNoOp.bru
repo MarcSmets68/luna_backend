@@ -1,0 +1,30 @@
+﻿meta {
+  name: ReserveringBevestigNoReservationNoOp
+  type: http
+  seq: 80
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{bevestigNoopBonnr}}/lijn/{{bevestigNoopLijnnr}}/reservering/bevestig
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.gereserv: eq 0
+}
+
+docs {
+  bon-auto-reservering design doc section 2 - confirming a line whose
+  bonlijn.gereserv is already 0 must be a plain 200 no-op, NOT an error
+  (avoids punishing a double-click on a line with nothing to confirm,
+  e.g. a subtotaal/kolomtitel/infolijn row or - as fixtured here - a
+  line whose article isn't stock-tracked). Requires
+  {{bevestigNoopBonnr}}/{{bevestigNoopLijnnr}} (run
+  "ReserveringBevestigNoReservationSetupLijn" first).
+}

@@ -1,0 +1,25 @@
+﻿meta {
+  name: HerstellingAutoTransitionDiagnose
+  type: http
+  seq: 98
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{herstelAutoBonnr}}/herstel/diagnose
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.stempel: eq DIAGNOSE
+}
+
+docs {
+  Transitions ONTVANGST -> DIAGNOSE for {{herstelAutoBonnr}}. Requires
+  "HerstellingAutoTransitionCreateHerstel" to have run first.
+}

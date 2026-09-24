@@ -1,0 +1,40 @@
+﻿meta {
+  name: AnnuleerReleasesConfirmedReservation
+  type: http
+  seq: 91
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{annuleerConfirmedBonnr}}/annuleer
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {}
+}
+
+assert {
+  res.status: eq 200
+  res.body.stempel: eq O
+}
+
+docs {
+  bon-auto-reservering design doc section 6.1 point 1 - regression test for the
+  bugfix "annuleer never released artikel.gereserveerd, only besteld-kl".
+  Cancels {{annuleerConfirmedBonnr}}, whose only line was moved to
+  "confirmed" by AnnuleerReleasesConfirmedReservationBevestig immediately
+  before this call. Before this fix, ReleaseReservationsForBon only
+  touched besteld-kl, so the confirmed unit would have leaked in
+  artikel.gereserveerd forever. The 200/stempel=O response here only
+  proves the cancel doesn't error - the actual release of
+  artikel.gereserveerd is not independently observable through the
+  documented HTTP contract - confirmed via direct ABL/DB query during
+  backend-coder implementation. Requires {{annuleerConfirmedBonnr}} (run
+  "AnnuleerReleasesConfirmedReservationBevestig" first).
+}

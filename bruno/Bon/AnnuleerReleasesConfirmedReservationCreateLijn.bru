@@ -1,0 +1,40 @@
+﻿meta {
+  name: AnnuleerReleasesConfirmedReservationCreateLijn
+  type: http
+  seq: 89
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{annuleerConfirmedBonnr}}/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "NOMALED.FUR1.2700.M.AB",
+    "aantal": 1,
+    "teLeveren": 1,
+    "vprijs": 10.0
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.gereserv: eq 1
+}
+
+script:post-response {
+  bru.setVar("annuleerConfirmedLijnnr", res.body.lijnnr);
+}
+
+docs {
+  Creates the bonlijn to be confirmed-then-cancelled below. Requires
+  {{annuleerConfirmedBonnr}} (run
+  "AnnuleerReleasesConfirmedReservationSetupBon" first).
+}

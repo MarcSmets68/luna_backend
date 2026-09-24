@@ -1,0 +1,39 @@
+﻿meta {
+  name: DeleteLijnReleasesReservationSetupBon
+  type: http
+  seq: 81
+}
+
+post {
+  url: {{baseUrl}}/web/bon
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "type": "TEST",
+    "klnr": 7629,
+    "naam": "ZTEST-DELETE-RELEASE",
+    "munt": "EUR"
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  bru.setVar("deleteReleaseBonnr", res.body.bonnr);
+}
+
+docs {
+  bon-auto-reservering design doc section 6 - creates a dedicated bon for the
+  "DELETE .../lijn/{lijnnr} releases the reservation it holds" test
+  sequence below. Stores bonnr into {{deleteReleaseBonnr}}.
+}

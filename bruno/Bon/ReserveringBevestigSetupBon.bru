@@ -1,0 +1,39 @@
+﻿meta {
+  name: ReserveringBevestigSetupBon
+  type: http
+  seq: 70
+}
+
+post {
+  url: {{baseUrl}}/web/bon
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "type": "TEST",
+    "klnr": 7629,
+    "naam": "ZTEST-BEVESTIG",
+    "munt": "EUR"
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  bru.setVar("bevestigBonnr", res.body.bonnr);
+}
+
+docs {
+  Creates a dedicated bon for the reservering/bevestig (confirm) test
+  sequence below - docs/architecture/bon-auto-reservering-design.md section 2.
+  Stores bonnr into {{bevestigBonnr}}.
+}

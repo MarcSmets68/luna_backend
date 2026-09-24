@@ -417,6 +417,19 @@ CLASS Luna.BusinessLogic.BonBE:
             IF NOT AVAILABLE bon THEN
                 UNDO, THROW NEW Progress.Lang.AppError(SUBSTITUTE("Bon &1 not found":u, piBonnr), 404).
 
+            /* Symmetry addition (design doc §6) - releases any reservation
+               still held by this bon's bonlijn rows before the delete.
+               Provably unreachable today: HasChildRows() above already
+               409s whenever any bonlijn row exists for this bonnr, so a
+               bon can never reach this point WITH bonlijn rows attached.
+               Added anyway, same convention as HasOutstandingBestelling
+               above - future-proofing against that guard changing (e.g.
+               if a cascading bon-delete is ever approved), not a
+               currently-reachable code path. */
+            FOR EACH bonlijn OF bon EXCLUSIVE-LOCK:
+                ReleaseReservationForLijn( BUFFER bonlijn, BUFFER bon ).
+            END.
+
             DELETE bon.
         END.
 
@@ -440,17 +453,63 @@ CLASS Luna.BusinessLogic.BonBE:
 
     /*------------------------------------------------------------------------------
         Purpose: Releases BOM (artlijn) sub-component reservations for a
-                 single cancelled bonlijn, 1-on-1 port of the legacy
-                 annul-bon BOM walk (Bon.w, verified against the real
-                 legacy source). Only reached for bonlijn.artnr rows whose
-                 `artikel.soort` is TRUE (a "gemengd"/BOM article).
+                 single cancelled/deleted bonlijn, 1-on-1 port of the
+                 legacy annul-bon BOM walk (Bon.w, verified against the
+                 real legacy source), updated per the bon-auto-reservering
+                 design doc §6.1 point 2. Only reached for bonlijn.artnr
+                 rows whose `artikel.soort` is TRUE (a "gemengd"/BOM
+                 article).
+        Notes  : Uses `bonlijn.gereserv` (not `bonlijn.te-leveren`) as the
+                 release amount - te-leveren can exceed what was actually
+                 reserved on a create-time stock shortfall (Iteratie C),
+                 so releasing te-leveren here could over-release. gereserv
+                 EQ te-leveren for the common (no-shortfall) case, so this
+                 is backward-compatible there; only shortfall lines get a
+                 different (correct, smaller) release amount. Only the
+                 *sign* of the delta matters for swVast sub-components
+                 (see ApplyBomReservationDelta), so this only changes
+                 proportional (non-swVast) sub-component releases.
     ------------------------------------------------------------------------------*/
     METHOD PRIVATE VOID ReleaseBomReservations(
         BUFFER pbArtikel FOR artikel,
         BUFFER pbBonlijn FOR bonlijn,
         BUFFER pbBon     FOR bon ):
 
-        ApplyBomReservationDelta( BUFFER pbArtikel, BUFFER pbBonlijn, BUFFER pbBon, (0 - pbBonlijn.te-leveren) ).
+        ApplyBomReservationDelta( BUFFER pbArtikel, BUFFER pbBonlijn, BUFFER pbBon, (0 - pbBonlijn.gereserv) ).
+
+    END METHOD.
+
+    /*------------------------------------------------------------------------------
+        Purpose: Looks up the "off_aantal" multiplier for a bonlijn that is
+                 part of a groepnr'd set (e.g. a set/kit line with a
+                 subtotaal line carrying the group's off_aantal), falling
+                 back to 1 if the line has no groepnr, no matching
+                 subtotaal line is found, or off_aantal is 0. Extracted
+                 (bon-auto-reservering design doc §3) from the identical
+                 inline block that used to be duplicated between
+                 ApplyBomReservationDelta (below) and
+                 Luna.BusinessLogic.BonLijnAutoReserveringBE:
+                 ReserveerBomComponenten - both now call this instead of
+                 maintaining their own copy, removing the risk of a
+                 groepnr/off_aantal bug fix landing in one copy and not
+                 the other. PUBLIC so BonLijnAutoReserveringBE can call it.
+    ------------------------------------------------------------------------------*/
+    METHOD PUBLIC DECIMAL GetOffAantal( BUFFER pbBon FOR bon, BUFFER pbBonlijn FOR bonlijn ):
+
+        DEFINE VARIABLE dOffAantal AS DECIMAL NO-UNDO.
+        DEFINE BUFFER bfBonlijn FOR bonlijn.
+
+        IF pbBonlijn.groepnr NE 0 THEN
+        DO:
+            FIND FIRST bfBonlijn OF pbBon
+                WHERE bfBonlijn.groepnr EQ pbBonlijn.groepnr
+                  AND bfBonlijn.subtotaal NO-LOCK NO-ERROR.
+            dOffAantal = (IF AVAILABLE bfBonlijn THEN bfBonlijn.off_aantal ELSE 1).
+        END.
+        ELSE dOffAantal = 1.
+        IF dOffAantal = 0 THEN dOffAantal = 1.
+
+        RETURN dOffAantal.
 
     END METHOD.
 
@@ -483,22 +542,13 @@ CLASS Luna.BusinessLogic.BonBE:
 
         DEFINE VARIABLE dOffAantal AS DECIMAL NO-UNDO.
         DEFINE VARIABLE dSign      AS DECIMAL NO-UNDO.
-        DEFINE BUFFER bfBonlijn  FOR bonlijn.
         DEFINE BUFFER bfArtikel  FOR artikel.
         DEFINE BUFFER bfArtlijn  FOR artlijn.
         DEFINE BUFFER bf2Artikel FOR artikel.
 
         dSign = (IF pdQtyDelta GE 0 THEN 1 ELSE -1).
 
-        IF pbBonlijn.groepnr NE 0 THEN
-        DO:
-            FIND FIRST bfBonlijn OF pbBon
-                WHERE bfBonlijn.groepnr EQ pbBonlijn.groepnr
-                  AND bfBonlijn.subtotaal NO-LOCK NO-ERROR.
-            dOffAantal = (IF AVAILABLE bfBonlijn THEN bfBonlijn.off_aantal ELSE 1).
-        END.
-        ELSE dOffAantal = 1.
-        IF dOffAantal = 0 THEN dOffAantal = 1.
+        dOffAantal = GetOffAantal( BUFFER pbBon, BUFFER pbBonlijn ).
 
         FOR EACH artlijn OF pbArtikel NO-LOCK:
             FIND FIRST bfArtikel WHERE bfArtikel.artnr EQ artlijn.l-artnr EXCLUSIVE-LOCK NO-ERROR.
@@ -540,13 +590,75 @@ CLASS Luna.BusinessLogic.BonBE:
     END METHOD.
 
     /*------------------------------------------------------------------------------
-        Purpose: Releases artikel.besteld-kl (and, for BOM articles,
-                 artlijn sub-component pbesteld-kl) reservations for every
-                 non-deleted, non-hold bonlijn of the given bon, and
+        Purpose: Releases the pending+confirmed reservation
+                 (artikel.besteld-kl AND artikel.gereserveerd, plus - for a
+                 BOM article - artlijn sub-component pbesteld-kl) held for
+                 a single bonlijn, zeroes bonlijn.gereserv, and deletes any
+                 bonlijn_productie rows created for it by the auto-reserve
+                 step. Shared helper (bon-auto-reservering design doc §6/
+                 §6.1) used by ReleaseReservationsForBon (annuleer), by
+                 Luna.BusinessLogic.BonLijnBE:DeleteBonLijn, and by
+                 DeleteBon below - one release implementation instead of
+                 three copies.
+        Notes  : No stored pending/confirmed split exists on bonlijn (Marc
+                 rejected the `bonlijn.gereserv-bevestigd` field - see
+                 design doc §2.1), so this cannot know exactly how much of
+                 `bonlijn.gereserv` sits in besteld-kl vs. gereserveerd.
+                 It releases the FULL bonlijn.gereserv amount from BOTH
+                 fields, each independently clamped at 0 - deliberately
+                 permissive/safe-by-overcorrection (a never-confirmed line
+                 releases 0 extra from gereserveerd; a fully-confirmed line
+                 releases 0 extra from besteld-kl, already drained by the
+                 confirm step). A partially-confirmed line that already
+                 caused gereserveerd to be over-counted by a double-confirm
+                 (§2.1) is NOT retroactively corrected here - this only
+                 prevents this release from making the drift worse.
+                 Caller must hold pbBonlijn under EXCLUSIVE-LOCK (this
+                 writes bonlijn.gereserv = 0) inside an active transaction.
+    ------------------------------------------------------------------------------*/
+    METHOD PUBLIC VOID ReleaseReservationForLijn( BUFFER pbBonlijn FOR bonlijn, BUFFER pbBon FOR bon ):
+
+        IF pbBonlijn.gereserv GT 0 AND pbBonlijn.artnr NE "":u THEN
+        DO:
+            FIND FIRST artikel EXCLUSIVE-LOCK
+                WHERE artikel.artnr EQ pbBonlijn.artnr AND artikel.stock NO-ERROR.
+            IF AVAILABLE artikel THEN
+            DO:
+                ASSIGN
+                    artikel.besteld-kl   = MAX(0, artikel.besteld-kl   - pbBonlijn.gereserv)
+                    artikel.gereserveerd = MAX(0, artikel.gereserveerd - pbBonlijn.gereserv)
+                    .
+
+                IF artikel.soort THEN
+                    ReleaseBomReservations( BUFFER artikel, BUFFER pbBonlijn, BUFFER pbBon ).
+            END.
+            RELEASE artikel.
+        END.
+
+        /* Requirement 7 (design doc §6/§6.1 point 4) - clean up the
+           production sub-lines the auto-reserve step created, so a
+           cancel/delete doesn't leave orphaned bonlijn_productie rows. */
+        FOR EACH bonlijn_productie EXCLUSIVE-LOCK
+            WHERE bonlijn_productie.bonnr   EQ pbBonlijn.bonnr
+              AND bonlijn_productie.blijnnr EQ pbBonlijn.lijnnr:
+            DELETE bonlijn_productie.
+        END.
+
+        pbBonlijn.gereserv = 0.
+
+    END METHOD.
+
+    /*------------------------------------------------------------------------------
+        Purpose: Releases the reservation (both besteld-kl and
+                 gereserveerd, per ReleaseReservationForLijn above) for
+                 every non-deleted, non-hold bonlijn of the given bon, and
                  accumulates the net order value (pdWsNet) used afterwards
                  by UpdateKlantBesteld. 1-on-1 port of the legacy annul-bon
                  loop (Bon.w, lines 10455-10540, verified against the real
-                 legacy source).
+                 legacy source), updated per the bon-auto-reservering
+                 design doc §6.1 to release from both fields (not just
+                 besteld-kl) using bonlijn.gereserv (not bonlijn.te-leveren)
+                 as the release amount.
     ------------------------------------------------------------------------------*/
     METHOD PRIVATE VOID ReleaseReservationsForBon( BUFFER pbBon FOR bon, OUTPUT pdWsNet AS DECIMAL ):
 
@@ -554,24 +666,11 @@ CLASS Luna.BusinessLogic.BonBE:
 
         FOR EACH bonlijn OF pbBon
             WHERE bonlijn.stempel NE "D":u
-              AND bonlijn.hold EQ FALSE NO-LOCK:
-
-            FIND artikel EXCLUSIVE-LOCK WHERE artikel.artnr EQ bonlijn.artnr AND artikel.stock NO-ERROR.
-            IF AVAILABLE artikel THEN
-            DO:
-                /* Clamped at 0 - see the comment in ReleaseBomReservations
-                   above for why (Iteratie C automatische
-                   voorraadreservering can reserve less than te-leveren on
-                   a stock shortfall, so releasing the full te-leveren on
-                   cancel could otherwise push besteld-kl below 0). */
-                artikel.besteld-kl = MAX(0, artikel.besteld-kl - bonlijn.te-leveren).
-
-                IF artikel.soort THEN
-                    ReleaseBomReservations( BUFFER artikel, BUFFER bonlijn, BUFFER pbBon ).
-            END.
-            RELEASE artikel.
+              AND bonlijn.hold EQ FALSE EXCLUSIVE-LOCK:
 
             pdWsNet = pdWsNet + (bonlijn.te-leveren * (bonlijn.vprijs * (1 - (bonlijn.korting / 100)))).
+
+            ReleaseReservationForLijn( BUFFER bonlijn, BUFFER pbBon ).
         END.
 
     END METHOD.

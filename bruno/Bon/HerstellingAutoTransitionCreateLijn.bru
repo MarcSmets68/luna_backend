@@ -1,0 +1,44 @@
+﻿meta {
+  name: HerstellingAutoTransitionCreateLijn
+  type: http
+  seq: 100
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{herstelAutoBonnr}}/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "NOMALED.FUR1.2700.M.AB",
+    "aantal": 1,
+    "teLeveren": 1,
+    "vprijs": 10.0
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.gereserv: eq 1
+  res.body.teLeveren: eq 1
+}
+
+docs {
+  bon-auto-reservering design doc section 5 - creates the ONLY bonlijn for
+  {{herstelAutoBonnr}}, fully auto-reserving on create (gereserv EQ
+  teLeveren = 1) purely via this POST - no manual
+  POST .../reservering call is ever made in this sequence. Per section 5, this
+  create path now also calls
+  Luna.BusinessLogic.BonHerstelBE:CheckAutoTransitionToInHerstelling
+  inside the same transaction; the follow-up GET below verifies the
+  resulting auto-transition. Requires {{herstelAutoBonnr}} (run
+  "HerstellingAutoTransitionBestellen" first, so bon_herstel.stempel is
+  OND.BESTELD when this line is created).
+}

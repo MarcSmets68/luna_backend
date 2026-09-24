@@ -1,0 +1,49 @@
+﻿meta {
+  name: AutoReserveringGeparkeerdSkip
+  type: http
+  seq: 67
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{parkedBonnr}}/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "NOMALED.FUR1.2700.M.AB",
+    "aantal": 1,
+    "teLeveren": 1,
+    "vprijs": 10.0
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.bonnr: eq {{parkedBonnr}}
+  res.body.gereserv: eq 0
+}
+
+script:post-response {
+  bru.setVar("parkedLijnnr", res.body.lijnnr);
+}
+
+docs {
+  bon-auto-reservering design doc section 4 - proves
+  Luna.BusinessLogic.BonLijnAutoReserveringBE:ReserveerBijCreate skips
+  reservation entirely (gereserv stays 0, artikel.besteld-kl untouched)
+  when the parent bon.geparkeerd = TRUE, even though the article has
+  stock and teLeveren > 0 (the exact combination that would otherwise
+  reserve stock - see AutoReserveringHappyPathBom using the same artnr).
+  The artikel.besteld-kl-unchanged half of this assertion is not
+  independently observable through the HTTP contract - confirmed via
+  direct ABL/DB query during backend-coder implementation, same
+  limitation as AutoReserveringHappyPathBom. Requires {{parkedBonnr}}
+  (run "AutoReserveringGeparkeerdSetupBon" first).
+}

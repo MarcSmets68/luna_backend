@@ -1,0 +1,32 @@
+﻿meta {
+  name: AnnuleerCleansUpProductieRowsAnnuleer
+  type: http
+  seq: 94
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{annuleerProductieBonnr}}/annuleer
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {}
+}
+
+assert {
+  res.status: eq 200
+  res.body.stempel: eq O
+}
+
+docs {
+  Cancels {{annuleerProductieBonnr}}. Requires {{annuleerProductieBonnr}}
+  (run "AnnuleerCleansUpProductieRowsCreateLijn" first) - the follow-up
+  GET below verifies the bonlijn_productie cleanup this cancel should
+  have performed.
+}

@@ -1,0 +1,43 @@
+﻿meta {
+  name: ReserveringBevestigDeliveredSetupLijn
+  type: http
+  seq: 75
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{bevestigDeliveredBonnr}}/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "TESTART",
+    "omschrijving": "Test regel stempel D",
+    "stempel": "D",
+    "aantal": 2,
+    "vprijs": 50.0
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.stempel: eq D
+}
+
+script:post-response {
+  bru.setVar("bevestigDeliveredLijnnr", res.body.lijnnr);
+}
+
+docs {
+  Creates a bonlijn with stempel "D" (geleverd) under
+  {{bevestigDeliveredBonnr}}, same convention as
+  Bon/UpdateLijnStempelDSetup.bru. Requires
+  {{bevestigDeliveredBonnr}} (run "ReserveringBevestigDeliveredSetupBon"
+  first).
+}

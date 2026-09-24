@@ -1,0 +1,27 @@
+﻿meta {
+  name: HerstellingAutoTransitionBestellen
+  type: http
+  seq: 99
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{herstelAutoBonnr}}/herstel/bestellen
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.stempel: eq OND.BESTELD
+}
+
+docs {
+  Transitions DIAGNOSE -> OND.BESTELD for {{herstelAutoBonnr}} - a
+  precondition of Luna.BusinessLogic.BonHerstelBE:
+  CheckAutoTransitionToInHerstelling. Requires
+  "HerstellingAutoTransitionDiagnose" to have run first.
+}

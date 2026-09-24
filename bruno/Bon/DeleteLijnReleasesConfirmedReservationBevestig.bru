@@ -1,0 +1,28 @@
+﻿meta {
+  name: DeleteLijnReleasesConfirmedReservationBevestig
+  type: http
+  seq: 86
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{deleteReleaseConfirmedBonnr}}/lijn/{{deleteReleaseConfirmedLijnnr}}/reservering/bevestig
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.gereserv: eq 1
+}
+
+docs {
+  Confirms the reservation created above, moving it from
+  artikel.besteld-kl (pending) to artikel.gereserveerd (confirmed) before
+  the delete test below. Requires
+  {{deleteReleaseConfirmedBonnr}}/{{deleteReleaseConfirmedLijnnr}} (run
+  "DeleteLijnReleasesConfirmedReservationCreateLijn" first).
+}

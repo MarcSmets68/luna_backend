@@ -1,0 +1,40 @@
+﻿meta {
+  name: AutoReserveringGeparkeerdUnparkedReserves
+  type: http
+  seq: 69
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{parkedBonnr}}/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "NOMALED.FUR1.2700.M.AB",
+    "aantal": 1,
+    "teLeveren": 1,
+    "vprijs": 10.0
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.bonnr: eq {{parkedBonnr}}
+  res.body.gereserv: eq 1
+}
+
+docs {
+  Companion to AutoReserveringGeparkeerdSkip - same bon, same artnr,
+  after AutoReserveringGeparkeerdUnpark flipped geparkeerd back to false.
+  Asserts normal reservation now happens (gereserv = teLeveren = 1),
+  proving the bon.geparkeerd check in ReserveerBijCreate is re-evaluated
+  live on every call, not a one-time/permanent skip. Requires
+  {{parkedBonnr}} (run "AutoReserveringGeparkeerdUnpark" first).
+}

@@ -1,0 +1,34 @@
+﻿meta {
+  name: HerstellingAutoTransitionVerify
+  type: http
+  seq: 101
+}
+
+get {
+  url: {{baseUrl}}/web/bon/{{herstelAutoBonnr}}/herstel
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.stempel: eq IN HERSTELLING
+}
+
+docs {
+  bon-auto-reservering design doc section 5 (Open Question 10) - the actual
+  regression assertion: after HerstellingAutoTransitionCreateLijn's
+  create-time auto-reserve brought the line's gereserv up to teLeveren
+  (with bon_herstel.stempel already OND.BESTELD), bon_herstel.stempel
+  must have auto-transitioned to "IN HERSTELLING" WITHOUT any manual
+  POST .../reservering call ever being made - proving
+  Luna.BusinessLogic.BonLijnBE:CreateBonLijnInternal now wires in
+  BonHerstelBE:CheckAutoTransitionToInHerstelling on the create path, not
+  only on the manual-reserve path (Bon/Herstel/Bestellen.bru's docs flag
+  this as the previously-missing case). Requires {{herstelAutoBonnr}}
+  (run "HerstellingAutoTransitionCreateLijn" first).
+}

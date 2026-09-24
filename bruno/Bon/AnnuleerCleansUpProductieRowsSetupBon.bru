@@ -1,0 +1,42 @@
+﻿meta {
+  name: AnnuleerCleansUpProductieRowsSetupBon
+  type: http
+  seq: 92
+}
+
+post {
+  url: {{baseUrl}}/web/bon
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "type": "TEST",
+    "stempel": "V",
+    "klnr": 7629,
+    "naam": "ZTEST-ANNULEER-PRODUCTIE",
+    "munt": "EUR"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.stempel: eq V
+}
+
+script:post-response {
+  bru.setVar("annuleerProductieBonnr", res.body.bonnr);
+}
+
+docs {
+  bon-auto-reservering design doc section 6.1 point 4 (Requirement 7) - creates
+  a dedicated bon (stempel "V") for the "annuleer deletes the orphaned
+  bonlijn_productie rows created by auto-reserve" regression test below.
+  Stores bonnr into {{annuleerProductieBonnr}}.
+}

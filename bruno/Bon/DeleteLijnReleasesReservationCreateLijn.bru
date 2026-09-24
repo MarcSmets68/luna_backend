@@ -1,0 +1,44 @@
+﻿meta {
+  name: DeleteLijnReleasesReservationCreateLijn
+  type: http
+  seq: 82
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{deleteReleaseBonnr}}/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "NOMALED.FUR1.2700.M.AB",
+    "aantal": 1,
+    "teLeveren": 1,
+    "vprijs": 10.0
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.bonnr: eq {{deleteReleaseBonnr}}
+  res.body.gereserv: eq 1
+}
+
+script:post-response {
+  bru.setVar("deleteReleaseLijnnr", res.body.lijnnr);
+}
+
+docs {
+  Creates a BOM/"gemengd" bonlijn (same artnr as
+  AutoReserveringHappyPathBom.bru) under {{deleteReleaseBonnr}}, which
+  auto-reserves 1 unit (pending, artikel.besteld-kl) plus one
+  bonlijn_productie row per artlijn component (each component's
+  artikel.pbesteld-kl incremented). Requires {{deleteReleaseBonnr}} (run
+  "DeleteLijnReleasesReservationSetupBon" first).
+}

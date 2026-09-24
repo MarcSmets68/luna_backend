@@ -17,7 +17,13 @@
                   GET    /web/bon/{bonnr}/lijn/{lijnnr}   - get one bonlijn
                   POST   /web/bon/{bonnr}/lijn            - create bonlijn
                   PUT    /web/bon/{bonnr}/lijn/{lijnnr}   - update bonlijn (409 if stempel = 'D')
-                  DELETE /web/bon/{bonnr}/lijn/{lijnnr}   - delete bonlijn
+                  DELETE /web/bon/{bonnr}/lijn/{lijnnr}   - delete bonlijn (releases any pending/
+                                                            confirmed reservation still held - see
+                                                            Luna.BusinessLogic.BonBE:ReleaseReservationForLijn)
+                  POST   /web/bon/{bonnr}/lijn/{lijnnr}/reservering            - manual reservation delta
+                  POST   /web/bon/{bonnr}/lijn/{lijnnr}/reservering/bevestig  - confirm entire pending
+                                                            reservation (all-or-nothing, not idempotent -
+                                                            see Luna.BusinessLogic.BonLijnReserveringBevestigingBE)
 
                   GET /web/bon supports an optional ?geparkeerd=true|false
                   query filter alongside the existing klnr/type/bonnr/naam/
@@ -54,6 +60,7 @@ USING Luna.BusinessLogic.BonLedBE.
 USING Luna.BusinessLogic.BonLedQcBE.
 USING Luna.BusinessLogic.BonHerstelBE.
 USING Luna.BusinessLogic.BonLijnReserveringBE.
+USING Luna.BusinessLogic.BonLijnReserveringBevestigingBE.
 USING Luna.BusinessLogic.PakLijnBE.
  
 BLOCK-LEVEL ON ERROR UNDO, THROW. 
@@ -638,11 +645,13 @@ CLASS Luna.Web.BonHandler INHERITS WebHandler:
         DEFINE VARIABLE cEntry2      AS CHARACTER  NO-UNDO.
         DEFINE VARIABLE cEntry3      AS CHARACTER  NO-UNDO.
         DEFINE VARIABLE cEntry4      AS CHARACTER  NO-UNDO.
+        DEFINE VARIABLE cEntry5      AS CHARACTER  NO-UNDO.
         DEFINE VARIABLE oProdBE      AS BonLijnProductieBE     NO-UNDO.
         DEFINE VARIABLE oLedBE       AS BonLedBE               NO-UNDO.
         DEFINE VARIABLE oLedQcBE     AS BonLedQcBE             NO-UNDO.
         DEFINE VARIABLE oHerstelBE   AS BonHerstelBE           NO-UNDO.
         DEFINE VARIABLE oReserveBE   AS BonLijnReserveringBE   NO-UNDO.
+        DEFINE VARIABLE oBevestigBE  AS BonLijnReserveringBevestigingBE NO-UNDO.
         DEFINE VARIABLE dDelta       AS DECIMAL                NO-UNDO.
 
         cRemainder = GetPathRemainder(poRequest).
@@ -725,6 +734,33 @@ CLASS Luna.Web.BonHandler INHERITS WebHandler:
 
                 WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oItems:GetJsonObject(1)).
 
+                RETURN 0.
+            END.
+
+            IF cEntry4 EQ "reservering":u AND iSegCount EQ 5 THEN
+            DO:
+                cEntry5 = ENTRY(5, cRemainder, "/":u).
+
+                IF cEntry5 EQ "bevestig":u THEN
+                DO:
+                    /* POST /bon/{bonnr}/lijn/{lijnnr}/reservering/bevestig
+                       (all-or-nothing confirm - see
+                       Luna.BusinessLogic.BonLijnReserveringBevestigingBE
+                       and docs/architecture/bon-auto-reservering-design.md
+                       §2). No request body is read. */
+                    oBevestigBE = NEW BonLijnReserveringBevestigingBE().
+                    hResult     = oBevestigBE:Bevestig(iBonnr, iLijnnr).
+                    oBody       = ResultHandleToJson(hResult).
+                    oItems      = oBody:GetJsonArray("items":u).
+
+                    WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oItems:GetJsonObject(1)).
+
+                    RETURN 0.
+                END.
+
+                WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest),
+                    SUBSTITUTE("Unknown /bon/[bonnr]/lijn/[lijnnr]/reservering/... sub-resource, got &1":u,
+                        cRemainder)).
                 RETURN 0.
             END.
 

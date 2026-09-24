@@ -1,0 +1,42 @@
+﻿meta {
+  name: AnnuleerReleasesConfirmedReservationSetupBon
+  type: http
+  seq: 88
+}
+
+post {
+  url: {{baseUrl}}/web/bon
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "type": "TEST",
+    "stempel": "V",
+    "klnr": 7629,
+    "naam": "ZTEST-ANNULEER-CONFIRMED",
+    "munt": "EUR"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.stempel: eq V
+}
+
+script:post-response {
+  bru.setVar("annuleerConfirmedBonnr", res.body.bonnr);
+}
+
+docs {
+  bon-auto-reservering design doc section 6.1 point 1 - creates a dedicated bon
+  (stempel "V" so it can be cancelled) for the "annuleer releases a
+  CONFIRMED reservation too" regression test below. Stores bonnr into
+  {{annuleerConfirmedBonnr}}.
+}

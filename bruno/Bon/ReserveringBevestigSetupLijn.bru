@@ -1,0 +1,42 @@
+﻿meta {
+  name: ReserveringBevestigSetupLijn
+  type: http
+  seq: 71
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{bevestigBonnr}}/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "NOMALED.FUR1.2700.M.AB",
+    "aantal": 1,
+    "teLeveren": 1,
+    "vprijs": 10.0
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.bonnr: eq {{bevestigBonnr}}
+  res.body.gereserv: eq 1
+}
+
+script:post-response {
+  bru.setVar("bevestigLijnnr", res.body.lijnnr);
+}
+
+docs {
+  Creates a bonlijn under {{bevestigBonnr}} that auto-reserves 1 unit
+  (pending, in artikel.besteld-kl) on create - the reservation this test
+  sequence then confirms. Requires {{bevestigBonnr}} (run
+  "ReserveringBevestigSetupBon" first).
+}

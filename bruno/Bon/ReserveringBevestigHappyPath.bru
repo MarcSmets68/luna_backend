@@ -1,0 +1,38 @@
+﻿meta {
+  name: ReserveringBevestigHappyPath
+  type: http
+  seq: 72
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{bevestigBonnr}}/lijn/{{bevestigLijnnr}}/reservering/bevestig
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.bonnr: eq {{bevestigBonnr}}
+  res.body.lijnnr: eq {{bevestigLijnnr}}
+  res.body.gereserv: eq 1
+}
+
+docs {
+  bon-auto-reservering design doc section 2 - confirms the entire pending
+  reservation (bonlijn.gereserv = 1) for {{bevestigBonnr}}/
+  {{bevestigLijnnr}}, moving it from artikel.besteld-kl to
+  artikel.gereserveerd. Asserts gereserv is UNCHANGED (still 1) -
+  confirmation moves WHERE the reservation is accounted for on artikel,
+  never bonlijn.gereserv itself. The besteld-kl/gereserveerd field move
+  itself is not independently observable through the documented
+  bon/bonlijn HTTP contract (no exposed GET on artikel's reservation
+  fields) - same limitation already noted by
+  AutoReserveringHappyPathBom.bru; confirmed via direct ABL/DB query
+  during backend-coder implementation. Requires {{bevestigBonnr}}/
+  {{bevestigLijnnr}} (run "ReserveringBevestigSetupLijn" first). Backed by
+  Luna.BusinessLogic.BonLijnReserveringBevestigingBE.
+}

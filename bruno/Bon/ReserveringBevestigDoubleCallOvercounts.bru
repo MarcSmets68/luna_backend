@@ -1,0 +1,37 @@
+﻿meta {
+  name: ReserveringBevestigDoubleCallOvercounts
+  type: http
+  seq: 73
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{bevestigBonnr}}/lijn/{{bevestigLijnnr}}/reservering/bevestig
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.gereserv: eq 1
+}
+
+docs {
+  bon-auto-reservering design doc section 2.1 - documents the ACCEPTED trade-off
+  of the all-or-nothing/non-idempotent confirm design, it is NOT a
+  pass/fail regression gate for "correct" behaviour. Calls
+  .../reservering/bevestig a SECOND time on the same
+  {{bevestigBonnr}}/{{bevestigLijnnr}} line (already confirmed by
+  ReserveringBevestigHappyPath) and still gets a plain 200 - there is no
+  stored field to detect "already confirmed" (Marc rejected the
+  bonlijn.gereserv-bevestigd field), so artikel.gereserveerd silently
+  over-counts by the full bonlijn.gereserv amount a second time. That
+  over-count is not independently observable through the documented HTTP
+  contract - confirmed via direct ABL/DB query during backend-coder
+  implementation (artikel.gereserveerd incremented by 1 twice, i.e. by 2
+  total, for a line whose true entitlement is 1). See design doc section 2.1 for
+  why this is a known, accepted limitation, not a bug to fix here.
+}

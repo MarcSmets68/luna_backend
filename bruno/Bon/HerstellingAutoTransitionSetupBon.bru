@@ -1,0 +1,42 @@
+﻿meta {
+  name: HerstellingAutoTransitionSetupBon
+  type: http
+  seq: 96
+}
+
+post {
+  url: {{baseUrl}}/web/bon
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "type": "HERSTELLING",
+    "klnr": 7629,
+    "naam": "ZTEST-HERSTEL-AUTOTRANSITION",
+    "munt": "EUR"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.type: eq HERSTELLING
+}
+
+script:post-response {
+  bru.setVar("herstelAutoBonnr", res.body.bonnr);
+}
+
+docs {
+  bon-auto-reservering design doc section 5 (Open Question 10) - dedicated
+  HERSTELLING-type bon for the "HERSTELLING auto-transitions to
+  IN HERSTELLING purely via POST .../lijn, with no manual reserve call"
+  regression test sequence below. Independent of {{herstelBonnr}} used
+  by the Bon/Herstel folder. Stores bonnr into {{herstelAutoBonnr}}.
+}

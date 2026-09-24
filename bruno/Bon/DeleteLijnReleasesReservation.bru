@@ -1,0 +1,40 @@
+﻿meta {
+  name: DeleteLijnReleasesReservation
+  type: http
+  seq: 83
+}
+
+delete {
+  url: {{baseUrl}}/web/bon/{{deleteReleaseBonnr}}/lijn/{{deleteReleaseLijnnr}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq deleted
+}
+
+docs {
+  bon-auto-reservering design doc section 6 - deletes the auto-reserved BOM
+  bonlijn created by DeleteLijnReleasesReservationCreateLijn. Per the
+  design, this must release the pending reservation from BOTH
+  artikel.besteld-kl (top-level article) AND its BOM sub-component
+  artikel.pbesteld-kl (via
+  Luna.BusinessLogic.BonBE:ReleaseReservationForLijn /
+  ApplyBomReservationDelta), and delete every bonlijn_productie row
+  created for this line. The besteld-kl/pbesteld-kl release itself is not
+  independently observable through the documented HTTP contract (no
+  exposed GET on artikel's reservation fields) - confirmed via direct
+  ABL/DB query during backend-coder implementation. The bonlijn_productie
+  cleanup IS independently observable - see
+  Bon/Productie/List.bru (GET .../lijn/{lijnnr}/productie) returning an
+  empty items array for {{deleteReleaseLijnnr}} after this delete, same
+  verification approach as AnnuleerCleansUpProductieRows.bru. Requires
+  {{deleteReleaseBonnr}}/{{deleteReleaseLijnnr}} (run
+  "DeleteLijnReleasesReservationCreateLijn" first).
+}

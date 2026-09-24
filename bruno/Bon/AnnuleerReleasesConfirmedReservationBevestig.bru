@@ -1,0 +1,27 @@
+﻿meta {
+  name: AnnuleerReleasesConfirmedReservationBevestig
+  type: http
+  seq: 90
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{annuleerConfirmedBonnr}}/lijn/{{annuleerConfirmedLijnnr}}/reservering/bevestig
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.gereserv: eq 1
+}
+
+docs {
+  Confirms the reservation (moves it into artikel.gereserveerd) before
+  the annuleer test below. Requires
+  {{annuleerConfirmedBonnr}}/{{annuleerConfirmedLijnnr}} (run
+  "AnnuleerReleasesConfirmedReservationCreateLijn" first).
+}

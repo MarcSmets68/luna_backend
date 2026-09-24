@@ -14,22 +14,32 @@
                   the exact skip/clamp algorithm. Shortfalls (not enough
                   stock) are NOT an error - bonlijn.gereserv simply ends up
                   lower than bonlijn.te-leveren.
-    Notes       : Deviation from the original design doc: the design doc
-                  referenced Luna.BusinessLogic.BonBE:ApplyBomReservationDelta
-                  as the precedent for the groepnr/off_aantal lookup
-                  pattern. That method does not exist on `main` (it only
-                  exists on the unmerged feature/orderbeheer-fase2 branch,
-                  which this feature must not touch/depend on per the git
-                  isolation rules). The equivalent lookup pattern DOES
-                  already exist on `main` inside
-                  Luna.BusinessLogic.BonBE:ReleaseBomReservations (the
-                  groepnr<>0 -> FIND FIRST bonlijn OF bon WHERE groepnr EQ
-                  ... AND subtotaal -> off_aantal block) - that is the
-                  pattern duplicated here, per the "accepted duplication,
-                  no refactor" instruction. If/when feature/orderbeheer-fase2
-                  merges and introduces ApplyBomReservationDelta, this
-                  duplicated block should be reconciled with it, but that is
-                  out of scope for this iteration.
+    Notes       : Correction (bon-auto-reservering reconciliation, see
+                  docs/architecture/bon-auto-reservering-design.md §3): an
+                  earlier version of this comment claimed
+                  Luna.BusinessLogic.BonBE:ApplyBomReservationDelta "does
+                  not exist on main". That was stale - it DOES exist on
+                  main (and is already reused by AnnuleerBon and
+                  Luna.BusinessLogic.BonLijnReserveringBE) - it just isn't
+                  the right tool for THIS method's job. ApplyBomReservationDelta
+                  is a pure delta propagator for a caller that has already
+                  decided the exact quantity to move (manual reserve /
+                  annuleer); ReserveerBomComponenten below is a
+                  provisioning + production-row-seeding step that must
+                  independently determine per-component availability
+                  (create-time is shortfall-tolerant) and leave an
+                  auditable bonlijn_productie trail - forcing both jobs
+                  into one method would need extra behavior-toggling flags
+                  on the shared, already-relied-upon ApplyBomReservationDelta.
+                  The design doc explicitly decided NOT to unify these two
+                  BOM walks (depth 1 vs. 2, different side effects) -
+                  see §3 for the full reasoning; this is a deliberate,
+                  named, deferred follow-up, not an oversight. What IS
+                  shared now: the groepnr/off_aantal lookup block below has
+                  been extracted into Luna.BusinessLogic.BonBE:GetOffAantal
+                  (PUBLIC), removing the actual duplication risk (a bug fix
+                  landing in one copy and not the other) without touching
+                  either method's depth or side-effect behavior.
                   Also: bonlijn_productie's actual schema (see
                   docs/db-analysis/schema_dump.txt) has both `blijnnr` and
                   `lijnnr` fields (unique index on bonnr+blijnnr+lijnnr).
@@ -55,6 +65,7 @@
   ----------------------------------------------------------------------*/
 
 USING Progress.Lang.*.
+USING Luna.BusinessLogic.BonBE.
 
 BLOCK-LEVEL ON ERROR UNDO, THROW.
 
@@ -66,6 +77,10 @@ CLASS Luna.BusinessLogic.BonLijnAutoReserveringBE:
                    - the line is a non-item line (subtotaal/kolomtitel/
                      infolijn),
                    - the line is on hold (hold = TRUE),
+                   - the parent bon is geparkeerd (bon.geparkeerd = TRUE) -
+                     added per bon-auto-reservering design doc §4,
+                     `bonlijn.hold` and `bon.geparkeerd` are separate
+                     concepts and must be checked independently,
                    - te-leveren <= 0,
                    - artnr is blank,
                    - the artikel doesn't exist, or isn't stock-tracked
@@ -86,6 +101,7 @@ CLASS Luna.BusinessLogic.BonLijnAutoReserveringBE:
 
         IF pbBonlijn.subtotaal OR pbBonlijn.kolomtitel OR pbBonlijn.infolijn THEN RETURN.
         IF pbBonlijn.hold THEN RETURN.
+        IF pbBon.geparkeerd THEN RETURN.
         IF pbBonlijn.te-leveren LE 0 THEN RETURN.
         IF pbBonlijn.artnr EQ "":u THEN RETURN.
 
@@ -125,7 +141,11 @@ CLASS Luna.BusinessLogic.BonLijnAutoReserveringBE:
                  no stock-tracking or not found simply reserves 0
                  (dComponentGereserveerd = 0), and a bonlijn_productie row
                  is still created recording aantal (benodigd) vs. gereserv
-                 (0 in that case).
+                 (0 in that case). The groepnr/off_aantal lookup is done
+                 via Luna.BusinessLogic.BonBE:GetOffAantal (PUBLIC, shared
+                 with ApplyBomReservationDelta) - see class-header Notes
+                 (design doc §3) for why this is now shared rather than
+                 duplicated.
     ------------------------------------------------------------------------------*/
     METHOD PRIVATE VOID ReserveerBomComponenten(
         BUFFER pbArtikel FOR artikel,
@@ -138,23 +158,12 @@ CLASS Luna.BusinessLogic.BonLijnAutoReserveringBE:
         DEFINE VARIABLE dBeschikbaarComp        AS DECIMAL NO-UNDO.
         DEFINE VARIABLE dComponentGereserveerd  AS DECIMAL NO-UNDO.
         DEFINE VARIABLE iSubLijnnr              AS INTEGER NO-UNDO.
+        DEFINE VARIABLE oBonBE                  AS BonBE   NO-UNDO.
 
-        DEFINE BUFFER bfBonlijn      FOR bonlijn.
         DEFINE BUFFER bfCompArtikel  FOR artikel.
 
-        /* Same groepnr/off_aantal lookup pattern as
-           Luna.BusinessLogic.BonBE:ReleaseBomReservations - see class-
-           header Notes for why this is duplicated here rather than
-           extracted into a shared helper. */
-        IF pbBonlijn.groepnr NE 0 THEN
-        DO:
-            FIND FIRST bfBonlijn OF pbBon
-                WHERE bfBonlijn.groepnr EQ pbBonlijn.groepnr
-                  AND bfBonlijn.subtotaal NO-LOCK NO-ERROR.
-            dOffAantal = (IF AVAILABLE bfBonlijn THEN bfBonlijn.off_aantal ELSE 1).
-        END.
-        ELSE dOffAantal = 1.
-        IF dOffAantal = 0 THEN dOffAantal = 1.
+        oBonBE     = NEW BonBE().
+        dOffAantal = oBonBE:GetOffAantal( BUFFER pbBon, BUFFER pbBonlijn ).
 
         iSubLijnnr = 0.
 

@@ -1,0 +1,40 @@
+﻿meta {
+  name: DeleteLijnReleasesConfirmedReservationSetupBon
+  type: http
+  seq: 84
+}
+
+post {
+  url: {{baseUrl}}/web/bon
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "type": "TEST",
+    "klnr": 7629,
+    "naam": "ZTEST-DELETE-RELEASE-CONFIRMED",
+    "munt": "EUR"
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  bru.setVar("deleteReleaseConfirmedBonnr", res.body.bonnr);
+}
+
+docs {
+  bon-auto-reservering design doc section 6 / section 2 - creates a dedicated bon for the
+  "delete releases a CONFIRMED reservation too, not just the pending one"
+  regression test below. Stores bonnr into
+  {{deleteReleaseConfirmedBonnr}}.
+}

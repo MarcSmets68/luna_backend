@@ -1,0 +1,39 @@
+﻿meta {
+  name: ReserveringBevestigDeliveredSetupBon
+  type: http
+  seq: 74
+}
+
+post {
+  url: {{baseUrl}}/web/bon
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "type": "TEST",
+    "klnr": 7629,
+    "naam": "ZTEST-BEVESTIG-DELIVERED",
+    "munt": "EUR"
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  bru.setVar("bevestigDeliveredBonnr", res.body.bonnr);
+}
+
+docs {
+  Creates a dedicated bon for the "bevestig blocked on a delivered
+  (stempel D) line" test below. Stores bonnr into
+  {{bevestigDeliveredBonnr}}.
+}

@@ -1,0 +1,44 @@
+﻿meta {
+  name: ReserveringBevestigNoReservationSetupLijn
+  type: http
+  seq: 79
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{bevestigNoopBonnr}}/lijn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "TESTART",
+    "aantal": 1,
+    "teLeveren": 1,
+    "vprijs": 5.0
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.gereserv: eq 0
+}
+
+script:post-response {
+  bru.setVar("bevestigNoopLijnnr", res.body.lijnnr);
+}
+
+docs {
+  Creates a bonlijn against artnr "TESTART" (not a real stock-tracked
+  artikel row, same fixture used by Bon/UpdateLijnStempelDSetup.bru and
+  Bon/Productie/Create.bru) - ReserveerBijCreate skips (artikel not
+  found), so gereserv stays 0. This is the fixture for the "confirm is a
+  no-op, not an error, on a line with nothing to confirm" test below.
+  Requires {{bevestigNoopBonnr}} (run
+  "ReserveringBevestigNoReservationSetupBon" first).
+}

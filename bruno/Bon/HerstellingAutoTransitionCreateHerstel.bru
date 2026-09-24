@@ -1,0 +1,35 @@
+﻿meta {
+  name: HerstellingAutoTransitionCreateHerstel
+  type: http
+  seq: 97
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{herstelAutoBonnr}}/herstel
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "TESTART",
+    "omschr": "Test toestel autotransition",
+    "probleem": "Werkt niet meer",
+    "technieker": "MARC"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.stempel: eq ONTVANGST
+}
+
+docs {
+  Creates the bon_herstel record for {{herstelAutoBonnr}}. Requires
+  {{herstelAutoBonnr}} (run "HerstellingAutoTransitionSetupBon" first).
+}

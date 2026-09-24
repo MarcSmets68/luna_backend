@@ -1,0 +1,36 @@
+﻿meta {
+  name: DeleteLijnReleasesConfirmedReservation
+  type: http
+  seq: 87
+}
+
+delete {
+  url: {{baseUrl}}/web/bon/{{deleteReleaseConfirmedBonnr}}/lijn/{{deleteReleaseConfirmedLijnnr}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq deleted
+}
+
+docs {
+  bon-auto-reservering design doc section 6 (edge case 8) - regression test
+  proving DeleteBonLijn releases from BOTH artikel.besteld-kl AND
+  artikel.gereserveerd (not just the pending one) via
+  Luna.BusinessLogic.BonBE:ReleaseReservationForLijn, for a line that was
+  moved to "confirmed" by
+  DeleteLijnReleasesConfirmedReservationBevestig immediately before this
+  delete. Same as DeleteLijnReleasesReservation.bru, the actual
+  besteld-kl/gereserveerd release is not independently observable
+  through the documented HTTP contract - confirmed via direct ABL/DB
+  query during backend-coder implementation (both fields drop by 1).
+  Requires {{deleteReleaseConfirmedBonnr}}/
+  {{deleteReleaseConfirmedLijnnr}} (run
+  "DeleteLijnReleasesConfirmedReservationBevestig" first).
+}

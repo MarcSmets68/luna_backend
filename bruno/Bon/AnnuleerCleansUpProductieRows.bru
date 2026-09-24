@@ -1,0 +1,32 @@
+﻿meta {
+  name: AnnuleerCleansUpProductieRows
+  type: http
+  seq: 95
+}
+
+get {
+  url: {{baseUrl}}/web/bon/{{annuleerProductieBonnr}}/lijn/{{annuleerProductieLijnnr}}/productie
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.items: length 0
+}
+
+docs {
+  bon-auto-reservering design doc section 6.1 point 4 (Requirement 7) -
+  regression test proving AnnuleerBon now deletes the bonlijn_productie
+  rows the auto-reserve step created for
+  {{annuleerProductieLijnnr}} (previously an orphaned-rows gap). Unlike
+  the besteld-kl/gereserveerd release itself, this IS directly observable
+  through the existing GET .../lijn/{lijnnr}/productie endpoint - asserts
+  an empty items array after AnnuleerCleansUpProductieRowsAnnuleer.
+  Requires {{annuleerProductieBonnr}}/{{annuleerProductieLijnnr}} (run
+  "AnnuleerCleansUpProductieRowsAnnuleer" first).
+}

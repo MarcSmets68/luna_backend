@@ -1,0 +1,35 @@
+﻿meta {
+  name: AutoReserveringGeparkeerdUnpark
+  type: http
+  seq: 68
+}
+
+put {
+  url: {{baseUrl}}/web/bon/{{parkedBonnr}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "geparkeerd": false
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.geparkeerd: eq false
+}
+
+docs {
+  Un-parks {{parkedBonnr}} (geparkeerd true -> false), so the companion
+  test below can prove the geparkeerd check is a live, per-request check
+  (re-evaluated on every create) and not a permanent skip baked in at bon
+  creation time. Requires {{parkedBonnr}} (run
+  "AutoReserveringGeparkeerdSetupBon" first).
+}

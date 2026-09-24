@@ -1,0 +1,28 @@
+﻿meta {
+  name: ReserveringBevestigDeliveredBlocked
+  type: http
+  seq: 76
+}
+
+post {
+  url: {{baseUrl}}/web/bon/{{bevestigDeliveredBonnr}}/lijn/{{bevestigDeliveredLijnnr}}/reservering/bevestig
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 409
+  res.body.error.code: eq 409
+}
+
+docs {
+  bon-auto-reservering design doc section 2 - confirming a delivered
+  (stempel = "D") line must 409, same message convention as
+  PUT .../lijn/{lijnnr} (see Bon/UpdateLijnStempelDBlocked.bru). Requires
+  {{bevestigDeliveredBonnr}}/{{bevestigDeliveredLijnnr}} (run
+  "ReserveringBevestigDeliveredSetupLijn" first).
+}

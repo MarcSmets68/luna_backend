@@ -1,0 +1,27 @@
+﻿meta {
+  name: ReserveringBevestigNotFound
+  type: http
+  seq: 77
+}
+
+post {
+  url: {{baseUrl}}/web/bon/9999999/lijn/1/reservering/bevestig
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 404
+  res.body.error.code: eq 404
+}
+
+docs {
+  bon-auto-reservering design doc section 2 - confirming a reservation on a
+  nonexistent bonnr must 404 ("Bon 9999999 not found"). No setup
+  required - 9999999 is not expected to exist in the shared LunaNew test
+  DB.
+}

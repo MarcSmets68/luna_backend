@@ -65,6 +65,8 @@
 
 USING Progress.Lang.*.
 USING Progress.Json.ObjectModel.JsonObject.
+USING Luna.BusinessLogic.BonBE.
+USING Luna.BusinessLogic.BonHerstelBE.
 
 BLOCK-LEVEL ON ERROR UNDO, THROW.
 
@@ -448,6 +450,20 @@ CLASS Luna.BusinessLogic.BonLijnBE:
                EnsureBonExists above - reused as-is, no new lookup. */
             NEW Luna.BusinessLogic.BonLijnAutoReserveringBE():ReserveerBijCreate( BUFFER bonlijn, BUFFER bon ).
 
+            /* bon-auto-reservering design doc §5 (Open Question 10) -
+               today CheckAutoTransitionToInHerstelling only fired from
+               the manual reservering endpoint, so a HERSTELLING order
+               whose only line gets fully auto-reserved purely via this
+               create path could never auto-transition to
+               "IN HERSTELLING". Reuses the existing, already-tested
+               method verbatim, still inside this same transaction, right
+               after the auto-reserve hook above - no change to
+               BonHerstelBE itself. Best-effort/silent, same as the
+               manual-reserve path - observable only via a subsequent
+               GET .../herstel. */
+            IF bon.type EQ "HERSTELLING":u THEN
+                NEW BonHerstelBE():CheckAutoTransitionToInHerstelling( piBonnr ).
+
             CREATE ttBonLijn.
             CopyToTt( BUFFER bonlijn, BUFFER ttBonLijn ).
         END.
@@ -508,12 +524,28 @@ CLASS Luna.BusinessLogic.BonLijnBE:
     END METHOD.
 
     /*------------------------------------------------------------------------------
-        Purpose: Deletes a bonlijn by bonnr+lijnnr. No cascade - bonlijn
-                 has no child tables in this scope.
+        Purpose: Deletes a bonlijn by bonnr+lijnnr. No cascade to other
+                 tables beyond the reservation release below - bonlijn has
+                 no OTHER child tables in this scope.
+        Notes  : bon-auto-reservering design doc §6 - before the DELETE,
+                 releases whatever reservation this line still holds
+                 (artikel.besteld-kl AND artikel.gereserveerd, plus BOM
+                 sub-component pbesteld-kl for a "gemengd" article) via
+                 Luna.BusinessLogic.BonBE:ReleaseReservationForLijn (shared
+                 with BonBE:DeleteBon and AnnuleerBon's release loop - no
+                 new BOM-walk code here), and deletes the auto-reserve
+                 step's bonlijn_productie rows for this line. No contract
+                 change to DELETE /web/bon/{bonnr}/lijn/{lijnnr}'s
+                 request/response shape - this is purely an added
+                 internal effect.
         Errors : AppError code 404 - the parent bonnr doesn't exist, or the
                  lijnnr doesn't exist under it.
+                 AppError code 409 - a productie sublijn with besteld <> 0
+                 still exists for this line (unrelated pre-existing guard).
     ------------------------------------------------------------------------------*/
     METHOD PUBLIC VOID DeleteBonLijn( INPUT piBonnr AS INTEGER, INPUT piLijnnr AS INTEGER ):
+
+        DEFINE VARIABLE oBonBE AS BonBE NO-UNDO.
 
         EnsureBonExists( piBonnr ).
 
@@ -525,6 +557,8 @@ CLASS Luna.BusinessLogic.BonLijnBE:
                 SUBSTITUTE("Bonlijn &1/&2 has a productie sublijn with besteld <> 0 and cannot be deleted":u,
                     piBonnr, piLijnnr), 409).
 
+        oBonBE = NEW BonBE().
+
         DO TRANSACTION:
             FIND FIRST bonlijn EXCLUSIVE-LOCK
                 WHERE bonlijn.bonnr EQ piBonnr
@@ -532,6 +566,10 @@ CLASS Luna.BusinessLogic.BonLijnBE:
             IF NOT AVAILABLE bonlijn THEN
                 UNDO, THROW NEW Progress.Lang.AppError(
                     SUBSTITUTE("Bonlijn &1/&2 not found":u, piBonnr, piLijnnr), 404).
+
+            /* `bon` is the default buffer already populated (NO-LOCK) by
+               EnsureBonExists above for this bonnr - reused as-is. */
+            oBonBE:ReleaseReservationForLijn( BUFFER bonlijn, BUFFER bon ).
 
             DELETE bonlijn.
         END.
