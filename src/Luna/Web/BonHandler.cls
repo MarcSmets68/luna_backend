@@ -656,11 +656,11 @@ CLASS Luna.Web.BonHandler INHERITS WebHandler:
 
         cRemainder = GetPathRemainder(poRequest).
         iSegCount  = SegmentCount(cRemainder).
-        oReqBody   = GetJsonBody(poRequest).
 
         IF iSegCount EQ 0 THEN
         DO:
             /* POST /bon (create bon) */
+            oReqBody = GetJsonBody(poRequest).
             oService = NEW BonBE().
             hResult  = oService:CreateBon(oReqBody).
             oBody    = ResultHandleToJson(hResult).
@@ -693,6 +693,7 @@ CLASS Luna.Web.BonHandler INHERITS WebHandler:
             IF iSegCount EQ 2 THEN
             DO:
                 /* POST /bon/{bonnr}/lijn (create bonlijn) */
+                oReqBody   = GetJsonBody(poRequest).
                 oBonLijnBE = NEW BonLijnBE().
                 hResult    = oBonLijnBE:CreateBonLijn(iBonnr, oReqBody).
                 oBody      = ResultHandleToJson(hResult).
@@ -709,6 +710,7 @@ CLASS Luna.Web.BonHandler INHERITS WebHandler:
             IF cEntry4 EQ "productie":u AND iSegCount EQ 4 THEN
             DO:
                 /* POST /bon/{bonnr}/lijn/{lijnnr}/productie */
+                oReqBody = GetJsonBody(poRequest).
                 oProdBE = NEW BonLijnProductieBE().
                 hResult = oProdBE:CreateProductieLijn(iBonnr, iLijnnr, oReqBody).
                 oBody   = ResultHandleToJson(hResult).
@@ -722,6 +724,7 @@ CLASS Luna.Web.BonHandler INHERITS WebHandler:
             IF cEntry4 EQ "reservering":u AND iSegCount EQ 4 THEN
             DO:
                 /* POST /bon/{bonnr}/lijn/{lijnnr}/reservering */
+                oReqBody = GetJsonBody(poRequest).
                 IF NOT oReqBody:Has("delta":u) THEN
                     UNDO, THROW NEW Progress.Lang.AppError("delta is required":u, 400).
 
@@ -772,6 +775,7 @@ CLASS Luna.Web.BonHandler INHERITS WebHandler:
         IF cEntry2 EQ "led":u AND iSegCount EQ 2 THEN
         DO:
             /* POST /bon/{bonnr}/led (create bon_led) */
+            oReqBody = GetJsonBody(poRequest).
             oLedBE  = NEW BonLedBE().
             hResult = oLedBE:CreateBonLedLijn(iBonnr, oReqBody).
             oBody   = ResultHandleToJson(hResult).
@@ -785,6 +789,7 @@ CLASS Luna.Web.BonHandler INHERITS WebHandler:
         IF cEntry2 EQ "led-qc":u AND iSegCount EQ 2 THEN
         DO:
             /* POST /bon/{bonnr}/led-qc (create bon_led_qc) */
+            oReqBody = GetJsonBody(poRequest).
             oLedQcBE = NEW BonLedQcBE().
             hResult  = oLedQcBE:CreateBonLedQcLijn(iBonnr, oReqBody).
             oBody    = ResultHandleToJson(hResult).
@@ -800,6 +805,7 @@ CLASS Luna.Web.BonHandler INHERITS WebHandler:
             IF iSegCount EQ 2 THEN
             DO:
                 /* POST /bon/{bonnr}/herstel (create bon_herstel) */
+                oReqBody   = GetJsonBody(poRequest).
                 oHerstelBE = NEW BonHerstelBE().
                 hResult    = oHerstelBE:CreateBonHerstel(iBonnr, oReqBody).
                 oBody      = ResultHandleToJson(hResult).
