@@ -31,6 +31,26 @@ BLOCK-LEVEL ON ERROR UNDO, THROW.
 
 CLASS Luna.BusinessLogic.BonLijnReserveringBE:
 
+    /* Deliberately an instance attribute, not a method-local variable. This
+       BE is fetched via BonLijnBE:GetBonLijn() at the end of
+       ApplyReservering() and its temp-table HANDLE is returned to the
+       caller (BonHandler) for serialization. A method-local BonLijnBE
+       variable would be the only reference keeping that object (and its
+       instance temp-table) alive; ABL reference-counts objects, so the
+       object - and the temp-table backing the returned HANDLE - would be
+       destroyed the instant ApplyReservering() returns and the local
+       variable goes out of scope, *before* BonHandler gets a chance to
+       call WRITE-JSON on it ("Invalid handle... points to a deleted
+       object" (3135), "Cannot access the WRITE-JSON attribute..." (3140) -
+       reproduced live 2026-09-24). Storing it as an instance attribute
+       instead ties its lifetime to THIS-OBJECT, which stays alive for as
+       long as BonHandler's own local BonLijnReserveringBE variable does -
+       i.e. through the rest of HandlePost(), well past the WRITE-JSON
+       call. See the identical fix/explanation in
+       Luna.BusinessLogic.BonLijnReserveringBevestigingBE, which had the
+       same bug. */
+    DEFINE PRIVATE VARIABLE oBonLijnBE AS BonLijnBE NO-UNDO.
+
     /*------------------------------------------------------------------------------
         Purpose: Applies a reservation delta to a bonlijn and returns the
                  full, updated bonlijn (same shape as
@@ -44,7 +64,6 @@ CLASS Luna.BusinessLogic.BonLijnReserveringBE:
         DEFINE VARIABLE dNewGereserv AS DECIMAL NO-UNDO.
         DEFINE VARIABLE oBonBE       AS BonBE         NO-UNDO.
         DEFINE VARIABLE oBonHerstel  AS BonHerstelBE  NO-UNDO.
-        DEFINE VARIABLE oBonLijnBE   AS BonLijnBE     NO-UNDO.
         DEFINE VARIABLE hResult      AS HANDLE        NO-UNDO.
 
         FIND FIRST bon NO-LOCK WHERE bon.bonnr EQ piBonnr NO-ERROR.

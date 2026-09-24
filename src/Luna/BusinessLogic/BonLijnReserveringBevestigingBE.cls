@@ -56,6 +56,22 @@ BLOCK-LEVEL ON ERROR UNDO, THROW.
 
 CLASS Luna.BusinessLogic.BonLijnReserveringBevestigingBE:
 
+    /* Deliberately an instance attribute, not a method-local variable -
+       see the detailed explanation in
+       Luna.BusinessLogic.BonLijnReserveringBE (identical bug, identical
+       fix, found live 2026-09-24: "Invalid handle... points to a deleted
+       object" (3135) / "Cannot access the WRITE-JSON attribute..." (3140)
+       on every call to this endpoint, including the gereserv EQ 0 no-op
+       path). In short: Bevestig() fetches the updated bonlijn via
+       BonLijnBE:GetBonLijn() and returns its temp-table HANDLE to the
+       caller; a method-local BonLijnBE variable would be destroyed (ABL
+       objects are reference-counted) the instant Bevestig() returns,
+       invalidating that HANDLE before BonHandler can serialize it. An
+       instance attribute ties its lifetime to THIS-OBJECT, which stays
+       alive for as long as BonHandler's own local
+       BonLijnReserveringBevestigingBE variable does. */
+    DEFINE PRIVATE VARIABLE oBonLijnBE AS BonLijnBE NO-UNDO.
+
     /*------------------------------------------------------------------------------
         Purpose: Confirms the entire currently-held reservation
                  (bonlijn.gereserv) for a single bonlijn, moving that
@@ -75,7 +91,6 @@ CLASS Luna.BusinessLogic.BonLijnReserveringBevestigingBE:
     METHOD PUBLIC HANDLE Bevestig( INPUT piBonnr AS INTEGER, INPUT piLijnnr AS INTEGER ):
 
         DEFINE VARIABLE dAmount    AS DECIMAL NO-UNDO.
-        DEFINE VARIABLE oBonLijnBE AS BonLijnBE NO-UNDO.
         DEFINE VARIABLE hResult    AS HANDLE NO-UNDO.
 
         FIND FIRST bon NO-LOCK WHERE bon.bonnr EQ piBonnr NO-ERROR.
