@@ -67,10 +67,22 @@ CLASS Luna.BusinessLogic.NPPBoxOverzichtBE:
             cRight = ENTRY(2, cScan, "-":u)
             .
 
-        piBonnr   = INTEGER(cLeft) NO-ERROR.
+        /* INTEGER() with NO-ERROR does NOT return the unknown value (?)
+           on a parse failure in this session - it returns 0 while
+           setting ERROR-STATUS:ERROR (verified directly: INTEGER("abc")
+           NO-ERROR = 0, not ?). Checking "EQ ?" here never caught a
+           malformed box-label value (e.g. "abc-1" fell through to a
+           bogus bonnr=0 lookup instead of the intended 400) - fixed to
+           check ERROR-STATUS:ERROR instead. Same root-cause bug found
+           and fixed in the sibling NPPArtikelScanBE. */
+        piBonnr = INTEGER(cLeft) NO-ERROR.
+
+        IF ERROR-STATUS:ERROR THEN
+            UNDO, THROW NEW Progress.Lang.AppError("Onbekend boxlabel":u, 400).
+
         piGroepnr = INTEGER(cRight) NO-ERROR.
 
-        IF piBonnr EQ ? OR piGroepnr EQ ? THEN
+        IF ERROR-STATUS:ERROR THEN
             UNDO, THROW NEW Progress.Lang.AppError("Onbekend boxlabel":u, 400).
 
     END METHOD.
