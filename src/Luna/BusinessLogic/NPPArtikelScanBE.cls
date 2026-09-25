@@ -184,10 +184,20 @@ CLASS Luna.BusinessLogic.NPPArtikelScanBE:
                     cRight = SUBSTRING(cScan, iDashPos + 1)
                     .
 
-                iNummer    = INTEGER(cLeft) NO-ERROR.
+                iNummer = INTEGER(cLeft) NO-ERROR.
+
+                /* INTEGER()/DECIMAL() with NO-ERROR do NOT return the
+                   unknown value (?) on a parse failure in this session -
+                   they return 0 while setting ERROR-STATUS:ERROR. Checking
+                   "EQ ?" here would never catch a malformed dash-value
+                   (verified directly: INTEGER("abc") NO-ERROR = 0, not ?),
+                   so ERROR-STATUS:ERROR is the only reliable check. */
+                IF ERROR-STATUS:ERROR THEN
+                    UNDO, THROW NEW Progress.Lang.AppError("Onbekend barcode-formaat":u, 400).
+
                 dAantalRaw = DECIMAL(cRight) NO-ERROR.
 
-                IF iNummer EQ ? OR dAantalRaw EQ ? THEN
+                IF ERROR-STATUS:ERROR THEN
                     UNDO, THROW NEW Progress.Lang.AppError("Onbekend barcode-formaat":u, 400).
 
                 /* Step 2: "nummer-aantal" dash form. Fallback (step 3, if
