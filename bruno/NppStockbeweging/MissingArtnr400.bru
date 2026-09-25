@@ -1,0 +1,36 @@
+meta {
+  name: MissingArtnr400
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/web/npp/stockbeweging
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  X-Auth-Token: {{authToken}}
+}
+
+body:json {
+  {
+    "artnr": "",
+    "movementType": "correctie_plus",
+    "aantal": 5,
+    "opm": "Klant retour, doos beschadigd"
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq artnr is verplicht
+}
+
+docs {
+  POST /web/npp/stockbeweging with a blank "artnr" - validation step 2,
+  runs before any DB access. Requires "Auth > Login" to have run first.
+}

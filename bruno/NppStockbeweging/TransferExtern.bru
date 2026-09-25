@@ -1,0 +1,39 @@
+meta {
+  name: TransferExtern
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/web/npp/stockbeweging
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  X-Auth-Token: {{authToken}}
+}
+
+body:json {
+  {
+    "artnr": "{{nppStockArtnr}}",
+    "movementType": "transfer_extern",
+    "aantal": 1,
+    "opm": "Transfer naar extern depot"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.artlog.beweging: eq E
+  res.body.artlog.aantal: eq -1
+}
+
+docs {
+  POST /web/npp/stockbeweging - transfer_extern: artlog.beweging "E",
+  artikel.aantal -aantal, artlog.aantal = -aantal. Negative-stock guard
+  applies, same as correctie_min - see NegativeStockGuard409.bru.
+  Requires "Auth > Login" to have run first.
+}

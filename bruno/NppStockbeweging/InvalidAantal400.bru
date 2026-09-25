@@ -1,0 +1,40 @@
+meta {
+  name: InvalidAantal400
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/web/npp/stockbeweging
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  X-Auth-Token: {{authToken}}
+}
+
+body:json {
+  {
+    "artnr": "{{nppStockArtnr}}",
+    "movementType": "correctie_plus",
+    "aantal": "abc",
+    "opm": "Klant retour, doos beschadigd"
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq Ongeldige waarde voor aantal
+}
+
+docs {
+  POST /web/npp/stockbeweging with a non-numeric "aantal" - checked via
+  poBody:GetDecimal("aantal") NO-ERROR + ERROR-STATUS:ERROR (NEVER "EQ
+  ?" - GetDecimal on a malformed value does not reliably return the
+  unknown value in this session, same root-cause class of bug fixed
+  twice already in NPPArtikelScanBE/NPPBoxOverzichtBE). Requires
+  "Auth > Login" to have run first.
+}

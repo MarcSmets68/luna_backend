@@ -1,0 +1,38 @@
+meta {
+  name: MissingAuthToken401
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/web/npp/stockbeweging
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "artnr": "{{nppStockArtnr}}",
+    "movementType": "correctie_plus",
+    "aantal": 5,
+    "opm": "Klant retour, doos beschadigd"
+  }
+}
+
+assert {
+  res.status: eq 401
+  res.body.error.message: eq Ongeldige of verlopen sessie
+  res.body.error.code: eq 401
+}
+
+docs {
+  POST /web/npp/stockbeweging with no X-Auth-Token header - AuthBE:
+  ValidateToken returns false for a blank token, and the handler 401s
+  before ever calling StockBewegingBE (no business-rule validation runs
+  when the session is invalid).
+}

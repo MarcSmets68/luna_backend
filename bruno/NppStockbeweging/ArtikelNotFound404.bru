@@ -1,0 +1,39 @@
+meta {
+  name: ArtikelNotFound404
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/web/npp/stockbeweging
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  X-Auth-Token: {{authToken}}
+}
+
+body:json {
+  {
+    "artnr": "DOES-NOT-EXIST-999999",
+    "movementType": "correctie_plus",
+    "aantal": 5,
+    "opm": "Klant retour, doos beschadigd"
+  }
+}
+
+assert {
+  res.status: eq 404
+  res.body.error.message: eq Artikel DOES-NOT-EXIST-999999 not found
+}
+
+docs {
+  POST /web/npp/stockbeweging with an artnr that does not exist in
+  `artikel` - checked inside the DO TRANSACTION: block (step 6, after
+  all pure input validation), FIND FIRST artikel EXCLUSIVE-LOCK fails
+  and StockBewegingBE throws AppError 404 via SUBSTITUTE. Requires
+  "Auth > Login" to have run first.
+}

@@ -1,0 +1,38 @@
+meta {
+  name: InvalidMovementType400
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/web/npp/stockbeweging
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  X-Auth-Token: {{authToken}}
+}
+
+body:json {
+  {
+    "artnr": "{{nppStockArtnr}}",
+    "movementType": "correctie_omhoog",
+    "aantal": 5,
+    "opm": "Klant retour, doos beschadigd"
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq Ongeldig of ontbrekend movementType
+}
+
+docs {
+  POST /web/npp/stockbeweging with an unsupported "movementType" value -
+  StockBewegingBE:ValidateMovementType (validation step 1, runs before
+  any DB access) rejects with 400. Requires "Auth > Login" to have run
+  first (this is a validation-order test, not an auth test).
+}

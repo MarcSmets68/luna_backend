@@ -1,0 +1,46 @@
+meta {
+  name: CorrectiePlus
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/web/npp/stockbeweging
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  X-Auth-Token: {{authToken}}
+}
+
+body:json {
+  {
+    "artnr": "{{nppStockArtnr}}",
+    "movementType": "correctie_plus",
+    "aantal": 5,
+    "opm": "Klant retour, doos beschadigd"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.artikel.artnr: isString
+  res.body.artikel.voorraad: isNumber
+  res.body.artlog.beweging: eq S
+  res.body.artlog.aantal: eq 5
+}
+
+docs {
+  POST /web/npp/stockbeweging - correctie_plus: artlog.beweging "S",
+  artikel.aantal +aantal, artlog.aantal = +aantal. Requires a valid
+  X-Auth-Token - run "Auth > Login" first (stores {{authToken}}).
+
+  {{nppStockArtnr}} must be set (collection/environment variable) to a
+  real artikel.artnr value from LunaNew.
+
+  Backed by Backend/src/Luna/Web/NPPStockBewegingHandler.cls +
+  Luna/BusinessLogic/StockBewegingBE.cls.
+}

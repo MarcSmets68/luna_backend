@@ -1,0 +1,39 @@
+meta {
+  name: CorrectieGelijk
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/web/npp/stockbeweging
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  X-Auth-Token: {{authToken}}
+}
+
+body:json {
+  {
+    "artnr": "{{nppStockArtnr}}",
+    "movementType": "correctie_gelijk",
+    "aantal": 10,
+    "opm": "Inventarisatie 2026Q3"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.artikel.voorraad: eq 10
+  res.body.artlog.beweging: eq S
+}
+
+docs {
+  POST /web/npp/stockbeweging - correctie_gelijk: artikel.aantal set to
+  the absolute "aantal" value, artlog.aantal = aantal - artikel.aantal
+  (before). "aantal" here may be 0 (allowed, unlike the other 4 opm
+  types which require > 0). Requires "Auth > Login" to have run first.
+}

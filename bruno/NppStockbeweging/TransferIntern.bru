@@ -1,0 +1,42 @@
+meta {
+  name: TransferIntern
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/web/npp/stockbeweging
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  X-Auth-Token: {{authToken}}
+}
+
+body:json {
+  {
+    "artnr": "{{nppStockArtnr}}",
+    "movementType": "transfer_intern",
+    "nieuwMagazijn": "MAG02"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.artikel.magazijn: eq MAG02
+  res.body.artlog.beweging: eq T
+  res.body.artlog.aantal: eq 0
+  res.body.artlog.opm: contains Transfer:
+}
+
+docs {
+  POST /web/npp/stockbeweging - transfer_intern: artlog.beweging "T",
+  artikel.aantal unchanged (delta 0), artikel.magazijn set to
+  "nieuwMagazijn" (max 10 chars). "aantal"/"opm" are not required/read
+  from the body for this type - the opm is always auto-generated as
+  "Transfer: <oud> -> <nieuw>". Requires "Auth > Login" to have run
+  first.
+}

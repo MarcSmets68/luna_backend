@@ -1,0 +1,40 @@
+meta {
+  name: CorrectieMin
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/web/npp/stockbeweging
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  X-Auth-Token: {{authToken}}
+}
+
+body:json {
+  {
+    "artnr": "{{nppStockArtnr}}",
+    "movementType": "correctie_min",
+    "aantal": 1,
+    "opm": "Beschadigd exemplaar"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.artlog.beweging: eq S
+  res.body.artlog.aantal: eq -1
+}
+
+docs {
+  POST /web/npp/stockbeweging - correctie_min: artlog.beweging "S",
+  artikel.aantal -aantal, artlog.aantal = -aantal. Negative-stock guard
+  applies (see NegativeStockGuard409.bru) - pick a small "aantal" here
+  relative to {{nppStockArtnr}}'s current voorraad so this succeeds.
+  Requires "Auth > Login" to have run first.
+}

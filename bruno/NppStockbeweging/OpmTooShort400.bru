@@ -1,0 +1,38 @@
+meta {
+  name: OpmTooShort400
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/web/npp/stockbeweging
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  X-Auth-Token: {{authToken}}
+}
+
+body:json {
+  {
+    "artnr": "{{nppStockArtnr}}",
+    "movementType": "correctie_plus",
+    "aantal": 5,
+    "opm": "te kort"
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq Opmerking moet minstens 10 tekens bevatten
+}
+
+docs {
+  POST /web/npp/stockbeweging with an "opm" shorter than 10 characters -
+  applies to correctie_plus/correctie_min/correctie_gelijk/ontvangst/
+  transfer_extern (not transfer_intern, whose opm is auto-generated -
+  see TransferIntern.bru). Requires "Auth > Login" to have run first.
+}

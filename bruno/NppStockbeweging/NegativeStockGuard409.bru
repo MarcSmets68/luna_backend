@@ -1,0 +1,40 @@
+meta {
+  name: NegativeStockGuard409
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/web/npp/stockbeweging
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  X-Auth-Token: {{authToken}}
+}
+
+body:json {
+  {
+    "artnr": "{{nppStockArtnr}}",
+    "movementType": "correctie_min",
+    "aantal": 999999999,
+    "opm": "Meer dan de volledige voorraad"
+  }
+}
+
+assert {
+  res.status: eq 409
+  res.body.error.message: contains Onvoldoende voorraad voor deze boeking
+}
+
+docs {
+  POST /web/npp/stockbeweging - correctie_min (or transfer_extern) with
+  an "aantal" larger than {{nppStockArtnr}}'s current voorraad. The
+  negative-stock guard is checked inside the DO TRANSACTION: block,
+  after the artikel EXCLUSIVE-LOCK, BEFORE any write - message includes
+  the current voorraad via SUBSTITUTE. Requires "Auth > Login" to have
+  run first.
+}
