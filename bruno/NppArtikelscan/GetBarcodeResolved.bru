@@ -1,0 +1,38 @@
+meta {
+  name: GetBarcodeResolved
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/web/npp/artikelscan?scan={{nppScanBarcode}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq resolved
+  res.body.article.artnr: isString
+  res.body.empty: eq false
+}
+
+docs {
+  GET /web/npp/artikelscan?scan=<barcode> - step 3 of
+  Luna.BusinessLogic.NPPArtikelScanBE:ResolveScan (no dash, no direct
+  artnr/nummer match): the scan value is matched against artikel.barcode
+  (artikel-x04) and/or art-subcodes.barcode (art-subcodes-x1). Exactly
+  one candidate -> resolves directly, no "aantal" key.
+
+  {{nppScanBarcode}} must be set (collection/environment variable, not
+  currently in Local.bru) to a real artikel.barcode or art-subcodes.barcode
+  value from LunaNew that maps to exactly ONE artnr, to exercise this
+  single-candidate path (see GetMultipleCandidates.bru for the 2+ case).
+
+  Read-only - backed by Backend/src/Luna/Web/NPPArtikelScanHandler.cls +
+  Luna/BusinessLogic/NPPArtikelScanBE.cls.
+}
