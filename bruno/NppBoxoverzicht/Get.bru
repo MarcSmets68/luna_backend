@@ -1,0 +1,47 @@
+meta {
+  name: Get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/npp/boxoverzicht?scan={{nppBoxScan}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.bonnr: isNumber
+  res.body.groepnr: isNumber
+  res.body.klant: isString
+  res.body.opmerking: isString
+  res.body.empty: isBoolean
+  res.body.articles: isArray
+}
+
+docs {
+  GET /web/npp/boxoverzicht?scan=<rawScanValue> - given a raw scanned box
+  label (e.g. "B12345-1" or "12345-1"), returns the bon header
+  (bonnr/groepnr/klant), a status remark (opmerking - from bon_led.opm,
+  bonnr/groepnr/led_lijn=0/lijnnr=90, or the literal "niets" if there is
+  none), and the aggregated article list (bonlijn.gereserv summed per
+  artnr, applying the exact same include/exclude filter as the legacy
+  N:\LunaV12\NPP\NPPBoxView.w vul-temptable procedure) for that bon/groep.
+
+  An empty box (bon exists, but zero bonlijn rows match the filter for
+  that groepnr) is NOT an error - it comes back 200 with "empty": true
+  and "articles": [].
+
+  {{nppBoxScan}} must be set (collection/environment variable, not
+  currently in Local.bru) to a real "<bonnr>-<groepnr>" (or
+  "B<bonnr>-<groepnr>") scan value from LunaNew for a bon/groep that
+  actually has matching bonlijn rows, to exercise the non-empty case.
+
+  Read-only - backed by Backend/src/Luna/Web/NPPBoxOverzichtHandler.cls +
+  Luna/BusinessLogic/NPPBoxOverzichtBE.cls.
+}

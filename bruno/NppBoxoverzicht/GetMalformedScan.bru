@@ -1,0 +1,29 @@
+meta {
+  name: GetMalformedScan
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/web/npp/boxoverzicht?scan=not-a-valid-scan
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq Onbekend boxlabel
+  res.body.error.code: eq 400
+}
+
+docs {
+  A "scan" value that doesn't match the expected shape (optional leading
+  "B"/"b", exactly one dash, both sides an INTEGER) -> 400 raised by
+  Luna.BusinessLogic.NPPBoxOverzichtBE:ParseScan (AppError 400). Here
+  "not-a-valid-scan" has more than one dash and non-numeric sides, so it
+  fails NUM-ENTRIES/INTEGER() parsing either way.
+}

@@ -216,6 +216,38 @@ required.
   directories, editing files outside this git workspace). See "Known gap"
   in `docs/backend/coating-reference-data.md` for the exact remaining
   steps before this can be considered done per `AGENTS.md`.
+- `handler31=Luna.Web.NPPBoxOverzichtHandler: /npp/boxoverzicht` — maps
+  `GET /web/npp/boxoverzicht?scan=<rawScanValue>` to the NPP
+  "Boxoverzicht" scan-lookup WebHandler (1:1 port of the read-side logic
+  in `\\LHDC01\TESTLUNA$\LunaV12\NPP\NPPBoxView.w` — see
+  `Luna.BusinessLogic.NPPBoxOverzichtBE`). Given a raw scanned box label
+  (e.g. `B12345-1` or `12345-1`), returns the bon header
+  (bonnr/groepnr/klant), a status remark (opmerking), and the aggregated
+  article list (bonlijn.gereserv summed per artnr, same
+  subtotaal/kolomtitel/infolijn/montage/gereserv/swEffectief filter as
+  the legacy `vul-temptable` procedure via index `bonlijn-x11`) for that
+  bon/groep. An empty box (bon exists, zero matching bonlijn rows) is not
+  an error - it returns 200 with `"empty": true, "articles": []`. Errors:
+  400 `Ontbrekende parameter 'scan'` (missing/blank param, handler-level),
+  400 `Onbekend boxlabel` (malformed scan value, BE-level), 404
+  `Bon niet gevonden` (parsed bonnr doesn't exist, BE-level). **Not yet
+  added to the live `openedge.properties`, PASOE not yet restarted** —
+  this session's sandbox denied writing to
+  `C:\OpenEdge\MarcOepas\conf\openedge.properties` (outside this git
+  workspace), same known limitation documented above for
+  handler28-30. Add `handler31=Luna.Web.NPPBoxOverzichtHandler:
+  /npp/boxoverzicht` to that file and restart PASOE (`tcman.bat stop` /
+  `start`) before this endpoint is reachable.
+- Also note: a full from-scratch `scripts/compile.ps1` run in this
+  worktree produced r-code for every `.cls` file it walked **except**
+  `Luna.BusinessLogic.LakproductieBE` and
+  `Luna.BusinessLogic.LakproductieCacheService` (both pre-existing,
+  untouched by this change) - every other file, including the two new
+  ones added here (`NPPBoxOverzichtBE`/`NPPBoxOverzichtHandler`),
+  compiled cleanly. Not investigated further here since it's outside
+  this feature's scope and those two files weren't touched - flagging
+  for whoever next touches Lakproductie or does a full clean-build
+  verification.
 
 Restart the instance after changing `openedge.properties`:
 ```powershell
