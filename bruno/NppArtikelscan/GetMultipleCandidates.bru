@@ -1,0 +1,41 @@
+meta {
+  name: GetMultipleCandidates
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/web/npp/artikelscan?scan={{nppScanMultiBarcode}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq multiple
+  res.body.article: isNull
+  res.body.empty: eq true
+  res.body.candidates: isArray
+}
+
+docs {
+  GET /web/npp/artikelscan?scan=<barcode> - step 3 of
+  Luna.BusinessLogic.NPPArtikelScanBE:ResolveScan where the barcode/
+  subcode search (artikel-x04 + art-subcodes-x1, deduplicated by artnr)
+  finds 2+ distinct artnr candidates -> NOT an error, 200 with "status":
+  "multiple", "article": null, "empty": true, and a "candidates" array
+  (each {artnr, omschrijving}).
+
+  {{nppScanMultiBarcode}} must be set (collection/environment variable,
+  not currently in Local.bru) to a real barcode/subcode value from
+  LunaNew that maps to 2+ distinct artnr values - likely rare/synthetic
+  data, may need to be seeded for this test to actually exercise the
+  "multiple" branch.
+
+  Read-only - backed by Backend/src/Luna/Web/NPPArtikelScanHandler.cls +
+  Luna/BusinessLogic/NPPArtikelScanBE.cls.
+}

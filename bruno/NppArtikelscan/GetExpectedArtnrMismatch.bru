@@ -1,0 +1,27 @@
+meta {
+  name: GetExpectedArtnrMismatch
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/web/npp/artikelscan?scan={{nppScanArtnr}}&expectedArtnr=DOES-NOT-EXIST
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq resolved
+  res.body.match: eq false
+}
+
+docs {
+  Same as GetExpectedArtnrMatch.bru but with an "expectedArtnr" that
+  doesn't equal the resolved article's artnr -> "match": false while
+  "status" is still "resolved".
+}

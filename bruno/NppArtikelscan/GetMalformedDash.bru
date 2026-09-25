@@ -1,0 +1,31 @@
+meta {
+  name: GetMalformedDash
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/web/npp/artikelscan?scan=abc-def
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq Onbekend barcode-formaat
+  res.body.error.code: eq 400
+}
+
+docs {
+  A "scan" value that contains a dash but doesn't fit the
+  "nummer-aantal" shape (left side "abc" doesn't parse as INTEGER, right
+  side "def" doesn't parse as DECIMAL) -> 400 raised by
+  Luna.BusinessLogic.NPPArtikelScanBE:ResolveScan (AppError 400). This is
+  validation the legacy \LHDC01\TESTLUNA$\LunaV12\CheckBarcode.p lacks
+  (see the class header of NPPArtikelScanBE.cls) - deliberately added
+  here per the API contract.
+}

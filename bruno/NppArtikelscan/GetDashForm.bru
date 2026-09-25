@@ -1,0 +1,42 @@
+meta {
+  name: GetDashForm
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/web/npp/artikelscan?scan={{nppScanNummer}}-500
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq resolved
+  res.body.article.artnr: isString
+  res.body.article.aantal: eq 0.5
+  res.body.empty: eq false
+}
+
+docs {
+  GET /web/npp/artikelscan?scan=<nummer>-<milliAantal> - the
+  "nummer-aantal" dash form (step 2 of
+  Luna.BusinessLogic.NPPArtikelScanBE:ResolveScan, 1:1 port of
+  \LHDC01\TESTLUNA$\LunaV12\CheckBarcode.p): splits on the first dash,
+  parses the left side as INTEGER and looks it up against artikel.nummer
+  (artikel-x09), parses the right side as DECIMAL and divides by 1000 for
+  "aantal". Here "-500" -> aantal 0.5. Only this resolution path adds the
+  "aantal" key to the "article" object - it's omitted entirely for every
+  other resolution path.
+
+  {{nppScanNummer}} must be set (collection/environment variable, not
+  currently in Local.bru) to a real artikel.nummer value (INTEGER, not
+  the artnr) from LunaNew.
+
+  Read-only - backed by Backend/src/Luna/Web/NPPArtikelScanHandler.cls +
+  Luna/BusinessLogic/NPPArtikelScanBE.cls.
+}

@@ -238,6 +238,40 @@ required.
   handler28-30. Add `handler31=Luna.Web.NPPBoxOverzichtHandler:
   /npp/boxoverzicht` to that file and restart PASOE (`tcman.bat stop` /
   `start`) before this endpoint is reachable.
+- `handler32=Luna.Web.NPPArtikelScanHandler: /npp/artikelscan` — maps
+  `GET /web/npp/artikelscan?scan=<rawScanValue>&expectedArtnr=<optional>`
+  to the NPP "Artikelscan" lookup WebHandler (1:1 port of the read-side
+  logic in `\\LHDC01\TESTLUNA$\LunaV12\CheckBarcode.p` — see
+  `Luna.BusinessLogic.NPPArtikelScanBE`). Resolves a scanned value to a
+  single article: direct `artikel.artnr` match, else the
+  "`<nummer>-<milliAantal>`" dash form (splits on the FIRST dash only,
+  left side `INTEGER` looked up against `artikel.nummer`
+  (`artikel-x09`), right side `DECIMAL` divided by 1000 for `aantal` -
+  the only path that adds an `aantal` key to `article`), else a
+  deduplicated `artikel.barcode` (`artikel-x04`) / `art-subcodes.barcode`
+  (`art-subcodes-x1`) candidate search. Zero candidates -> 200
+  `"status": "not_found"`; exactly one -> 200 `"status": "resolved"`;
+  2+ -> 200 `"status": "multiple"` with a `candidates` array (not an
+  error in either case). An optional `expectedArtnr` query param adds a
+  top-level `"match"` boolean (resolved article's artnr equals
+  `expectedArtnr`; always `false` when not resolved) - not used by this
+  tile's own frontend yet, but part of the contract for future callers.
+  Errors: 400 `Ontbrekende parameter 'scan'` (missing/blank param,
+  handler-level), 400 `Onbekend barcode-formaat` (scan contains a dash
+  but either side fails to parse as INTEGER/DECIMAL, BE-level -
+  validation the legacy `CheckBarcode.p` itself lacks, added
+  deliberately per the API contract). **Divergence from the original
+  design draft, documented in `NPPArtikelScanBE.cls`'s class header**:
+  when the dash form parses but no `artikel.nummer` matches, the
+  barcode/subcode fallback search in the true legacy code
+  (`CheckBarcode.p`) runs against the left-of-dash numeric string (the
+  working scan variable there gets overwritten before the fallback
+  loops), NOT the whole original raw scan as the draft assumed - this BE
+  replicates the verified legacy behaviour. `handler32` line has been
+  added to the live `openedge.properties` at `C:\OpenEdge\MarcOepas\conf`
+  by this session; PASOE restart + live-endpoint smoke test are done by
+  the orchestrating session/backend-tester per the pipeline, not by this
+  backend-coder session.
 - Also note: a full from-scratch `scripts/compile.ps1` run in this
   worktree produced r-code for every `.cls` file it walked **except**
   `Luna.BusinessLogic.LakproductieBE` and

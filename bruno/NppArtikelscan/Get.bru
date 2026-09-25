@@ -1,0 +1,38 @@
+meta {
+  name: Get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/npp/artikelscan?scan={{nppScanArtnr}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq resolved
+  res.body.scan: isString
+  res.body.article.artnr: isString
+  res.body.article.nummer: isNumber
+  res.body.empty: eq false
+}
+
+docs {
+  GET /web/npp/artikelscan?scan=<rawScanValue> - direct artnr match (step 1
+  of Luna.BusinessLogic.NPPArtikelScanBE:ResolveScan): the scan value is
+  looked up as-is against artikel.artnr (artikel-x01). Resolves with no
+  "aantal" key (that's only added for the "nummer-aantal" dash form, see
+  GetDashForm.bru).
+
+  {{nppScanArtnr}} must be set (collection/environment variable, not
+  currently in Local.bru) to a real artikel.artnr value from LunaNew.
+
+  Read-only - backed by Backend/src/Luna/Web/NPPArtikelScanHandler.cls +
+  Luna/BusinessLogic/NPPArtikelScanBE.cls.
+}

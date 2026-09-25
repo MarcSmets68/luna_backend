@@ -1,0 +1,31 @@
+meta {
+  name: GetExpectedArtnrMatch
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/web/npp/artikelscan?scan={{nppScanArtnr}}&expectedArtnr={{nppScanArtnr}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq resolved
+  res.body.match: eq true
+}
+
+docs {
+  Optional "expectedArtnr" query param (future-use - not exercised by
+  this tile's own frontend today, but part of the contract): when
+  non-blank, the response gets a top-level "match" boolean = (resolved
+  article's artnr EQ expectedArtnr). Here scan and expectedArtnr are the
+  same real artnr, so match is true.
+
+  {{nppScanArtnr}} must be set the same as in Get.bru.
+}

@@ -1,0 +1,30 @@
+meta {
+  name: GetNotFound
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/web/npp/artikelscan?scan=99999999999
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq not_found
+  res.body.article: isNull
+  res.body.empty: eq true
+}
+
+docs {
+  A "scan" value that matches nothing - no artikel.artnr, no dash, no
+  artikel.barcode, no art-subcodes.barcode -> NOT an error, 200 with
+  "status": "not_found", "article": null, "empty": true. Assumes
+  "99999999999" never matches any artikel/art-subcodes row in LunaNew -
+  adjust if that ever changes.
+}
