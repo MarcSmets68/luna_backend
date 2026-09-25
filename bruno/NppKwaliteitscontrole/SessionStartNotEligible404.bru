@@ -1,0 +1,36 @@
+meta {
+  name: SessionStartNotEligible404
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/web/npp/kwaliteitscontrole/{{nppQcNotEligibleBonnr}}/{{nppQcNotEligibleGroepnr}}/session
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  X-Auth-Token: {{authToken}}
+}
+
+body:json {
+  {}
+}
+
+assert {
+  res.status: eq 404
+  res.body.error.code: eq 404
+}
+
+docs {
+  POST /web/npp/kwaliteitscontrole/{bonnr}/{groepnr}/session for a
+  bonnr/groepnr combination with no currently-eligible bonlijn row
+  (already approved/rejected, or never flagged ledmontage=TRUE) - 404
+  "Bonlijn niet gevonden voor bon &1 groep &2".
+
+  {{nppQcNotEligibleBonnr}}/{{nppQcNotEligibleGroepnr}} must be set to a
+  combination known NOT to be currently eligible.
+}

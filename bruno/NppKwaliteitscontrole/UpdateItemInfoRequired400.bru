@@ -1,0 +1,39 @@
+meta {
+  name: UpdateItemInfoRequired400
+  type: http
+  seq: 8
+}
+
+put {
+  url: {{baseUrl}}/web/npp/kwaliteitscontrole/{{nppQcBonnr}}/{{nppQcGroepnr}}/{{nppQcVolgnr}}/items/{{nppQcSwInfoLijnnr}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  X-Auth-Token: {{authToken}}
+}
+
+body:json {
+  {
+    "controle": "OK",
+    "info": ""
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq info is verplicht voor dit controlepunt
+}
+
+docs {
+  PUT .../items/{lijnnr} with controle="OK" on a swInfo=true checklist
+  item (e.g. lijnnr=400 "Vermogen led strip" or 500 "Lichtkleur" in the
+  fallback checklist) and a blank info - 400 "info is verplicht voor dit
+  controlepunt".
+
+  {{nppQcSwInfoLijnnr}} should be set to 400 or 500 when using the
+  fallback checklist.
+}

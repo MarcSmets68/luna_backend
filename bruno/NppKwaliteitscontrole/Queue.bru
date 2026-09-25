@@ -1,0 +1,35 @@
+meta {
+  name: Queue
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/npp/kwaliteitscontrole/queue
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  X-Auth-Token: {{authToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.items: isArray
+}
+
+docs {
+  GET /web/npp/kwaliteitscontrole/queue - lists eligible bonlijn groups
+  (bonlijn.ledmontage EQ TRUE AND gereserv EQ 0 AND montage-datum EQ ?
+  AND stempel NE "D" AND montage EQ TRUE AND swLed EQ TRUE), enriched
+  with klant naam, profielgroep and per-row hasInProgressSession/
+  inProgressByOther flags for the calling user.
+
+  Requires a valid X-Auth-Token - run "Auth > Login" first (stores
+  {{authToken}}).
+
+  Backed by Luna/Web/NPPKwaliteitscontroleHandler.cls +
+  Luna/BusinessLogic/NPPKwaliteitscontroleBE.cls.
+}

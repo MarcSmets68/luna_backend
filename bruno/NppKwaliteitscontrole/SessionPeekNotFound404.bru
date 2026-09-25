@@ -1,0 +1,30 @@
+meta {
+  name: SessionPeekNotFound404
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/web/npp/kwaliteitscontrole/{{nppQcNoSessionBonnr}}/{{nppQcNoSessionGroepnr}}/session
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  X-Auth-Token: {{authToken}}
+}
+
+assert {
+  res.status: eq 404
+  res.body.error.message: eq QC-sessie niet gevonden
+}
+
+docs {
+  GET /web/npp/kwaliteitscontrole/{bonnr}/{groepnr}/session for a
+  bonnr/groepnr with no bon_led_qc row created today - 404 "QC-sessie
+  niet gevonden".
+
+  {{nppQcNoSessionBonnr}}/{{nppQcNoSessionGroepnr}} must be set to a
+  combination with no session started today.
+}

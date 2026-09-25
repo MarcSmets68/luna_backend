@@ -1,0 +1,35 @@
+meta {
+  name: UpdateItemInvalidControle400
+  type: http
+  seq: 7
+}
+
+put {
+  url: {{baseUrl}}/web/npp/kwaliteitscontrole/{{nppQcBonnr}}/{{nppQcGroepnr}}/{{nppQcVolgnr}}/items/{{nppQcLijnnr}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  X-Auth-Token: {{authToken}}
+}
+
+body:json {
+  {
+    "controle": "Te controleren"
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq Ongeldige waarde voor controle
+}
+
+docs {
+  PUT .../items/{lijnnr} with controle="Te controleren" (the unset
+  default only, never a valid client-supplied value) - 400 "Ongeldige
+  waarde voor controle". Also 400s for any value outside
+  OK/N.v.t./Fout.
+}

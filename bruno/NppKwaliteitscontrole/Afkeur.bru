@@ -1,0 +1,44 @@
+meta {
+  name: Afkeur
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/web/npp/kwaliteitscontrole/{{nppQcBonnr}}/{{nppQcGroepnr}}/{{nppQcVolgnr}}/afkeur
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  X-Auth-Token: {{authToken}}
+}
+
+body:json {
+  {
+    "opmerking": "Kras op profiel"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.outcome: eq rejected
+  res.body.bonnr: isNumber
+  res.body.groepnr: isNumber
+  res.body.volgnr: isNumber
+}
+
+docs {
+  POST /web/npp/kwaliteitscontrole/{bonnr}/{groepnr}/{volgnr}/afkeur -
+  rejects the session: bonlijn.ledmontage=FALSE, besteld/gereserv reset,
+  opmerking appended to bonlijn.opm, and a bon_led afkeuring marker row
+  is written. No stock/artlog writes.
+
+  Run "SessionStart" first to get a live, non-terminal volgnr - this
+  request is destructive (moves the bonlijn back to "unfinished"), so
+  use a disposable/test bon.
+
+  Backed by Luna/BusinessLogic/NPPKwaliteitscontroleBE.cls:Afkeuren.
+}

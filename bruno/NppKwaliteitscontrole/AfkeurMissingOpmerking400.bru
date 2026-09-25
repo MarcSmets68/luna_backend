@@ -1,0 +1,33 @@
+meta {
+  name: AfkeurMissingOpmerking400
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/web/npp/kwaliteitscontrole/{{nppQcBonnr}}/{{nppQcGroepnr}}/{{nppQcVolgnr}}/afkeur
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  X-Auth-Token: {{authToken}}
+}
+
+body:json {
+  {
+    "opmerking": ""
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq opmerking is verplicht bij afkeuring
+}
+
+docs {
+  POST .../afkeur with a blank opmerking - 400 "opmerking is verplicht
+  bij afkeuring".
+}

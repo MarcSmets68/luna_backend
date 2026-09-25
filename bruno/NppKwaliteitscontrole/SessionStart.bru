@@ -1,0 +1,47 @@
+meta {
+  name: SessionStart
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/web/npp/kwaliteitscontrole/{{nppQcBonnr}}/{{nppQcGroepnr}}/session
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  X-Auth-Token: {{authToken}}
+}
+
+body:json {
+  {}
+}
+
+assert {
+  res.status: eq 200
+  res.body.bonnr: isNumber
+  res.body.groepnr: isNumber
+  res.body.volgnr: isNumber
+  res.body.resumed: isBoolean
+  res.body.items: isArray
+}
+
+docs {
+  POST /web/npp/kwaliteitscontrole/{bonnr}/{groepnr}/session - starts a
+  new QC session (allocates a fresh volgnr, builds the checklist from
+  QC_controlepunten or the 16-item fallback list) or resumes an existing
+  one started earlier today by the same user.
+
+  {{nppQcBonnr}}/{{nppQcGroepnr}} must be set (collection/environment
+  variables) to a bonnr/groepnr combination that is currently eligible
+  in LunaNew (see the Queue request in this folder to find one).
+
+  Requires a valid X-Auth-Token - run "Auth > Login" first (stores
+  {{authToken}}).
+
+  Backed by Luna/Web/NPPKwaliteitscontroleHandler.cls +
+  Luna/BusinessLogic/NPPKwaliteitscontroleBE.cls:StartOrResumeSession.
+}

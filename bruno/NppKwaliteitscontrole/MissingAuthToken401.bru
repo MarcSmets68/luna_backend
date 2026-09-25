@@ -1,0 +1,27 @@
+meta {
+  name: MissingAuthToken401
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/web/npp/kwaliteitscontrole/queue
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 401
+  res.body.error.message: eq Ongeldige of verlopen sessie
+  res.body.error.code: eq 401
+}
+
+docs {
+  GET /web/npp/kwaliteitscontrole/queue with no X-Auth-Token header -
+  AuthBE:ValidateToken returns false for a blank token, and the handler
+  401s before ever calling NPPKwaliteitscontroleBE.
+}

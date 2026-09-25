@@ -1,0 +1,43 @@
+meta {
+  name: UpdateItem
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{baseUrl}}/web/npp/kwaliteitscontrole/{{nppQcBonnr}}/{{nppQcGroepnr}}/{{nppQcVolgnr}}/items/{{nppQcLijnnr}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  X-Auth-Token: {{authToken}}
+}
+
+body:json {
+  {
+    "controle": "OK",
+    "info": ""
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.item.lijnnr: isNumber
+  res.body.item.controle: eq OK
+  res.body.sessionComplete: isBoolean
+}
+
+docs {
+  PUT /web/npp/kwaliteitscontrole/{bonnr}/{groepnr}/{volgnr}/items/{lijnnr}
+  - upserts one checklist answer. Run "SessionStart" first to get a
+  volgnr, and use lijnnr=100 ("Kleur profiel", swInfo=false) from the
+  fallback checklist so no info is required.
+
+  {{nppQcVolgnr}}/{{nppQcLijnnr}} must be set to match a session started
+  via "SessionStart".
+
+  Backed by Luna/BusinessLogic/NPPKwaliteitscontroleBE.cls:UpdateItem.
+}

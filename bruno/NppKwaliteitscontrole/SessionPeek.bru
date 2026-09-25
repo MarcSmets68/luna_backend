@@ -1,0 +1,32 @@
+meta {
+  name: SessionPeek
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/web/npp/kwaliteitscontrole/{{nppQcBonnr}}/{{nppQcGroepnr}}/session
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  X-Auth-Token: {{authToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.bonnr: isNumber
+  res.body.groepnr: isNumber
+  res.body.volgnr: isNumber
+  res.body.items: isArray
+}
+
+docs {
+  GET /web/npp/kwaliteitscontrole/{bonnr}/{groepnr}/session - read-only
+  peek at today's session (does NOT allocate a new volgnr). Run
+  "SessionStart" first in this folder so a session exists for today.
+
+  Backed by Luna/BusinessLogic/NPPKwaliteitscontroleBE.cls:PeekSession.
+}
