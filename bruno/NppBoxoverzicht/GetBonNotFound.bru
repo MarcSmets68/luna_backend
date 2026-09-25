@@ -1,0 +1,29 @@
+meta {
+  name: GetBonNotFound
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/web/npp/boxoverzicht?scan=B9999999-1
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 404
+  res.body.error.message: eq Bon niet gevonden
+  res.body.error.code: eq 404
+}
+
+docs {
+  A well-formed scan value ("B9999999-1" parses fine into
+  bonnr=9999999/groepnr=1) whose bonnr doesn't exist in the bon table ->
+  404 raised by Luna.BusinessLogic.NPPBoxOverzichtBE:GetBoxOverzicht
+  (AppError 404). Assumes bonnr 9999999 never exists in LunaNew - adjust
+  if that ever changes.
+}

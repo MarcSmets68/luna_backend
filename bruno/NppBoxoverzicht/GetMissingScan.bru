@@ -1,0 +1,27 @@
+meta {
+  name: GetMissingScan
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/web/npp/boxoverzicht
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.message: eq Ontbrekende parameter 'scan'
+  res.body.error.code: eq 400
+}
+
+docs {
+  No "scan" query param at all -> 400, handler-level validation
+  (Luna.Web.NPPBoxOverzichtHandler:HandleGet), before the request ever
+  reaches Luna.BusinessLogic.NPPBoxOverzichtBE.
+}
