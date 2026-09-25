@@ -152,17 +152,17 @@ CLASS Luna.Web.NPPStockBewegingHandler INHERITS WebHandler:
     END METHOD.
 
     /* Writes a JSON response with the given status code.
-       CORS headers - allow the frontend (localhost:3000) to call this
-       endpoint with the X-Auth-Token header, same pattern as
-       Luna.Web.LogoutHandler (missing here initially, which broke every
-       call from an actual browser with a CORS preflight error - curl-
-       based testing never exercises the browser's preflight OPTIONS
-       request, so this was missed until a real browser hit it). */
+       Note: CORS (including the X-Auth-Token preflight) is handled
+       globally by PASOE's own OECORSFilter (oeablSecurity.properties -
+       OECORSFilter.messageHeaders needed "X-Auth-Token" added to its
+       list; that filter runs ahead of every WebHandler, including this
+       one) - no per-handler CORS header code is needed or should be
+       added here, to avoid emitting duplicate/conflicting
+       Access-Control-* headers alongside the filter's own. */
     METHOD PRIVATE VOID WriteJsonResponse( INPUT piStatusCode AS INTEGER, INPUT poBody AS JsonObject ):
 
         DEFINE VARIABLE oResponse AS OpenEdge.Net.HTTP.IHttpResponse NO-UNDO.
         DEFINE VARIABLE oWriter   AS WebResponseWriter               NO-UNDO.
-        DEFINE VARIABLE oHeader   AS OpenEdge.Net.HTTP.HttpHeader    NO-UNDO.
 
         ASSIGN
             oResponse             = NEW OpenEdge.Web.WebResponse()
@@ -171,33 +171,9 @@ CLASS Luna.Web.NPPStockBewegingHandler INHERITS WebHandler:
             oResponse:ContentType = "application/json":u
             .
 
-        oHeader = NEW OpenEdge.Net.HTTP.HttpHeader("Access-Control-Allow-Origin":u, "http://localhost:3000":u).
-        oResponse:SetHeader(oHeader).
-
-        oHeader = NEW OpenEdge.Net.HTTP.HttpHeader("Access-Control-Allow-Methods":u, "POST, OPTIONS":u).
-        oResponse:SetHeader(oHeader).
-
-        oHeader = NEW OpenEdge.Net.HTTP.HttpHeader("Access-Control-Allow-Headers":u, "Content-Type, X-Auth-Token":u).
-        oResponse:SetHeader(oHeader).
-
         oWriter = NEW WebResponseWriter(oResponse).
         oWriter:Open().
         oWriter:Close().
-
-    END METHOD.
-
-    /* OPTIONS /npp/stockbeweging - CORS preflight request handler.
-       Mirrors Luna.Web.LogoutHandler:HandleOptions. */
-    METHOD OVERRIDE PROTECTED INTEGER HandleOptions( INPUT poRequest AS IWebRequest ):
-
-        DEFINE VARIABLE oBody AS JsonObject NO-UNDO.
-
-        oBody = NEW JsonObject().
-        oBody:Add("message":u, "CORS preflight OK":u).
-
-        WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oBody).
-
-        RETURN 0.
 
     END METHOD.
 
