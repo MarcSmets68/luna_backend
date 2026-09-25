@@ -592,6 +592,8 @@ CLASS Luna.BusinessLogic.NPPKwaliteitscontroleBE:
         DEFINE VARIABLE lSwComplex    AS LOGICAL   NO-UNDO.
         DEFINE VARIABLE cOmschr       AS CHARACTER NO-UNDO.
         DEFINE VARIABLE lSwInfo       AS LOGICAL   NO-UNDO.
+        DEFINE VARIABLE iTotalItems   AS INTEGER   NO-UNDO.
+        DEFINE VARIABLE iAnsweredCount AS INTEGER  NO-UNDO.
 
         plSessionComplete = FALSE.
         pcOutcome         = "":u.
@@ -627,6 +629,14 @@ CLASS Luna.BusinessLogic.NPPKwaliteitscontroleBE:
         lSwComplex    = ResolveSwComplex(piBonnr, piGroepnr).
 
         BuildChecklist(cProfielgroep, lSwComplex).
+
+        /* Total expected checklist size - needed for the auto-completion
+           check below. Counted here, before ttChecklistItem gets reused
+           further down to build this method's single-item response row. */
+        iTotalItems = 0.
+        FOR EACH ttChecklistItem:
+            iTotalItems = iTotalItems + 1.
+        END.
 
         FIND FIRST ttChecklistItem WHERE ttChecklistItem.lijnnr EQ piLijnnr NO-ERROR.
         IF NOT AVAILABLE ttChecklistItem THEN
@@ -694,13 +704,29 @@ CLASS Luna.BusinessLogic.NPPKwaliteitscontroleBE:
             .
 
         /* Step 7: auto-completion check - separate, sequential
-           transaction, not nested inside the upsert above. */
-        IF NOT CAN-FIND(FIRST bon_led_qc
+           transaction, not nested inside the upsert above.
+           BUG FIXED: "Te controleren" is the in-memory default for items
+           that were never answered - such items never get a persisted
+           bon_led_qc row at all (per the incremental-save design), so a
+           CAN-FIND checking for a *persisted* "Te controleren" row would
+           never find one, and the session would incorrectly auto-complete
+           after answering just a single non-Fout item, regardless of how
+           many of the other checklist items were still untouched. The
+           correct check compares the number of OK/N.v.t. answered rows
+           against the FULL checklist size (iTotalItems, computed above) -
+           this also correctly keeps a session open while any item is
+           "Fout", since a Fout row does not count toward the total. */
+        iAnsweredCount = 0.
+        FOR EACH bon_led_qc NO-LOCK
             WHERE bon_led_qc.bonnr   EQ piBonnr
               AND bon_led_qc.groepnr EQ piGroepnr
               AND bon_led_qc.datum   EQ TODAY
               AND bon_led_qc.volgnr  EQ piVolgnr
-              AND (bon_led_qc.controle EQ "Te controleren":u OR bon_led_qc.controle EQ "Fout":u)) THEN
+              AND (bon_led_qc.controle EQ "OK":u OR bon_led_qc.controle EQ "N.v.t.":u):
+            iAnsweredCount = iAnsweredCount + 1.
+        END.
+
+        IF iTotalItems GT 0 AND iAnsweredCount GE iTotalItems THEN
         DO:
             ApproveSession(piBonnr, piGroepnr, pcKode).
             ASSIGN
