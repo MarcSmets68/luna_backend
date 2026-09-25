@@ -22,6 +22,8 @@ USING Progress.Lang.*.
 USING Progress.Json.ObjectModel.JsonObject.
 USING Progress.Json.ObjectModel.JsonArray.
 
+BLOCK-LEVEL ON ERROR UNDO, THROW.
+
 CLASS Luna.BusinessLogic.NPPBoxOverzichtBE:
 
     /* Grouping temp-table: one row per distinct output artnr, aantal is
