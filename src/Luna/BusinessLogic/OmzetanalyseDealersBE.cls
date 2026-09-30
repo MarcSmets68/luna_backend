@@ -381,6 +381,7 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
             ttAnalyse.analyseId = 1
             ttAnalyse.modus     = (IF lJaren THEN "JAREN":u ELSE "PERIODE":u).
 
+        cKlantNaam = ?.
         IF iKlnrF NE ? THEN
         DO:
             FIND FIRST klant NO-LOCK WHERE klant.klnr EQ iKlnrF NO-ERROR.
