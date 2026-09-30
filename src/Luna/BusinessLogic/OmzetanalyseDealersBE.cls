@@ -617,6 +617,38 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
     END METHOD.
 
     /*------------------------------------------------------------------------------
+        Purpose: Cheap, DB-round-trip-free pre-filter on the denormalized
+                 bonlijn.klnr / bonlijn.bon-datum (verified in sync with bon.klnr /
+                 bon.datum). Only used to skip the expensive bon lookup for lines that
+                 are certainly out of scope; bon stays the authority for everything
+                 that is kept. Unknown/empty denormalized values never exclude a line.
+    ------------------------------------------------------------------------------*/
+    METHOD PRIVATE LOGICAL PreFilterOut( BUFFER pbLijn FOR bonlijn ):
+
+        DEFINE VARIABLE iYr AS INTEGER NO-UNDO.
+
+        IF iKlnrF NE ? AND pbLijn.klnr NE 0 AND pbLijn.klnr NE iKlnrF THEN
+            RETURN TRUE.
+
+        IF pbLijn.bon-datum NE ? THEN
+        DO:
+            IF lJaren THEN
+            DO:
+                iYr = YEAR(pbLijn.bon-datum).
+                IF iYr GT iYearNow OR iYr LE iYearNow - 5 THEN RETURN TRUE.
+            END.
+            ELSE
+            DO:
+                IF dFiltVan NE ? AND pbLijn.bon-datum LT dFiltVan THEN RETURN TRUE.
+                IF dFiltTot NE ? AND pbLijn.bon-datum GT dFiltTot THEN RETURN TRUE.
+            END.
+        END.
+
+        RETURN FALSE.
+
+    END METHOD.
+
+    /*------------------------------------------------------------------------------
         Purpose: TRUE when the line counts towards REVENUE: artnr or
                  artikel.x-ref BEGINS "NOMALED.".
     ------------------------------------------------------------------------------*/
@@ -695,6 +727,7 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
         DEFINE VARIABLE iBonnr  AS INTEGER NO-UNDO.
 
         iBonnr = pbLijn.bonnr.
+        IF PreFilterOut(BUFFER pbLijn) THEN RETURN.
         IF NOT LoadBon(iBonnr) THEN RETURN.
 
         iKol = ttBon.bKol.
@@ -798,6 +831,7 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
               AND bonlijn.kolomtitel EQ FALSE
               AND bonlijn.infolijn   EQ FALSE:
 
+            IF PreFilterOut(BUFFER bonlijn) THEN NEXT.
             IF NOT LoadBon(bonlijn.bonnr) THEN NEXT.
 
             iSk = (IF lDealerMode THEN ttBon.bKlnr ELSE 0).
@@ -849,7 +883,15 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
 
         DO i = 1 TO iNCols:
             CREATE ttM.
-            ttM.idx = i.
+            ASSIGN
+                ttM.idx                 = i
+                /* growth stays null in PERIODE mode and for the oldest JAREN column */
+                ttM.groeiQtyLos         = ?
+                ttM.groeiQtyProductie   = ?
+                ttM.groeiAantalOrders   = ?
+                ttM.groeiOmzetLos       = ?
+                ttM.groeiOmzetProductie = ?
+                ttM.groeiOmzetTotaal    = ?.
             FIND ttAgg WHERE ttAgg.sk EQ piSk AND ttAgg.lvl EQ piLvl AND ttAgg.scp EQ piScp AND ttAgg.kol EQ i NO-ERROR.
 
             ASSIGN
