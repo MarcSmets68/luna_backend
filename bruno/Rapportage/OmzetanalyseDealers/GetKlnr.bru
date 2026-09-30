@@ -1,0 +1,26 @@
+meta {
+  name: GetKlnr
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/web/rapportage/omzetanalyse-dealers?klnr=14644&datumVan=2026-01-01
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.filters.klnr: eq 14644
+  res.body.secties.length: eq 1
+}
+
+docs {
+  Filter on a single customer. Unknown klnr or klnr that does not match soort is NOT an error: 200 with empty/zero result.
+}
+

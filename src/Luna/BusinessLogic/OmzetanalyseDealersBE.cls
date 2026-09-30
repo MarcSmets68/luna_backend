@@ -532,13 +532,16 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
 
         DEFINE VARIABLE cPat AS CHARACTER NO-UNDO.
 
+        /* USE-INDEX bonlijn-x2 is mandatory: with the structural-flag predicates in the
+           WHERE the optimizer otherwise picks bonlijn-x14 (kolomtitel, infolijn,
+           subtotaal, ...) and scans ALL real lines per pattern (~1.4s x 200 patterns). */
         FOR EACH ttPat:
 
             cPat = ttPat.pat.
 
             IF ttPat.isBegins THEN
             DO:
-                FOR EACH bonlijn NO-LOCK
+                FOR EACH bonlijn NO-LOCK USE-INDEX bonlijn-x2
                     WHERE bonlijn.artnr     BEGINS cPat
                       AND bonlijn.subtotaal  EQ FALSE
                       AND bonlijn.kolomtitel EQ FALSE
@@ -548,7 +551,7 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
             END.
             ELSE
             DO:
-                FOR EACH bonlijn NO-LOCK
+                FOR EACH bonlijn NO-LOCK USE-INDEX bonlijn-x2
                     WHERE bonlijn.artnr     EQ cPat
                       AND bonlijn.subtotaal  EQ FALSE
                       AND bonlijn.kolomtitel EQ FALSE
@@ -788,7 +791,7 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
 
         DEFINE VARIABLE iSk AS INTEGER NO-UNDO.
 
-        FOR EACH bonlijn NO-LOCK
+        FOR EACH bonlijn NO-LOCK USE-INDEX bonlijn-x2
             WHERE bonlijn.artnr     EQ pcArtnr
               AND bonlijn.groepnr    EQ 0
               AND bonlijn.subtotaal  EQ FALSE

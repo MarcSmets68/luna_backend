@@ -279,12 +279,14 @@ CLASS Luna.Web.RapportageHandler INHERITS WebHandler:
         DEFINE VARIABLE oMeter     AS JsonObject NO-UNDO.
         DEFINE VARIABLE oMeters    AS JsonObject NO-UNDO.
         DEFINE VARIABLE oFilters   AS JsonObject NO-UNDO.
+        DEFINE VARIABLE cNames     AS CHARACTER  NO-UNDO EXTENT.
         DEFINE VARIABLE iSec       AS INTEGER    NO-UNDO.
         DEFINE VARIABLE iCat       AS INTEGER    NO-UNDO.
         DEFINE VARIABLE iRij       AS INTEGER    NO-UNDO.
         DEFINE VARIABLE iMet       AS INTEGER    NO-UNDO.
 
-        oDs   = poRaw:GetJsonObject(poRaw:GetNames()[1]).
+        cNames = poRaw:GetNames().
+        oDs    = poRaw:GetJsonObject(cNames[1]).
         oRoot = oDs:GetJsonArray("analyse":u):GetJsonObject(1).
 
         EnsureArray(oRoot, "kolommen":u).

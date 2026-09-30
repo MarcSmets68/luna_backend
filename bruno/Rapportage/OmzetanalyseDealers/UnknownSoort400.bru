@@ -1,0 +1,25 @@
+meta {
+  name: UnknownSoort400
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/web/rapportage/omzetanalyse-dealers?soort=ZZZZZ
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.code: eq 400
+}
+
+docs {
+  soort not found in the soort table -> 400.
+}
+

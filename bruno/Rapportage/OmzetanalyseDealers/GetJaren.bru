@@ -1,0 +1,29 @@
+meta {
+  name: GetJaren
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/rapportage/omzetanalyse-dealers
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.modus: eq JAREN
+  res.body.kolommen.length: eq 5
+  res.body.secties.length: eq 1
+  res.body.secties[0].dealerKlnr: isNull
+  res.body.generatedAt: isDefined
+}
+
+docs {
+  JAREN mode (no date bound): 5 year columns (current year + 4 previous) with year-over-year growth %. Normal mode: exactly one section, dealerKlnr/dealerNaam null. Heavy cold call (scans bonlijn per match pattern) - expect several seconds.
+}
+

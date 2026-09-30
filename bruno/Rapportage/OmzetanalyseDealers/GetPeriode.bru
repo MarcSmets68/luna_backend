@@ -1,0 +1,29 @@
+meta {
+  name: GetPeriode
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/web/rapportage/omzetanalyse-dealers?datumVan=2026-01-01&datumTot=2026-03-31
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.modus: eq PERIODE
+  res.body.kolommen.length: eq 1
+  res.body.kolommen[0].key: eq periode
+  res.body.filters.datumVan: eq 2026-01-01
+  res.body.filters.datumTot: eq 2026-03-31
+}
+
+docs {
+  PERIODE mode (either date bound present): a single period-total column, all groei* fields null. Dates are YYYY-MM-DD, bounds inclusive.
+}
+
