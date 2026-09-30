@@ -151,7 +151,14 @@ CLASS Luna.Web.NPPStockBewegingHandler INHERITS WebHandler:
 
     END METHOD.
 
-    /* Writes a JSON response with the given status code. */
+    /* Writes a JSON response with the given status code.
+       Note: CORS (including the X-Auth-Token preflight) is handled
+       globally by PASOE's own OECORSFilter (oeablSecurity.properties -
+       OECORSFilter.messageHeaders needed "X-Auth-Token" added to its
+       list; that filter runs ahead of every WebHandler, including this
+       one) - no per-handler CORS header code is needed or should be
+       added here, to avoid emitting duplicate/conflicting
+       Access-Control-* headers alongside the filter's own. */
     METHOD PRIVATE VOID WriteJsonResponse( INPUT piStatusCode AS INTEGER, INPUT poBody AS JsonObject ):
 
         DEFINE VARIABLE oResponse AS OpenEdge.Net.HTTP.IHttpResponse NO-UNDO.
