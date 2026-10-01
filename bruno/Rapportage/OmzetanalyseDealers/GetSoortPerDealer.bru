@@ -1,0 +1,27 @@
+meta {
+  name: GetSoortPerDealer
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/web/rapportage/omzetanalyse-dealers?soort=DNOM&perDealer=true&leegRijen=false
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.filters.soort: eq DNOM
+  res.body.filters.perDealer: eq true
+  res.body.secties: isArray
+}
+
+docs {
+  Per-dealer mode (only honoured when soort is set): one section per dealer with at least one matching line, sorted by dealerNaam. leegRijen=false hides article rows / categories without data. Soort filters on klant.soort (current customer type), not bon.soort.
+}
+

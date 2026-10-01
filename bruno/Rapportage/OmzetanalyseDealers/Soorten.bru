@@ -1,0 +1,26 @@
+meta {
+  name: Soorten
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/web/rapportage/omzetanalyse-dealers/soorten
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.items: isArray
+  res.body.items[0].kode: isDefined
+}
+
+docs {
+  All rows of the soort table sorted by kode - feeds the frontend Soort dropdown.
+}
+

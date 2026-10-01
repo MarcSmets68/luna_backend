@@ -1,0 +1,25 @@
+meta {
+  name: MethodNotAllowed
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/web/rapportage/omzetanalyse-dealers
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 405
+  res.body.error.code: eq 405
+}
+
+docs {
+  Only GET is supported on /rapportage/* - POST -> 405 with the standard error envelope.
+}
+

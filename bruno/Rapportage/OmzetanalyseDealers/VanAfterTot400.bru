@@ -1,0 +1,25 @@
+meta {
+  name: VanAfterTot400
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/web/rapportage/omzetanalyse-dealers?datumVan=2026-06-01&datumTot=2026-01-01
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.code: eq 400
+}
+
+docs {
+  datumVan after datumTot -> 400 (business rule, raised by OmzetanalyseDealersBE).
+}
+

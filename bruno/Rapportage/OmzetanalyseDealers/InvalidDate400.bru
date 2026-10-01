@@ -1,0 +1,25 @@
+meta {
+  name: InvalidDate400
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/web/rapportage/omzetanalyse-dealers?datumVan=31-12-2026
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.code: eq 400
+}
+
+docs {
+  Malformed datumVan (expects YYYY-MM-DD) -> 400 with the standard error envelope.
+}
+
