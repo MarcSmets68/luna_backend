@@ -454,6 +454,7 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
         DEFINE VARIABLE lFirst   AS LOGICAL   NO-UNDO INITIAL TRUE.
         DEFINE VARIABLE cUnit    AS CHARACTER NO-UNDO.
         DEFINE VARIABLE cArtnr   AS CHARACTER NO-UNDO.
+        DEFINE VARIABLE cMatchArtnr AS CHARACTER NO-UNDO.
         DEFINE VARIABLE iCatNr   AS INTEGER   NO-UNDO.
         DEFINE VARIABLE iSpecId  AS INTEGER   NO-UNDO.
 
@@ -484,6 +485,21 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
                 NEXT.
             END.
 
+            /* Legacy rule (LstAnalyseDealers.w): exact-match rows are resolved via
+               artikel.artnr, falling back to artikel.x-ref; the resolved current
+               artnr is the bonlijn match target. Unresolvable rows are skipped.
+               Prefix rows (swBegins) always use the literal text. */
+            IF led_lijstparameters.swBegins THEN
+                cMatchArtnr = cArtnr.
+            ELSE
+            DO:
+                FIND FIRST artikel NO-LOCK WHERE artikel.artnr EQ cArtnr NO-ERROR.
+                IF NOT AVAILABLE artikel THEN
+                    FIND FIRST artikel NO-LOCK WHERE artikel.x-ref EQ cArtnr NO-ERROR.
+                IF NOT AVAILABLE artikel THEN NEXT.
+                cMatchArtnr = artikel.artnr.
+            END.
+
             iSpecId = iSpecId + 1.
             CREATE ttSpec.
             ASSIGN
@@ -500,7 +516,7 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
                 AddRule(iSpecId, "NOMALED.NC.O":u, TRUE).
             END.
             ELSE
-                AddRule(iSpecId, cArtnr, led_lijstparameters.swBegins).
+                AddRule(iSpecId, cMatchArtnr, led_lijstparameters.swBegins).
 
         END.
 
