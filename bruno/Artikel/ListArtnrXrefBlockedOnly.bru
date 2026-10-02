@@ -1,0 +1,32 @@
+meta {
+  name: ListArtnrXrefBlockedOnly
+  type: http
+  seq: 31
+}
+
+get {
+  url: {{baseUrl}}/web/artikel?artnr=SIKTA.S.B&geblokkeerd=true&pageSize=20
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("geblokkeerd=true returns the blocked x-ref matches", function() {
+    var arts = res.body.items.map(function(i) { return i.artnr; });
+    expect(arts).to.include("ROE.ROS-BRAC D40.V2");
+    expect(arts).to.include("ROE.ROS-BRAC D50");
+    res.body.items.forEach(function(i) { expect(i.geblokkeerd).to.equal(true); });
+  });
+}
+
+docs {
+  Counterpart of ListArtnrXrefBlockedExcluded.
+}

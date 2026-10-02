@@ -1,0 +1,32 @@
+meta {
+  name: ListArtnrSameRowBothLegsOnce
+  type: http
+  seq: 28
+}
+
+get {
+  url: {{baseUrl}}/web/artikel?artnr=NOMALED.E.BHR.00.CF-HT.W&pageSize=20
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("row matching both artnr and x-ref appears once", function() {
+    var hits = res.body.items.filter(function(i) { return i.artnr === "NOMALED.E.BHR.00.CF-HT.W"; });
+    expect(hits.length).to.equal(1);
+    expect(res.body.items.length).to.equal(1);
+  });
+}
+
+docs {
+  artnr = x-ref = NOMALED.E.BHR.00.CF-HT.W in LunaNew: leg A returns it,
+  leg B skips it (artnr already BEGINS the term).
+}

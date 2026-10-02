@@ -182,6 +182,142 @@ CLASS Luna.BusinessLogic.ArtikelBE:
     END METHOD.
 
     /*------------------------------------------------------------------------------
+        Purpose: TRUE when pcTerm can safely be used as an x-ref CONTAINS word
+                 phrase (pcTerm + "*"). Allowlist: letters, digits, '.', '-', '_',
+                 starting with a letter/digit. Anything else (quotes, '*', '~',
+                 '&', '|', '!', parentheses, spaces, '#', '%', ...) returns FALSE
+                 and the caller falls back to x-ref BEGINS, because CONTAINS
+                 raises a runtime syntax error (e.g. 4686) on such input.
+                 Verified live: '.', '-' work inside terms (SIKTA.S40.C.21*,
+                 D25-10*).
+    ------------------------------------------------------------------------------*/
+    METHOD PRIVATE LOGICAL IsSafeContainsTerm( INPUT pcTerm AS CHARACTER ):
+
+        DEFINE VARIABLE i AS INTEGER   NO-UNDO.
+        DEFINE VARIABLE c AS CHARACTER NO-UNDO.
+
+        IF pcTerm EQ "":u OR pcTerm EQ ? THEN RETURN FALSE.
+
+        DO i = 1 TO LENGTH(pcTerm):
+            c = SUBSTRING(pcTerm, i, 1).
+            IF (ASC(c) GE 48 AND ASC(c) LE 57)
+               OR (ASC(c) GE 65 AND ASC(c) LE 90)
+               OR (ASC(c) GE 97 AND ASC(c) LE 122) THEN NEXT.
+            IF i GT 1 AND (c EQ ".":u OR c EQ "-":u OR c EQ "_":u) THEN NEXT.
+            RETURN FALSE.
+        END.
+
+        RETURN TRUE.
+
+    END METHOD.
+
+    /*------------------------------------------------------------------------------
+        Purpose: Shared per-row scan-cap + filter + paging + emit logic for both
+                 legs of GetArtikelen (artnr leg and x-ref leg), so the two
+                 can never diverge. See the GetArtikelen header for why every
+                 check is evaluated per-row (not in the WHERE clause).
+        Notes  : plSkipArtnrMatch = TRUE for the x-ref leg: rows whose artnr
+                 BEGINS pcArtnr were already returned by the artnr leg and are
+                 skipped (after being counted towards the scan cap).
+                 plStop = TRUE tells the caller to LEAVE its loop (and skip any
+                 later leg); plHasMore is set TRUE in that case.
+    ------------------------------------------------------------------------------*/
+    METHOD PRIVATE VOID ProcessRow(
+        BUFFER pbArtikel          FOR artikel,
+        INPUT  plSkipArtnrMatch   AS LOGICAL,
+        INPUT  pcArtnr            AS CHARACTER,
+        INPUT  pcOmschrijving     AS CHARACTER,
+        INPUT  pcGroep            AS CHARACTER,
+        INPUT  pcOnderMinimum     AS CHARACTER,
+        INPUT  plExternInBewerking AS LOGICAL,
+        INPUT  pcGeblokkeerd      AS CHARACTER,
+        INPUT  piSkip             AS INTEGER,
+        INPUT  piPageSize         AS INTEGER,
+        INPUT  piMaxRowsScanned   AS INTEGER,
+        INPUT-OUTPUT piRowsScanned AS INTEGER,
+        INPUT-OUTPUT piSeen       AS INTEGER,
+        INPUT-OUTPUT piTaken      AS INTEGER,
+        OUTPUT plHasMore          AS LOGICAL,
+        OUTPUT plStop             AS LOGICAL ):
+
+        DEFINE VARIABLE lMatch AS LOGICAL NO-UNDO.
+
+        ASSIGN
+            plHasMore = FALSE
+            plStop    = FALSE.
+
+        /* Scan-depth safety cap - see the GetArtikelen header note.
+           Counts every physical row examined (not just matches), so it
+           bounds worst-case latency even when the filter matches
+           nothing at all. Must run before any per-row condition below
+           that can RETURN early, so every visited row counts. */
+        piRowsScanned = piRowsScanned + 1.
+        IF piRowsScanned GT piMaxRowsScanned THEN
+        DO:
+            ASSIGN plHasMore = TRUE
+                   plStop    = TRUE.
+            RETURN.
+        END.
+
+        /* x-ref leg dedup: artnr leg already returned this row. */
+        IF plSkipArtnrMatch AND pbArtikel.artnr BEGINS pcArtnr THEN RETURN.
+
+        /* 2026-08-27 (groep-fix): same reasoning as omschrijving below -
+           when pcArtnr is blank, "groep EQ pcGroep" in the WHERE clause
+           above used to let the query engine pre-filter non-matching
+           rows before they ever reached the loop body/counter, so the
+           scan-depth cap never triggered and this degraded into a full
+           ~1.8M-row table scan (measured live at 13+s). Moved to a
+           per-row IF/NEXT check, same pattern as omschrijving/
+           onderMinimum, so every physically-visited row counts towards
+           iMaxRowsScanned regardless of whether it matches groep. */
+        IF pcGroep NE "":u AND pbArtikel.groep NE pcGroep THEN RETURN.
+
+        IF pcOmschrijving NE "":u THEN
+        DO:
+            IF INDEX(UPPER(pbArtikel.omschr-n), pcOmschrijving) EQ 0
+               AND INDEX(UPPER(pbArtikel.omschr-f), pcOmschrijving) EQ 0 THEN
+                RETURN.
+        END.
+
+        /* BR-1: "onder minimum" always requires stock = TRUE - vermijdt
+           betekenisloze vergelijkingen op niet-voorraadartikelen. */
+        IF pcOnderMinimum NE "":u THEN
+        DO:
+            lMatch = pbArtikel.stock AND
+                (   (pcOnderMinimum EQ "intern":u AND pbArtikel.aantal   LT pbArtikel.minv)
+                 OR (pcOnderMinimum EQ "extern":u AND pbArtikel.x-aantal LT pbArtikel.x-minv)
+                 OR (pcOnderMinimum EQ "beide":u  AND (pbArtikel.aantal   LT pbArtikel.minv
+                                                     OR pbArtikel.x-aantal LT pbArtikel.x-minv))).
+            IF NOT lMatch THEN RETURN.
+        END.
+
+        IF plExternInBewerking AND NOT (pbArtikel.x-gereserveerd GT 0) THEN RETURN.
+
+        /* geblokkeerd-filter: "true" = enkel geblokkeerde artikelen,
+           "false" = enkel niet-geblokkeerde, leeg = geen filter. Per-rij
+           geëvalueerd zodat iRowsScanned elke bezochte rij telt. */
+        IF pcGeblokkeerd EQ "true":u  AND NOT pbArtikel.blokkeren THEN RETURN.
+        IF pcGeblokkeerd EQ "false":u AND pbArtikel.blokkeren     THEN RETURN.
+
+        piSeen = piSeen + 1.
+
+        IF piSeen LE piSkip THEN RETURN.
+
+        IF piTaken GE piPageSize THEN
+        DO:
+            ASSIGN plHasMore = TRUE
+                   plStop    = TRUE.
+            RETURN.
+        END.
+
+        CREATE ttArtikel.
+        CopyToTt( BUFFER pbArtikel, BUFFER ttArtikel ).
+        piTaken = piTaken + 1.
+
+    END METHOD.
+
+    /*------------------------------------------------------------------------------
         Purpose: Returns a page of artikel rows, optionally filtered by artnr
                  (prefix match), omschrijving (substring match on NL/FR
                  description) and groep (exact match).
@@ -235,6 +371,19 @@ CLASS Luna.BusinessLogic.ArtikelBE:
                  omschrijving above; the artnr BEGINS condition is
                  untouched and still drives the index range when artnr is
                  supplied alongside groep.
+                 x-ref ("4L-code", artikel.x-ref CHARACTER X(40)): the artnr
+                 filter ALSO matches artikel.x-ref. No new query param -
+                 folded into artnr (approved, see feature artikel-xref-search).
+                 Implemented as two legs sharing the same per-row filters,
+                 scan cap and paging state (ProcessRow): leg A = artnr BEGINS
+                 (artikel-x01), leg B = x-ref CONTAINS "<artnr>*" on the
+                 artikel-x13 WORD index (same as legacy ZkArtikel.w, so the
+                 term may start at any word of x-ref); terms containing
+                 CONTAINS-special characters fall back to x-ref BEGINS on
+                 artikel-x10 (see IsSafeContainsTerm). Leg B only runs when
+                 artnr is non-blank and leg A did not already stop; it skips
+                 rows whose artnr already matches, so no duplicates. x-ref is
+                 an internal match criterion and is never exposed in the JSON.
     ------------------------------------------------------------------------------*/
     METHOD PUBLIC HANDLE GetArtikelen(
         INPUT  pcArtnr            AS CHARACTER,
@@ -253,6 +402,7 @@ CLASS Luna.BusinessLogic.ArtikelBE:
         DEFINE VARIABLE lMatch         AS LOGICAL NO-UNDO.
         DEFINE VARIABLE iRowsScanned   AS INTEGER NO-UNDO.
         DEFINE VARIABLE iMaxRowsScanned AS INTEGER NO-UNDO INITIAL 15000.
+        DEFINE VARIABLE lStop          AS LOGICAL NO-UNDO.
 
         EMPTY TEMP-TABLE ttArtikel.
 
@@ -267,6 +417,7 @@ CLASS Luna.BusinessLogic.ArtikelBE:
             iTaken         = 0
             iRowsScanned   = 0
             plHasMore      = FALSE
+            lStop          = FALSE
             .
 
         IF pcOnderMinimum NE "":u AND LOOKUP(pcOnderMinimum, "intern,extern,beide":u) EQ 0 THEN
@@ -313,73 +464,63 @@ CLASS Luna.BusinessLogic.ArtikelBE:
            silently scanned the full table pre-filtering on groep before
            any row reached iRowsScanned, so the cap never triggered
            (measured live at 13+s). It's evaluated per-row below instead. */
+        /* Leg A: artnr prefix match (artikel-x01 range scan), unchanged. */
         FOR EACH artikel NO-LOCK
             WHERE artikel.artnr BEGINS pcArtnr
             BY artikel.artnr:
 
-            /* Scan-depth safety cap - see the method header note above.
-               Counts every physical row examined (not just matches), so it
-               bounds worst-case latency even when the filter matches
-               nothing at all. Must run before any per-row condition below
-               that can NEXT out of the loop, so every visited row counts. */
-            iRowsScanned = iRowsScanned + 1.
-            IF iRowsScanned GT iMaxRowsScanned THEN
+            ProcessRow( BUFFER artikel, FALSE, pcArtnr, pcOmschrijving, pcGroep,
+                        pcOnderMinimum, plExternInBewerking, pcGeblokkeerd,
+                        iSkip, piPageSize, iMaxRowsScanned,
+                        INPUT-OUTPUT iRowsScanned, INPUT-OUTPUT iSeen, INPUT-OUTPUT iTaken,
+                        OUTPUT plHasMore, OUTPUT lStop ).
+            IF lStop THEN LEAVE.
+        END.
+
+        /* Leg B: x-ref ("4L-code") match - only when an artnr filter was given
+           (a blank term would match every row) and leg A did not already stop
+           on the shared scan cap / filled page. Matches like legacy
+           ZkArtikel.w: x-ref CONTAINS '<input>*' (word index artikel-x13), so
+           the term can start at any word of x-ref (SIKTA.S40.C.21 is found by
+           SIKTA.S40.C.21, S40.C.21, S40, SIKTA, C.21, ...). Legacy does no
+           escaping at all; CONTAINS syntax errors (e.g. '*' mid-word) are
+           raised at runtime, so only a conservative character set is passed
+           to CONTAINS (see IsSafeContainsTerm) and anything else falls back to
+           the plain x-ref BEGINS index range (artikel-x10).
+           Rows whose artnr already matches are skipped inside ProcessRow
+           (leg A returned them), so each article appears at most once. Shares
+           the counters with leg A so paging is one continuous sequence
+           (artnr hits, then x-ref-only hits). */
+        IF pcArtnr NE "":u AND NOT lStop THEN
+        DO:
+            IF IsSafeContainsTerm( pcArtnr ) THEN
             DO:
-                plHasMore = TRUE.
-                LEAVE.
+                FOR EACH artikel NO-LOCK
+                    WHERE artikel.x-ref CONTAINS pcArtnr + "*":u:
+
+                    ProcessRow( BUFFER artikel, TRUE, pcArtnr, pcOmschrijving, pcGroep,
+                                pcOnderMinimum, plExternInBewerking, pcGeblokkeerd,
+                                iSkip, piPageSize, iMaxRowsScanned,
+                                INPUT-OUTPUT iRowsScanned, INPUT-OUTPUT iSeen, INPUT-OUTPUT iTaken,
+                                OUTPUT plHasMore, OUTPUT lStop ).
+                    IF lStop THEN LEAVE.
+                END.
             END.
-
-            /* 2026-08-27 (groep-fix): same reasoning as omschrijving below -
-               when pcArtnr is blank, "groep EQ pcGroep" in the WHERE clause
-               above used to let the query engine pre-filter non-matching
-               rows before they ever reached the loop body/counter, so the
-               scan-depth cap never triggered and this degraded into a full
-               ~1.8M-row table scan (measured live at 13+s). Moved to a
-               per-row IF/NEXT check, same pattern as omschrijving/
-               onderMinimum, so every physically-visited row counts towards
-               iMaxRowsScanned regardless of whether it matches groep. */
-            IF pcGroep NE "":u AND artikel.groep NE pcGroep THEN NEXT.
-
-            IF pcOmschrijving NE "":u THEN
+            ELSE
             DO:
-                IF INDEX(UPPER(artikel.omschr-n), pcOmschrijving) EQ 0
-                   AND INDEX(UPPER(artikel.omschr-f), pcOmschrijving) EQ 0 THEN
-                    NEXT.
+                FOR EACH artikel NO-LOCK
+                    WHERE artikel.x-ref BEGINS pcArtnr
+                    BY artikel.x-ref
+                    BY artikel.artnr:
+
+                    ProcessRow( BUFFER artikel, TRUE, pcArtnr, pcOmschrijving, pcGroep,
+                                pcOnderMinimum, plExternInBewerking, pcGeblokkeerd,
+                                iSkip, piPageSize, iMaxRowsScanned,
+                                INPUT-OUTPUT iRowsScanned, INPUT-OUTPUT iSeen, INPUT-OUTPUT iTaken,
+                                OUTPUT plHasMore, OUTPUT lStop ).
+                    IF lStop THEN LEAVE.
+                END.
             END.
-
-            /* BR-1: "onder minimum" always requires stock = TRUE - vermijdt
-               betekenisloze vergelijkingen op niet-voorraadartikelen. */
-            IF pcOnderMinimum NE "":u THEN
-            DO:
-                lMatch = artikel.stock AND
-                    (   (pcOnderMinimum EQ "intern":u AND artikel.aantal   LT artikel.minv)
-                     OR (pcOnderMinimum EQ "extern":u AND artikel.x-aantal LT artikel.x-minv)
-                     OR (pcOnderMinimum EQ "beide":u  AND (artikel.aantal   LT artikel.minv
-                                                         OR artikel.x-aantal LT artikel.x-minv))).
-                IF NOT lMatch THEN NEXT.
-            END.
-
-            IF plExternInBewerking AND NOT (artikel.x-gereserveerd GT 0) THEN NEXT.
-
-            /* geblokkeerd-filter: "true" = enkel geblokkeerde artikelen,
-               "false" = enkel niet-geblokkeerde, leeg = geen filter. Per-rij
-               geëvalueerd zodat iRowsScanned elke bezochte rij telt. */
-            IF pcGeblokkeerd EQ "true":u  AND NOT artikel.blokkeren THEN NEXT.
-            IF pcGeblokkeerd EQ "false":u AND artikel.blokkeren     THEN NEXT.
-
-            iSeen = iSeen + 1.
-
-            IF iSeen LE iSkip THEN NEXT.
-
-            IF iTaken GE piPageSize THEN
-            DO:
-                plHasMore = TRUE.
-                LEAVE.
-            END.
-
-            CREATE ttArtikel.
-            CopyToTt( BUFFER artikel, BUFFER ttArtikel ).
-            iTaken = iTaken + 1.
         END.
 
         RETURN TEMP-TABLE ttArtikel:HANDLE.

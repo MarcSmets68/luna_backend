@@ -1,0 +1,31 @@
+meta {
+  name: ListArtnrXrefPartialWord
+  type: http
+  seq: 25
+}
+
+get {
+  url: {{baseUrl}}/web/artikel?artnr=S40.C.21&geblokkeerd=false&pageSize=10
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("CONTAINS semantics: term may start at a later word of x-ref", function() {
+    expect(res.body.items.length).to.equal(1);
+    expect(res.body.items[0].artnr).to.equal("ROE.SIKTA40.COAT.ANO BLACK");
+  });
+}
+
+docs {
+  x-ref SIKTA.S40.C.21 is found by a term starting at a later word
+  ("S40.C.21"), not only by its prefix - legacy CONTAINS behaviour.
+}

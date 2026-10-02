@@ -1,0 +1,30 @@
+meta {
+  name: ListArtnrSpecialCharsFallback
+  type: http
+  seq: 32
+}
+
+get {
+  url: {{baseUrl}}/web/artikel?artnr=SIKTA*&pageSize=10
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("CONTAINS-special characters do not error (BEGINS fallback)", function() {
+    expect(res.body.items).to.be.an("array");
+  });
+}
+
+docs {
+  '*' (and quotes, spaces, ...) would raise a CONTAINS syntax error
+  (4686); IsSafeContainsTerm sends such terms to the x-ref BEGINS fallback.
+}

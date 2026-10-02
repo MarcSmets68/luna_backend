@@ -1,0 +1,33 @@
+meta {
+  name: ListArtnrOnlyUnchanged
+  type: http
+  seq: 26
+}
+
+get {
+  url: {{baseUrl}}/web/artikel?artnr=ROE.SIKTA40&pageSize=20
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("artnr prefix search unchanged (artnr hits only, sorted by artnr)", function() {
+    var items = res.body.items;
+    expect(items.length).to.equal(20);
+    items.forEach(function(i) { expect(i.artnr.toUpperCase().indexOf("ROE.SIKTA40")).to.equal(0); });
+    expect(res.body.hasMore).to.equal(true);
+  });
+}
+
+docs {
+  Non-regression for the pre-existing artnr BEGINS search. x-ref rows
+  never appear before the artnr hits are exhausted.
+}
