@@ -1,0 +1,29 @@
+meta {
+  name: ListModeWithGroepnr
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/npp/reservaties?mode=direct&groepnr=1
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.mode: eq direct
+  res.body.items: isArray
+}
+
+docs {
+  Regression test: "mode" and "groepnr" were missing from cKnownParamNames
+  in QueryParamHelper, so "&groepnr=1" was swallowed into the mode value
+  and the list returned 400 "Ongeldige parameter 'mode'". The list route
+  ignores groepnr; this only checks that "mode" parses cleanly when
+  followed by another param.
+}
