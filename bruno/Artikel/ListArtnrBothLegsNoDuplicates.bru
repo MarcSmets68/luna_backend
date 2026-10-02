@@ -1,0 +1,37 @@
+meta {
+  name: ListArtnrBothLegsNoDuplicates
+  type: http
+  seq: 27
+}
+
+get {
+  url: {{baseUrl}}/web/artikel?artnr=SIKTA&pageSize=200&page=2
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("artnr hits first, then x-ref-only hits, no duplicate artnr", function() {
+    var items = res.body.items;
+    var seen = {};
+    items.forEach(function(i) { expect(seen[i.artnr]).to.equal(undefined); seen[i.artnr] = true; });
+    var starts = items.map(function(i) { return i.artnr.toUpperCase().indexOf("SIKTA") === 0; });
+    expect(starts.indexOf(true)).to.not.equal(-1);   /* artnr leg hits */
+    expect(starts.indexOf(false)).to.not.equal(-1);  /* x-ref leg hits (e.g. ALC.HK-HG-25@13-10-D2.5-21-1g-1-ASM, x-ref SIKTA.D25-10) */
+    expect(starts.lastIndexOf(true)).to.be.lessThan(starts.indexOf(false));
+  });
+}
+
+docs {
+  Page 2 of the "SIKTA" search (pageSize 200) spans the boundary between
+  leg A (artnr BEGINS SIKTA) and leg B (x-ref-only hits). Paging is one
+  continuous sequence. Depends on LunaNew data (> 200 SIKTA* artnrs).
+}

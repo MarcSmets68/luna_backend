@@ -1,0 +1,35 @@
+meta {
+  name: ListArtnrXrefBlockedExcluded
+  type: http
+  seq: 30
+}
+
+get {
+  url: {{baseUrl}}/web/artikel?artnr=SIKTA.S.B&geblokkeerd=false&pageSize=20
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("geblokkeerd=false excludes blocked articles matched via x-ref", function() {
+    var arts = res.body.items.map(function(i) { return i.artnr; });
+    expect(arts.length).to.be.greaterThan(0);
+    res.body.items.forEach(function(i) { expect(i.geblokkeerd).to.equal(false); });
+    expect(arts).to.not.include("ROE.ROS-BRAC D40.V2");
+    expect(arts).to.not.include("ROE.ROS-BRAC D50");
+  });
+}
+
+docs {
+  x-ref SIKTA.S.B40 / SIKTA.S.B50 belong to blocked articles
+  ROE.ROS-BRAC D40.V2 / D50 (LunaNew); with geblokkeerd=true they are the
+  only hits, with geblokkeerd=false they must be absent.
+}

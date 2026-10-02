@@ -1,0 +1,39 @@
+meta {
+  name: ListArtnrXrefMatch
+  type: http
+  seq: 24
+}
+
+get {
+  url: {{baseUrl}}/web/artikel?artnr=SIKTA.S40.C.21&geblokkeerd=false&pageSize=10
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("artnr also matches artikel.x-ref (4L-code) - exactly one hit, x-ref not exposed", function() {
+    expect(res.body.items.length).to.equal(1);
+    var i = res.body.items[0];
+    expect(i.artnr).to.equal("ROE.SIKTA40.COAT.ANO BLACK");
+    expect(i.verkoopprijs).to.equal(33);
+    expect(i.aankoopprijs).to.equal(6.5);
+    expect(i.voorraad).to.equal(293);
+    expect(i).to.not.have.property("xRef");
+    expect(i).to.not.have.property("x-ref");
+  });
+}
+
+docs {
+  `artnr` also matches `artikel.x-ref` (legacy "4L-code") via
+  `x-ref CONTAINS "<artnr>*"` (word index artikel-x13), like legacy
+  ZkArtikel.w. Real-data fixture in LunaNew: x-ref SIKTA.S40.C.21 belongs
+  to artnr ROE.SIKTA40.COAT.ANO BLACK.
+}

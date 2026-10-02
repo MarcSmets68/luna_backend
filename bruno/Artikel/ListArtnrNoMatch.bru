@@ -1,0 +1,30 @@
+meta {
+  name: ListArtnrNoMatch
+  type: http
+  seq: 29
+}
+
+get {
+  url: {{baseUrl}}/web/artikel?artnr=ZZZNOMATCH123&pageSize=10
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("no artnr/x-ref match gives empty list", function() {
+    expect(res.body.items.length).to.equal(0);
+    expect(res.body.hasMore).to.equal(false);
+  });
+}
+
+docs {
+  Neither artnr nor x-ref matches.
+}
