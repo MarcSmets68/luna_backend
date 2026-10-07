@@ -264,6 +264,7 @@ CLASS Luna.BusinessLogic.LakproductieBE:
         INITIAL "NOMALED.SPECIAL PRODUCTION":u.
     DEFINE PRIVATE VARIABLE cSpecialProductionGroep AS CHARACTER NO-UNDO
         INITIAL "Special Production":u.
+    DEFINE PRIVATE VARIABLE iVmUnresolvedRows AS INTEGER NO-UNDO INITIAL 0.
 
     /*------------------------------------------------------------------------------
         Purpose: Orchestrator - builds all 3 sources into one flat
@@ -277,6 +278,7 @@ CLASS Luna.BusinessLogic.LakproductieBE:
         DEFINE VARIABLE hVerkoopBuf     AS HANDLE                     NO-UNDO.
 
         EMPTY TEMP-TABLE ttLakproductieLine.
+        iVmUnresolvedRows = 0.
 
         /* Rolling sales figures - computed once, shared by all 3 sources
            below. Consumed through a dynamic buffer since ttVerkoop is
@@ -291,7 +293,40 @@ CLASS Luna.BusinessLogic.LakproductieBE:
 
         DELETE OBJECT hVerkoopBuf.
 
+        IF iVmUnresolvedRows GT 0 THEN
+            LogWarning(SUBSTITUTE("led_VeroMetal unavailable; VM kleurkodes returned unresolved (&1 rows)":u, iVmUnresolvedRows)).
+
         RETURN TEMP-TABLE ttLakproductieLine:HANDLE.
+
+    END METHOD.
+
+    /*------------------------------------------------------------------------------
+        Purpose: Appends a timestamped WARN line to the Lakproduktie refresh
+                 log (same file as LakproductieCacheService:LogError).
+                 Best-effort: never throws - any I/O error is swallowed.
+    ------------------------------------------------------------------------------*/
+    METHOD PRIVATE VOID LogWarning( INPUT pcMessage AS CHARACTER ):
+
+        DEFINE VARIABLE cLogFile AS CHARACTER NO-UNDO
+            INITIAL "C:\LunaWEB - workspace\Backend\cache\lakproductie-cache-refresh.log":u.
+
+        DEFINE VARIABLE lOpened AS LOGICAL NO-UNDO INITIAL FALSE.
+
+        DO ON ERROR UNDO, LEAVE:
+            OUTPUT TO VALUE(cLogFile) APPEND.
+            lOpened = TRUE.
+            PUT UNFORMATTED
+                SUBSTITUTE("[&1] WARN &2":u, ISO-DATE(NOW), pcMessage) SKIP.
+
+            CATCH oError AS Progress.Lang.Error:
+                /* swallow - logging must never break a request */
+            END CATCH.
+
+            FINALLY:
+                IF lOpened THEN
+                    OUTPUT CLOSE.
+            END FINALLY.
+        END.
 
     END METHOD.
 
@@ -987,9 +1022,12 @@ CLASS Luna.BusinessLogic.LakproductieBE:
                  (kleursoort;kleurkode;afwerking;techniek) into the 4
                  output fields, resolving techniek/afwerking/kleurkode
                  against the led_laktechniek/led_kleurafwerking/led_SC/
-                 led_SP/led_VeroMetal reference tables exactly as the
-                 legacy .p does. All 4 outputs are "" when pcKleurKodes
-                 doesn't split into exactly 4 entries.
+                 led_SP reference tables exactly as the legacy .p does.
+                 All 4 outputs are "" when pcKleurKodes doesn't split
+                 into exactly 4 entries.
+        Notes  : The VM kleurkode lookup is currently skipped (its
+                 reference table is missing in LunaNew); VM kleurkodes
+                 are returned unresolved and counted in iVmUnresolvedRows.
     ------------------------------------------------------------------------------*/
     METHOD PRIVATE VOID ResolveKleur(
         INPUT  pcKleurKodes AS CHARACTER,
@@ -1002,7 +1040,6 @@ CLASS Luna.BusinessLogic.LakproductieBE:
         DEFINE BUFFER bfLedKleurafwerking FOR led_kleurafwerking.
         DEFINE BUFFER bfLedSc             FOR led_SC.
         DEFINE BUFFER bfLedSp             FOR led_SP.
-        DEFINE BUFFER bfLedVeroMetal      FOR led_VeroMetal.
 
         IF NUM-ENTRIES(pcKleurKodes, ";":u) EQ 4 THEN DO:
 
@@ -1070,9 +1107,10 @@ CLASS Luna.BusinessLogic.LakproductieBE:
                     END.
                 END.
                 WHEN "VM":u THEN DO:
-                    FIND FIRST bfLedVeroMetal NO-LOCK WHERE bfLedVeroMetal.kode = pcKleurkode NO-ERROR.
-                    IF AVAILABLE bfLedVeroMetal THEN
-                        pcKleurkode = bfLedVeroMetal.omschrijving.
+                    /* VM kleurkode lookup intentionally skipped: table
+                       led_VeroMetal does not exist in LunaNew and no schema
+                       change is allowed. Kleurkode is returned unresolved. */
+                    iVmUnresolvedRows = iVmUnresolvedRows + 1.
 
                     IF pcAfwerking EQ "X":u THEN
                         pcAfwerking = "":u.
