@@ -38,7 +38,7 @@
   <Actions Context="Author">
     <Exec>
       <Command>powershell.exe</Command>
-      <Arguments>-NoProfile -ExecutionPolicy Bypass -File "C:\LunaWEB - workspace\Backend\scripts\RefreshLakproductieCache.ps1"</Arguments>
+      <Arguments>-NoProfile -ExecutionPolicy Bypass -File "C:\LunaWEB - Workspace\luna_backend\scripts\RefreshLakproductieCache.ps1"</Arguments>
     </Exec>
   </Actions>
 </Task>
