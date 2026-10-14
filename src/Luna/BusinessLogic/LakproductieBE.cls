@@ -307,8 +307,18 @@ CLASS Luna.BusinessLogic.LakproductieBE:
     ------------------------------------------------------------------------------*/
     METHOD PRIVATE VOID LogWarning( INPUT pcMessage AS CHARACTER ):
 
-        DEFINE VARIABLE cLogFile AS CHARACTER NO-UNDO
-            INITIAL "C:\LunaWEB - workspace\Backend\cache\lakproductie-cache-refresh.log":u.
+        DEFINE VARIABLE cLogFile AS CHARACTER NO-UNDO.
+        DEFINE VARIABLE cSelf    AS CHARACTER NO-UNDO.
+        DEFINE VARIABLE iIdx     AS INTEGER   NO-UNDO.
+
+        cSelf = SEARCH("Luna/BusinessLogic/LakproductieBE.r":u).
+        IF cSelf EQ ? THEN
+            cSelf = SEARCH("Luna/BusinessLogic/LakproductieBE.cls":u).
+        iIdx = IF cSelf EQ ? THEN 0
+               ELSE MAX(R-INDEX(cSelf, "\build\":u), R-INDEX(cSelf, "\src\":u)).
+        cLogFile = (IF iIdx GT 1 THEN SUBSTRING(cSelf, 1, iIdx - 1)
+                    ELSE "C:\LunaWEB - Workspace\luna_backend":u)
+                 + "\cache\lakproductie-cache-refresh.log":u.
 
         DEFINE VARIABLE lOpened AS LOGICAL NO-UNDO INITIAL FALSE.
 

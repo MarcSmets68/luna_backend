@@ -433,6 +433,34 @@ file instead of waiting on the live query.
   scheduled refresh fails) — an accepted tradeoff for this feature, not a
   bug.
 
+## Omzetanalyse dealers cache
+`GET /web/rapportage/omzetanalyse-dealers` recomputes the full analysis
+live on every request (~20s for the five-year DNOM dealer scan). The
+dashboard page always fires one canned request — `soort=DNOM,
+perDealer=true, leegRijen=false, inclusiefZonderOmzet=true`, no dates or
+klnr — which `RapportageHandler` now serves from an on-disk cache
+(`Luna.BusinessLogic.OmzetanalyseDealersCacheService`), modelled on the
+Lakproduktie cache above. Every other parameter combination still
+computes live.
+
+- **Cache file**: `cache/omzetanalyse-dealers-dnom.json` under the backend
+  root (gitignored — generated at runtime). The location is resolved from
+  the class's own `.r`/`.cls` on PROPATH, so it follows wherever the
+  checkout lives.
+- **Refresh**: `scripts/RefreshOmzetanalyseDealersCache.ps1` wraps
+  `scripts/RefreshOmzetanalyseDealersCache.p` (standalone `_progres -b`
+  batch client against the same `LunaNew` db), meant to run every 5
+  minutes as `Luna-RefreshOmzetanalyseDealersCache-task.xml` — same
+  mechanism as the Lakproduktie cache. Writes are atomic (`.tmp` +
+  rename); a failed refresh is logged to
+  `cache/omzetanalyse-dealers-refresh.log` and leaves the previous
+  snapshot in place.
+- **Freshness guard**: unlike the Lakproduktie cache, a cache file older
+  than ~6 minutes is recomputed on read — so the report stays fresh even
+  when the scheduled task isn't registered, at the cost of one slow
+  request. `generatedAt` in the response reflects the snapshot time, not
+  the request time.
+
 ## Artikel CRUD (`/web/artikel`)
 Full CRUD over a curated core subset of the `artikel` table (~120 fields in
 total; only identification, description, pricing, stock, supplier and

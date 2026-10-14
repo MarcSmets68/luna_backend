@@ -28,6 +28,7 @@ USING Progress.Json.ObjectModel.JsonArray.
 USING Progress.Json.ObjectModel.ObjectModelParser.
 USING Luna.BusinessLogic.VerkoopFurBE.
 USING Luna.BusinessLogic.OmzetanalyseDealersBE.
+USING Luna.BusinessLogic.OmzetanalyseDealersCacheService.
 USING Luna.Web.Util.QueryParamHelper.
 
 BLOCK-LEVEL ON ERROR UNDO, THROW.
@@ -414,6 +415,26 @@ CLASS Luna.Web.RapportageHandler INHERITS WebHandler:
         IF NOT TryParseBool(cInclZonder, FALSE, OUTPUT lInclZonder) THEN
         DO:
             WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest), "Ongeldige inclusiefZonderOmzet - verwacht true of false":u).
+            RETURN.
+        END.
+
+        /* The dashboard page always fires one canned request (JAREN mode,
+           soort DNOM, per dealer, no empty rows, seeded zero-omzet dealers)
+           whose live scan takes ~20s - serve it from the file cache that the
+           scheduled refresh keeps warm. Every other combination computes
+           live as before. */
+        IF dVan EQ ? AND dTot EQ ? AND iKlnr EQ ?
+           AND cSoort EQ "DNOM":u
+           AND lPerDealer EQ TRUE AND lLeeg EQ FALSE AND lInclZonder EQ TRUE THEN
+        DO:
+            DEFINE VARIABLE oCacheService AS OmzetanalyseDealersCacheService NO-UNDO.
+            DEFINE VARIABLE oCached       AS JsonObject                    NO-UNDO.
+            oCacheService = NEW OmzetanalyseDealersCacheService().
+            oCached       = oCacheService:GetReport().
+            oBody         = ShapeOmzetanalyse(oCached:GetJsonObject("data":u)).
+            /* generatedAt reflects the cache-refresh time, not request time. */
+            oBody:Add("generatedAt":u, oCached:GetCharacter("generatedAt":u)).
+            WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oBody).
             RETURN.
         END.
 

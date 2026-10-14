@@ -49,10 +49,43 @@ BLOCK-LEVEL ON ERROR UNDO, THROW.
 
 CLASS Luna.BusinessLogic.LakproductieCacheService:
 
-    DEFINE PRIVATE VARIABLE cCacheDir  AS CHARACTER NO-UNDO INITIAL "C:\LunaWEB - workspace\Backend\cache\":u.
-    DEFINE PRIVATE VARIABLE cCacheFile AS CHARACTER NO-UNDO INITIAL "C:\LunaWEB - workspace\Backend\cache\lakproductie-cache.json":u.
-    DEFINE PRIVATE VARIABLE cTmpFile   AS CHARACTER NO-UNDO INITIAL "C:\LunaWEB - workspace\Backend\cache\lakproductie-cache.json.tmp":u.
-    DEFINE PRIVATE VARIABLE cLogFile   AS CHARACTER NO-UNDO INITIAL "C:\LunaWEB - workspace\Backend\cache\lakproductie-cache-refresh.log":u.
+    /* Resolved in the constructor from this class's own location on
+       PROPATH, so the cache follows whichever backend checkout PASOE and
+       the batch refresh actually run from. */
+    DEFINE PRIVATE VARIABLE cCacheDir  AS CHARACTER NO-UNDO.
+    DEFINE PRIVATE VARIABLE cCacheFile AS CHARACTER NO-UNDO.
+    DEFINE PRIVATE VARIABLE cTmpFile   AS CHARACTER NO-UNDO.
+    DEFINE PRIVATE VARIABLE cLogFile   AS CHARACTER NO-UNDO.
+
+    CONSTRUCTOR PUBLIC LakproductieCacheService():
+
+        DEFINE VARIABLE cSelf AS CHARACTER NO-UNDO.
+        DEFINE VARIABLE cRoot AS CHARACTER NO-UNDO.
+        DEFINE VARIABLE iIdx  AS INTEGER   NO-UNDO.
+
+        cSelf = SEARCH("Luna/BusinessLogic/LakproductieCacheService.r":u).
+        IF cSelf EQ ? THEN
+            cSelf = SEARCH("Luna/BusinessLogic/LakproductieCacheService.cls":u).
+
+        IF cSelf NE ? THEN
+        DO:
+            iIdx = MAX(R-INDEX(cSelf, "\build\":u),
+                       R-INDEX(cSelf, "\src\":u)).
+            IF iIdx GT 1 THEN
+                cRoot = SUBSTRING(cSelf, 1, iIdx - 1).
+        END.
+
+        IF cRoot EQ ? OR cRoot EQ "":u THEN
+            cRoot = "C:\LunaWEB - Workspace\luna_backend":u.
+
+        ASSIGN
+            cCacheDir  = cRoot + "\cache\":u
+            cCacheFile = cCacheDir + "lakproductie-cache.json":u
+            cTmpFile   = cCacheDir + "lakproductie-cache.json.tmp":u
+            cLogFile   = cCacheDir + "lakproductie-cache-refresh.log":u
+            .
+
+    END CONSTRUCTOR.
 
     /*------------------------------------------------------------------------------
         Purpose: Returns the current Lakproduktie overview - from the
@@ -221,12 +254,25 @@ CLASS Luna.BusinessLogic.LakproductieCacheService:
     ------------------------------------------------------------------------------*/
     METHOD PRIVATE VOID LogError( INPUT pcMessage AS CHARACTER ):
 
-        EnsureCacheDir().
+        DEFINE VARIABLE lOpened AS LOGICAL NO-UNDO INITIAL FALSE.
 
-        OUTPUT TO VALUE(cLogFile) APPEND.
-        PUT UNFORMATTED
-            SUBSTITUTE("[&1] &2":u, ISO-DATE(NOW), pcMessage) SKIP.
-        OUTPUT CLOSE.
+        DO ON ERROR UNDO, LEAVE:
+            EnsureCacheDir().
+
+            OUTPUT TO VALUE(cLogFile) APPEND.
+            lOpened = TRUE.
+            PUT UNFORMATTED
+                SUBSTITUTE("[&1] &2":u, ISO-DATE(NOW), pcMessage) SKIP.
+
+            CATCH oError AS Progress.Lang.Error:
+                /* swallow - logging must never break a request */
+            END CATCH.
+
+            FINALLY:
+                IF lOpened THEN
+                    OUTPUT CLOSE.
+            END FINALLY.
+        END.
 
     END METHOD.
 

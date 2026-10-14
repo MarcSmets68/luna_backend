@@ -2,8 +2,9 @@
 build/
 compile_output.log
 
-# Runtime cache + refresh logs for the Lakproduktie overview (see
-# Luna.BusinessLogic.LakproductieCacheService / scripts/RefreshLakproductieCache.ps1)
-# - generated at runtime, not source of truth.
+# Runtime cache + refresh logs for the Lakproduktie overview and the
+# Omzetanalyse dealers dashboard (see Luna.BusinessLogic.*CacheService /
+# scripts/Refresh*.ps1) - generated at runtime, not source of truth.
 cache/
 scripts/RefreshLakproductieCache.log
+scripts/RefreshOmzetanalyseDealersCache.log
