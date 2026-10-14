@@ -12,13 +12,21 @@ DEFINE VARIABLE iNumFiles   AS INTEGER   NO-UNDO INITIAL 0.
 DEFINE VARIABLE iNumErrors  AS INTEGER   NO-UNDO INITIAL 0.
 
 DEFINE VARIABLE cSaveDir AS CHARACTER NO-UNDO.
+DEFINE VARIABLE cNetLib  AS CHARACTER NO-UNDO.
+
+/* OE 12.8+ ships the HTTP/WebHandler library as OpenEdge.Net.apl;
+   OE 12.2 still ships it as OpenEdge.Net.pl. Pick whichever exists. */
+cNetLib = OS-GETENV("DLC":u) + "/tty/netlib/OpenEdge.Net.apl":u.
+FILE-INFO:FILE-NAME = cNetLib.
+IF FILE-INFO:FULL-PATHNAME = ? THEN
+    cNetLib = OS-GETENV("DLC":u) + "/tty/netlib/OpenEdge.Net.pl":u.
 
 ASSIGN
     cSrcDir   = ENTRY(1, SESSION:PARAMETER, ";")
     cBuildDir = ENTRY(2, SESSION:PARAMETER, ";")
     PROPATH   = cSrcDir + ",":u
               + OS-GETENV("DLC":u) + "/tty,":u
-              + OS-GETENV("DLC":u) + "/tty/netlib/OpenEdge.Net.apl,":u
+              + cNetLib + ",":u
               + PROPATH
     .
 
