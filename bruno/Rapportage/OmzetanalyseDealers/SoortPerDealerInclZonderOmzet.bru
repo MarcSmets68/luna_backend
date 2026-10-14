@@ -1,0 +1,26 @@
+meta {
+  name: SoortPerDealerInclZonderOmzet
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/web/rapportage/omzetanalyse-dealers?soort=DNOM&perDealer=true&inclusiefZonderOmzet=true
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.filters.perDealer: eq true
+  res.body.filters.inclusiefZonderOmzet: eq true
+  res.body.secties: isArray
+}
+
+docs {
+  Seeds a section per non-blocked klant of the soort even without revenue; seeded zero-activity sections have categorieen: []. Section count must be >= GetSoortPerDealer (same soort).
+}

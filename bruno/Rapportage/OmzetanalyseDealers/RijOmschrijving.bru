@@ -1,0 +1,24 @@
+meta {
+  name: RijOmschrijving
+  type: http
+  seq: 14
+}
+
+get {
+  url: {{baseUrl}}/web/rapportage/omzetanalyse-dealers?klnr=14644&datumVan=2026-01-01
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.secties[0].categorieen[0].rijen[0].omschrijving: isDefined
+}
+
+docs {
+  rijen[].omschrijving = artikel.omschr-n for exact-match rows; null for swBegins rows and the Nomacurve spec.
+}

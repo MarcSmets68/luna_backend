@@ -1,0 +1,25 @@
+meta {
+  name: PerDealerZonderFilter400
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/web/rapportage/omzetanalyse-dealers?perDealer=true
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.code: eq 400
+  res.body.error.message: contains soort- of klantfilter
+}
+
+docs {
+  perDealer=true without soort or klnr would be an unbounded all-dealers/all-time query -> 400.
+}

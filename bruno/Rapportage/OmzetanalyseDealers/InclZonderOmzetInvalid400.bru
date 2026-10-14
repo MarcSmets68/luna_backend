@@ -1,0 +1,23 @@
+meta {
+  name: InclZonderOmzetInvalid400
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{baseUrl}}/web/rapportage/omzetanalyse-dealers?soort=DNOM&perDealer=true&inclusiefZonderOmzet=maybe
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 400
+}
+
+docs {
+  inclusiefZonderOmzet must be true or false.
+}

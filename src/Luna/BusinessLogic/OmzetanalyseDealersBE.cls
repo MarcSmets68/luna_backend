@@ -7,7 +7,8 @@
                   GET /rapportage/omzetanalyse-dealers
                   GET /rapportage/omzetanalyse-dealers/soorten
     Description : Owns all DB access + business rules for this report. See
-                  docs/backend/omzetanalyse-dealers.md for the contract.
+                  the Bruno collection (bruno/Rapportage/OmzetanalyseDealers)
+                  for the contract.
                   Rules implemented (Marc-confirmed, legacy-exact):
                   1. Rows come from led_lijstparameters (primary index order).
                      artnr "" = category title, "m"/"st" = unit marker for the
@@ -29,6 +30,13 @@
                      "Cover" with art_cover.licht; aantal only.
                   7. Soort filter = klant.soort (not bon.soort).
                   8. Growth vs next (older) column, JAREN mode only.
+                  9. perDealer requires soort or klnr (else 400). Section key =
+                     bon klnr; soort is not required for grouping.
+                  10. inclusiefZonderOmzet (perDealer only): seeds sections for
+                     klant.soort = soort (non-blocked) or the requested klnr, even
+                     without lines. Seeded no-activity sections never carry categories.
+                  11. rijen[].omschrijving = artikel.omschr-n of the resolved artikel
+                     for exact-match rows; null for swBegins rows and the Nomacurve spec.
                   Performance: one indexed bonlijn scan per DISTINCT match
                   pattern (bonlijn-x2), each line bucketed in-loop via a cached
                   bon lookup (bon.datum has no index).
@@ -64,6 +72,7 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
         FIELD soortOmschr AS CHARACTER SERIALIZE-NAME "soortOmschr":u
         FIELD perDealer   AS LOGICAL   SERIALIZE-NAME "perDealer":u
         FIELD leegRijen   AS LOGICAL   SERIALIZE-NAME "leegRijen":u
+        FIELD inclusiefZonderOmzet AS LOGICAL SERIALIZE-NAME "inclusiefZonderOmzet":u
         INDEX idxPk IS PRIMARY analyseId.
 
     DEFINE TEMP-TABLE ttKolom NO-UNDO SERIALIZE-NAME "kolommen":u
@@ -91,6 +100,7 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
         FIELD catId    AS INTEGER SERIALIZE-HIDDEN
         FIELD rijId    AS INTEGER SERIALIZE-HIDDEN
         FIELD artnr    AS CHARACTER SERIALIZE-NAME "artnr":u
+        FIELD omschrijving AS CHARACTER SERIALIZE-NAME "omschrijving":u
         FIELD swBegins AS LOGICAL   SERIALIZE-NAME "swBegins":u
         FIELD eenheid  AS CHARACTER SERIALIZE-NAME "eenheid":u
         INDEX idxPk IS PRIMARY catId rijId.
@@ -183,6 +193,7 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
         FIELD artnr     AS CHARACTER
         FIELD swBegins  AS LOGICAL
         FIELD eenheid   AS CHARACTER
+        FIELD omschr    AS CHARACTER
         INDEX idxPk IS PRIMARY UNIQUE specId
         INDEX idxCat catNr specId.
 
@@ -283,6 +294,7 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
     DEFINE PRIVATE VARIABLE cSoortF      AS CHARACTER NO-UNDO.
     DEFINE PRIVATE VARIABLE lDealerMode  AS LOGICAL   NO-UNDO.
     DEFINE PRIVATE VARIABLE lLeegRijen   AS LOGICAL   NO-UNDO.
+    DEFINE PRIVATE VARIABLE lInclZonder  AS LOGICAL   NO-UNDO.
     DEFINE PRIVATE VARIABLE iSeqSectie   AS INTEGER   NO-UNDO.
     DEFINE PRIVATE VARIABLE iSeqCat      AS INTEGER   NO-UNDO.
     DEFINE PRIVATE VARIABLE iSeqRij      AS INTEGER   NO-UNDO.
@@ -319,7 +331,8 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
                                      INPUT piKlnr      AS INTEGER,
                                      INPUT pcSoort     AS CHARACTER,
                                      INPUT plPerDealer AS LOGICAL,
-                                     INPUT plLeegRijen AS LOGICAL ):
+                                     INPUT plLeegRijen AS LOGICAL,
+                                     INPUT plInclZonderOmzet AS LOGICAL ):
 
         DEFINE VARIABLE cSoortOmschr AS CHARACTER NO-UNDO.
         DEFINE VARIABLE cKlantNaam   AS CHARACTER NO-UNDO.
@@ -339,12 +352,16 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
                 cSoortOmschr = soort.omschr.
         END.
 
+        IF plPerDealer EQ TRUE AND cSoortF EQ ? AND piKlnr EQ ? THEN
+            UNDO, THROW NEW Progress.Lang.AppError("perDealer vereist een soort- of klantfilter":u, 400).
+
         ASSIGN
             dFiltVan    = pdVan
             dFiltTot    = pdTot
             iKlnrF      = piKlnr
             lLeegRijen  = (plLeegRijen NE FALSE)
-            lDealerMode = (plPerDealer EQ TRUE AND cSoortF NE ?)
+            lDealerMode = (plPerDealer EQ TRUE)
+            lInclZonder = (plPerDealer EQ TRUE AND plInclZonderOmzet EQ TRUE)
             lJaren      = (pdVan EQ ? AND pdTot EQ ?)
             iYearNow    = YEAR(TODAY)
             iNCols      = (IF lJaren THEN 5 ELSE 1)
@@ -398,7 +415,8 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
             ttFilter.soort       = cSoortF
             ttFilter.soortOmschr = (IF cSoortF NE ? THEN cSoortOmschr ELSE ?)
             ttFilter.perDealer   = lDealerMode
-            ttFilter.leegRijen   = lLeegRijen.
+            ttFilter.leegRijen   = lLeegRijen
+            ttFilter.inclusiefZonderOmzet = lInclZonder.
 
         IF lJaren THEN
         DO iYr = 0 TO 4:
@@ -422,6 +440,7 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
         LoadSpecs().
         ScanPatterns().
         ScanMeters().
+        IF lInclZonder THEN SeedDealers().
         BuildOutput().
 
         RETURN DATASET dsOmzetanalyse:HANDLE.
@@ -455,6 +474,7 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
         DEFINE VARIABLE cUnit    AS CHARACTER NO-UNDO.
         DEFINE VARIABLE cArtnr   AS CHARACTER NO-UNDO.
         DEFINE VARIABLE cMatchArtnr AS CHARACTER NO-UNDO.
+        DEFINE VARIABLE cOmschr  AS CHARACTER NO-UNDO.
         DEFINE VARIABLE iCatNr   AS INTEGER   NO-UNDO.
         DEFINE VARIABLE iSpecId  AS INTEGER   NO-UNDO.
 
@@ -473,7 +493,8 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
                     ttCat.catNaam = led_lijstparameters.categorie.
             END.
 
-            cArtnr = TRIM(led_lijstparameters.artnr).
+            cArtnr  = TRIM(led_lijstparameters.artnr).
+            cOmschr = ?.
 
             /* Title row: the category name itself is carried by ttCat. */
             IF cArtnr EQ "":u THEN NEXT.
@@ -498,6 +519,8 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
                     FIND FIRST artikel NO-LOCK WHERE artikel.x-ref EQ cArtnr NO-ERROR.
                 IF NOT AVAILABLE artikel THEN NEXT.
                 cMatchArtnr = artikel.artnr.
+                IF TRIM(artikel.omschr-n) NE "":u THEN
+                    cOmschr = TRIM(artikel.omschr-n).
             END.
 
             iSpecId = iSpecId + 1.
@@ -506,6 +529,7 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
                 ttSpec.specId   = iSpecId
                 ttSpec.catNr    = iCatNr
                 ttSpec.artnr    = cArtnr
+                ttSpec.omschr   = (IF cArtnr EQ cNomacurveArtnr THEN ? ELSE cOmschr)
                 ttSpec.swBegins = led_lijstparameters.swBegins
                 ttSpec.eenheid  = cUnit.
 
@@ -954,6 +978,38 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
 
     END METHOD.
 
+    /*------------------------------------------------------------------------------
+        Purpose: inclusiefZonderOmzet: seeds a section per matching klant even
+                 without any bon lines (soort non-blocked, or the requested klnr).
+    ------------------------------------------------------------------------------*/
+    METHOD PRIVATE VOID SeedDealers():
+
+        IF iKlnrF NE ? THEN
+        DO:
+            FIND FIRST klant NO-LOCK WHERE klant.klnr EQ iKlnrF NO-ERROR.
+            IF AVAILABLE klant AND (cSoortF EQ ? OR klant.soort EQ cSoortF) THEN
+                SeedOne(klant.klnr, klant.naam).
+        END.
+        ELSE
+        DO:
+            FOR EACH klant NO-LOCK WHERE klant.soort EQ cSoortF AND klant.blokkeren EQ FALSE:
+                SeedOne(klant.klnr, klant.naam).
+            END.
+        END.
+
+    END METHOD.
+
+    METHOD PRIVATE VOID SeedOne( INPUT piKlnr AS INTEGER, INPUT pcNaam AS CHARACTER ):
+
+        IF CAN-FIND(ttSectKey WHERE ttSectKey.sk EQ piKlnr) THEN RETURN.
+
+        CREATE ttSectKey.
+        ASSIGN
+            ttSectKey.sk     = piKlnr
+            ttSectKey.skNaam = (IF pcNaam EQ ? THEN "":u ELSE pcNaam).
+
+    END METHOD.
+
     METHOD PRIVATE VOID BuildSection( INPUT piSk AS INTEGER, INPUT piKlnr AS INTEGER, INPUT pcNaam AS CHARACTER ):
 
         DEFINE VARIABLE iSectieId  AS INTEGER   NO-UNDO.
@@ -963,6 +1019,14 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
         DEFINE VARIABLE cUnit      AS CHARACTER NO-UNDO.
         DEFINE VARIABLE lMixed     AS LOGICAL   NO-UNDO.
         DEFINE VARIABLE i          AS INTEGER   NO-UNDO.
+        DEFINE VARIABLE lToonLeeg  AS LOGICAL   NO-UNDO.
+
+        /* Per-dealer: empty rows/categories are only shown for sections that have
+           any activity; seeded zero-activity sections always carry no categories. */
+        lToonLeeg = lLeegRijen
+                    AND (NOT lDealerMode
+                         OR CAN-FIND(FIRST ttAgg WHERE ttAgg.sk EQ piSk AND ttAgg.lvl EQ 3)
+                         OR CAN-FIND(FIRST ttMeterAgg WHERE ttMeterAgg.sk EQ piSk)).
 
         iSeqSectie = iSeqSectie + 1.
         iSectieId  = iSeqSectie.
@@ -989,7 +1053,7 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
 
             FOR EACH ttSpec WHERE ttSpec.catNr EQ ttCat.catNr BY ttSpec.specId:
 
-                IF NOT lLeegRijen
+                IF NOT lToonLeeg
                    AND NOT CAN-FIND(FIRST ttAgg WHERE ttAgg.sk EQ piSk AND ttAgg.lvl EQ 1 AND ttAgg.scp EQ ttSpec.specId) THEN
                     NEXT.
 
@@ -1001,6 +1065,7 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
                     ttRij.catId    = iCatId
                     ttRij.rijId    = iSeqRij
                     ttRij.artnr    = ttSpec.artnr
+                    ttRij.omschrijving = ttSpec.omschr
                     ttRij.swBegins = ttSpec.swBegins
                     ttRij.eenheid  = ttSpec.eenheid.
 
@@ -1017,7 +1082,7 @@ CLASS Luna.BusinessLogic.OmzetanalyseDealersBE:
 
             END.
 
-            IF iRows EQ 0 AND NOT lLeegRijen THEN
+            IF iRows EQ 0 AND NOT lToonLeeg THEN
             DO:
                 DELETE ttCategorie.
                 NEXT.
