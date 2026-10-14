@@ -1,0 +1,26 @@
+meta {
+  name: PerDealerKlnr
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/web/rapportage/omzetanalyse-dealers?klnr=14644&perDealer=true&leegRijen=false
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.filters.perDealer: eq true
+  res.body.secties.length: eq 1
+  res.body.secties[0].dealerKlnr: eq 14644
+}
+
+docs {
+  Per-dealer mode with only a klnr filter (no soort). Fixture klnr 14644 as in GetKlnr.bru; validate against real data.
+}

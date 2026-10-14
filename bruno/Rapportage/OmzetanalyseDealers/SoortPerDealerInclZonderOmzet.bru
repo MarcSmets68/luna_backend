@@ -1,0 +1,40 @@
+meta {
+  name: SoortPerDealerInclZonderOmzet
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/web/rapportage/omzetanalyse-dealers?soort=DNOM&perDealer=true&inclusiefZonderOmzet=true&leegRijen=false
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.filters.perDealer: eq true
+  res.body.filters.inclusiefZonderOmzet: eq true
+  res.body.secties: isArray
+  res.body.secties.length: gte 38
+}
+
+tests {
+  test("seeded zero-revenue dealer 14807 has categorieen: []", function () {
+    const s = res.body.secties.find((x) => x.dealerKlnr === 14807);
+    expect(s).to.not.equal(undefined);
+    expect(s.categorieen).to.eql([]);
+  });
+  test("dealers with revenue still carry categories", function () {
+    const withCats = res.body.secties.filter((x) => x.categorieen.length > 0);
+    expect(withCats.length).to.be.greaterThan(0);
+  });
+}
+
+docs {
+  Seeds a section per non-blocked klant of the soort even without revenue; seeded zero-activity sections have categorieen: [].
+  Live data (LunaNew, 2026-10-14): GetSoortPerDealer (same soort, no seeding) returns 38 sections; with inclusiefZonderOmzet=true 42 (extra: klnr 14807, 14726, 13788, 14431, all categorieen: []). Fixture dealer 14807 (Accuraat) has no revenue in the 5-year window. The >= 38 assert is a floor, not an exact count, so new revenue-bearing dealers don't break it.
+}

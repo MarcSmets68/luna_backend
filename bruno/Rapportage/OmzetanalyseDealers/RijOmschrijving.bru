@@ -1,0 +1,41 @@
+meta {
+  name: RijOmschrijving
+  type: http
+  seq: 14
+}
+
+get {
+  url: {{baseUrl}}/web/rapportage/omzetanalyse-dealers?klnr=14644&datumVan=2026-01-01
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.secties[0].categorieen[0].rijen[0].omschrijving: isDefined
+}
+
+tests {
+  const rijen = () => res.body.secties.flatMap((s) => s.categorieen.flatMap((c) => c.rijen));
+  test("exact-match artnr NOMALED.1D.00.A has a non-empty omschrijving", function () {
+    const r = rijen().find((x) => x.artnr === "NOMALED.1D.00.A");
+    expect(r).to.not.equal(undefined);
+    expect(r.swBegins).to.equal(false);
+    expect(r.omschrijving).to.be.a("string");
+    expect(r.omschrijving.length).to.be.greaterThan(0);
+  });
+  test("swBegins prefix rows have omschrijving null", function () {
+    const sw = rijen().filter((x) => x.swBegins === true);
+    expect(sw.length).to.be.greaterThan(0);
+    sw.forEach((x) => expect(x.omschrijving).to.equal(null));
+  });
+}
+
+docs {
+  rijen[].omschrijving = artikel.omschr-n for exact-match rows; null for swBegins rows and the Nomacurve spec (NOMALED.NTX.00.BRUT-T4).
+  Live data (LunaNew, 2026-10-14): NOMALED.1D.00.A -> "1D LED profiel 30,2x41mm ANO per meter (zonder toebehoren) EINDE"; swBegins rows e.g. AIMER., NOMALED.FUR1.2700 -> null. Some exact rows are also null when the artikel has no omschr-n or no artikel match.
+}

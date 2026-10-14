@@ -350,6 +350,8 @@ CLASS Luna.Web.RapportageHandler INHERITS WebHandler:
         DEFINE VARIABLE cSoort      AS CHARACTER  NO-UNDO.
         DEFINE VARIABLE cPerDealer  AS CHARACTER  NO-UNDO.
         DEFINE VARIABLE cLeeg       AS CHARACTER  NO-UNDO.
+        DEFINE VARIABLE cInclZonder AS CHARACTER  NO-UNDO.
+        DEFINE VARIABLE lInclZonder AS LOGICAL    NO-UNDO.
         DEFINE VARIABLE dVan        AS DATE       NO-UNDO.
         DEFINE VARIABLE dTot        AS DATE       NO-UNDO.
         DEFINE VARIABLE iKlnr       AS INTEGER    NO-UNDO.
@@ -373,6 +375,7 @@ CLASS Luna.Web.RapportageHandler INHERITS WebHandler:
             cSoort     = QueryParamHelper:GetQueryValue(poRequest, "soort":u)
             cPerDealer = QueryParamHelper:GetQueryValue(poRequest, "perDealer":u)
             cLeeg      = QueryParamHelper:GetQueryValue(poRequest, "leegRijen":u)
+            cInclZonder = QueryParamHelper:GetQueryValue(poRequest, "inclusiefZonderOmzet":u)
             .
 
         IF NOT TryParseDate(cVan, OUTPUT dVan) THEN
@@ -408,9 +411,15 @@ CLASS Luna.Web.RapportageHandler INHERITS WebHandler:
             RETURN.
         END.
 
+        IF NOT TryParseBool(cInclZonder, FALSE, OUTPUT lInclZonder) THEN
+        DO:
+            WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest), "Ongeldige inclusiefZonderOmzet - verwacht true of false":u).
+            RETURN.
+        END.
+
         hResult = oService:GetAnalyse(dVan, dTot, iKlnr,
                                       (IF cSoort EQ "":u THEN ? ELSE cSoort),
-                                      lPerDealer, lLeeg).
+                                      lPerDealer, lLeeg, lInclZonder).
 
         oBody = ShapeOmzetanalyse(ResultHandleToJson(hResult)).
         oBody:Add("generatedAt":u, ISO-DATE(NOW)).
