@@ -16,3 +16,6 @@ __pycache__/
 # Raw API output / compile logs - may contain real customer data
 scripts/out*.json
 compile_out*.log
+
+# Machine-local PASOE environment variables (may contain the Gemini API key)
+scripts/luna-env.local

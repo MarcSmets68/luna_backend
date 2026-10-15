@@ -385,6 +385,18 @@ Bruno: every request sends `X-Auth-Token: {{authToken}}` (run `Auth/Login`
 first); each handler group has a `MissingAuthToken401` request that only
 passes with `AUTH_ENFORCE=true`.
 
+### PASOE environment variables (`scripts/luna-env.local`)
+`AUTH_ENFORCE`, `DEV_ENDPOINTS_ENABLED`, `AUTH_EVERYONE_ADMIN` and
+`GEMINI_API_KEY` are OS environment variables that the PASOE agents inherit
+from the process that starts the instance. `RestartPasoe.ps1`,
+`RestartMarcDev.ps1` and `start-luna-env.ps1` therefore dot-source
+`scripts/Load-LunaEnv.ps1`, which reads `scripts/luna-env.local` (one
+`NAME=VALUE` per line, gitignored, only these four names accepted, values
+never printed). Copy `scripts/luna-env.example` to `scripts/luna-env.local`
+and fill it in; a PASOE restart is needed for changes to apply. Starting
+PASOE by any other route (e.g. `tcman start` from a plain shell) does NOT
+load this file.
+
 ## Compiling (CLI workflow — no PDSOE/Eclipse)
 ```powershell
 $env:DLC = "C:\Progress\OpenEdge"

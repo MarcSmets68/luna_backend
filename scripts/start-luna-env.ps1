@@ -89,7 +89,9 @@ if (Test-PortOpen -HostName $remoteHost -Port $remotePort) {
     }
 }
 
-# 2. Start the MarcTest PASOE instance.
+# 2. Start the MarcTest PASOE instance. The agents inherit this
+#    process's environment, so load AUTH_ENFORCE/DEV_ENDPOINTS_ENABLED/GEMINI_API_KEY first.
+. "$PSScriptRoot\Load-LunaEnv.ps1"
 Write-Log "Starting MarcTest PASOE instance..."
 $tcman = Join-Path $pasoeHome "bin\tcman.bat"
 $output = & $tcman start 2>&1
