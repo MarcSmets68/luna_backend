@@ -1050,6 +1050,18 @@ in that doc's §1.4 and §1.5 - the `X-Auth-Token` header instead of
   Confirmed live; use `X-Auth-Token` for any future endpoint that needs to
   read an auth token from a header.
 
+### Login throttling (429)
+`AuthBE:Login` refuses a kode after 5 failed attempts within 15 minutes with
+`429` and a Dutch message ("Te veel mislukte inlogpogingen. Probeer het over
+N minuten opnieuw."). State lives in `Luna.BusinessLogic.LoginThrottle`: one
+append-only file per kode (SHA-256 of the upper-cased kode) in
+`cache/login-attempts/` (gitignored, shared by all PASOE agents, survives a
+restart, stale files swept automatically; I/O problems fail open). Failures
+are counted for existing and non-existing kodes alike and the check runs
+before the password check, so the response never reveals whether a kode
+exists. A successful login clears the counter; `403` (passief) is not counted.
+Password hashing proposal (not implemented): `docs/wachtwoord-hashing-voorstel.md`.
+
 ## AI Search (`/web/ai-search`)
 AI-powered natural-language search over bon/offerte/klant/artikel/factuur/
 bestelorder data, using Google Gemini for stage 1 (NL prompt -> structured
@@ -1064,7 +1076,7 @@ header for the full orchestration and the exact whitelist.
 **Config - `GEMINI_API_KEY`:** the Gemini API key is read from the
 `GEMINI_API_KEY` OS-environment variable by `Luna.BusinessLogic.
 GeminiGateway` (never hardcoded) - same pattern as `AUTH_EVERYONE_ADMIN` in
-`Luna.BusinessLogic.AuthBE`. Must be set in the environment the PASOE
+`Luna.BusinessLogic.AuthBE`. The key is sent in the `x-goog-api-key` request header (not as a `?key=` query parameter, so it never ends up in URLs/logs). Must be set in the environment the PASOE
 `MarcTest` agent process itself runs in (e.g. exported before `tcman
 start`) - a PASOE restart is required to pick up a new/changed key. If it's
 unset (or the Gemini call otherwise fails/times out - 8s timeout), stage 1

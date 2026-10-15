@@ -103,7 +103,7 @@ CLASS Luna.Web.LoginHandler INHERITS WebHandler:
 
     END METHOD.
 
-    /* Maps an AppError raised by AuthBE (400/401/403) to an HTTP status
+    /* Maps an AppError raised by AuthBE (400/401/403/429) to an HTTP status
        code, defaulting unrecognized codes to 500 so no ABL stack trace
        ever leaks to the client - same pattern as
        Luna.Web.KlantHandler:HandleAppError(). */
@@ -113,7 +113,7 @@ CLASS Luna.Web.LoginHandler INHERITS WebHandler:
 
         iStatus = poError:GetMessageNum(1).
 
-        IF LOOKUP(STRING(iStatus), "400,401,403":u) EQ 0 THEN
+        IF LOOKUP(STRING(iStatus), "400,401,403,429":u) EQ 0 THEN
             iStatus = INTEGER(StatusCodeEnum:InternalServerError).
 
         WriteErrorResponse(iStatus, poError:GetMessage(1)).

@@ -65,7 +65,7 @@ CLASS Luna.BusinessLogic.GeminiGateway:
        this feature. Model availability/naming on Gemini's side changes
        over time - if TranslateToIntent/GenerateSummary start failing
        again, check GET https://generativelanguage.googleapis.com/v1beta/
-       models?key=... for the current list of models supporting
+       models (header x-goog-api-key, never a ?key= query parameter) for the current list of models supporting
        generateContent before assuming the API key/network is at fault. */
     DEFINE PRIVATE VARIABLE cModel       AS CHARACTER NO-UNDO INITIAL "gemini-3.1-flash-lite":u.
     DEFINE PRIVATE VARIABLE cApiBase     AS CHARACTER NO-UNDO INITIAL "https://generativelanguage.googleapis.com/v1beta/models/":u.
@@ -121,7 +121,7 @@ CLASS Luna.BusinessLogic.GeminiGateway:
         IF cApiKey EQ ? OR TRIM(cApiKey) EQ "":u THEN
             RETURN ?.
 
-        cUrl = cApiBase + cModel + ":generateContent?key=":u + cApiKey.
+        cUrl = cApiBase + cModel + ":generateContent":u.
 
         oSystemPart  = NEW JsonObject().
         oSystemPart:Add("text":u, pcSystemInstruction).
@@ -165,6 +165,7 @@ CLASS Luna.BusinessLogic.GeminiGateway:
 
         oRequest = RequestBuilder:Post(cUrl, oBody)
                        :ContentType("application/json":u)
+                       :AddHeader("x-goog-api-key":u, cApiKey)
                        :Request.
 
         oResponse = oClient:Execute(oRequest).

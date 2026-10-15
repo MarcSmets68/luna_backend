@@ -1,0 +1,48 @@
+meta {
+  name: LoginThrottle429
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/web/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "kode": "{{throttleKode}}",
+    "password": "fout-wachtwoord"
+  }
+}
+
+assert {
+  res.status: eq 429
+  res.body.error.code: eq 429
+}
+
+script:pre-request {
+  const axios = require("axios");
+  const url = bru.getEnvVar("baseUrl") + "/web/login";
+  const kode = "THR" + Date.now().toString(36).slice(-6).toUpperCase();
+  for (let i = 0; i < 5; i++) {
+    try { await axios.post(url, { kode, password: "fout" + i }); } catch (e) {}
+  }
+  bru.setVar("throttleKode", kode);
+}
+
+docs {
+  Fires 5 failed logins for a random, non-existing kode (pre-request
+  script), then this 6th attempt must answer 429 with a Dutch message
+  ("Te veel mislukte inlogpogingen. Probeer het over N minuten opnieuw.").
+  A random unknown kode is used so no real account gets locked - failures
+  are counted per kode whether or not it exists, so this proves the
+  throttle without revealing existence. The attempt files live in
+  cache/login-attempts/ (gitignored, swept automatically after 15 min).
+}
