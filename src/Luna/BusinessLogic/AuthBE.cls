@@ -19,6 +19,7 @@
   ----------------------------------------------------------------------*/
 
 USING Progress.Lang.*.
+USING Luna.BusinessLogic.LoginThrottle.
 
 BLOCK-LEVEL ON ERROR UNDO, THROW.
 
@@ -128,6 +129,7 @@ CLASS Luna.BusinessLogic.AuthBE:
     /* Login beslisboom - ontwerp paragraaf 1.2.1, exacte volgorde, geen
        bypass-pad:
          1. kode/password leeg/ontbrekend -> 400
+       1b. 5 mislukte pogingen binnen 15 min voor deze kode -> 429
          2. onbekende kode                -> 401 (generiek)
          3. fout wachtwoord                -> 401 (generiek, identiek aan 2)
          4. gebruiker.passief              -> 403 (NA de wachtwoordcheck)
@@ -138,6 +140,8 @@ CLASS Luna.BusinessLogic.AuthBE:
 
         DEFINE VARIABLE cToken    AS CHARACTER   NO-UNDO.
         DEFINE VARIABLE dtExpires AS DATETIME-TZ NO-UNDO.
+        DEFINE VARIABLE oThrottle AS LoginThrottle NO-UNDO.
+        DEFINE VARIABLE iLockMin  AS INTEGER     NO-UNDO.
 
         EMPTY TEMP-TABLE ttLoginResult.
 
@@ -145,10 +149,24 @@ CLASS Luna.BusinessLogic.AuthBE:
         IF TRIM(pcKode) EQ "":u OR TRIM(pcPassword) EQ "":u THEN
             UNDO, THROW NEW Progress.Lang.AppError("Gebruikerskode en wachtwoord zijn verplicht":u, 400).
 
+        /* Stap 1b - inlogbeperking (429): 5 mislukte pogingen per kode binnen
+           15 minuten. Geldt voor bestaande EN onbestaande kodes en wordt
+           gecontroleerd VOOR het wachtwoord, zodat het antwoord niet
+           onthult of een kode bestaat. Zie Luna.BusinessLogic.LoginThrottle. */
+        oThrottle = NEW LoginThrottle().
+        iLockMin  = oThrottle:GetLockoutMinutes(pcKode).
+        IF iLockMin GT 0 THEN
+            UNDO, THROW NEW Progress.Lang.AppError(
+                SUBSTITUTE("Te veel mislukte inlogpogingen. Probeer het over &1 &2 opnieuw.":u,
+                           iLockMin, IF iLockMin EQ 1 THEN "minuut":u ELSE "minuten":u), 429).
+
         /* Stap 2 - generieke fout, geen user-enumeratie. */
         FIND FIRST gebruiker NO-LOCK WHERE gebruiker.kode EQ pcKode NO-ERROR.
         IF NOT AVAILABLE gebruiker THEN
+        DO:
+            oThrottle:RecordFailure(pcKode).
             UNDO, THROW NEW Progress.Lang.AppError("Gebruikersnaam of wachtwoord onjuist":u, 401).
+        END.
 
         /* Stap 3.
            TODO(security, productie-blocker): plaintext-vergelijking - GEEN hashing.
@@ -156,7 +174,12 @@ CLASS Luna.BusinessLogic.AuthBE:
            een echte productie-rollout met klantdata. Zie
            docs/architecture/login-auth-ontwerp.md paragraaf 5. */
         IF gebruiker.Password NE pcPassword THEN
+        DO:
+            oThrottle:RecordFailure(pcKode).
             UNDO, THROW NEW Progress.Lang.AppError("Gebruikersnaam of wachtwoord onjuist":u, 401).
+        END.
+
+        oThrottle:Reset(pcKode).
 
         /* Stap 4 - NA de wachtwoordcheck, specifieke melding. */
         IF gebruiker.passief EQ TRUE THEN
