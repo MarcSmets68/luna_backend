@@ -293,9 +293,16 @@ $env:DLC = "C:\Progress\OpenEdge"
 & "C:\OpenEdge\MarcOepas\bin\tcman.bat" start
 ```
 
+**Currently running (checked 2026-10-15):** `MarcTest` runs on the developer
+machine itself, as a `java.exe` process (JDK 17, OpenEdge 12.8.0,
+`-Dpsc.as.alias=MarcTest`) listening on 8080/8443; `GET /web/test` answers
+`databaseConnected: true`. `MarcDev` was not running at that time (8081/8444
+not listening). Which backend revision a running instance serves is not
+recorded here - check `Backend/build` / restart after a merge.
+
 ## MarcDev instance (CI/CD target)
 A second PASOE instance, `MarcDev` (`C:\OpenEdge\WRK\MarcDev`, Tomcat ports
-8081/8444, same host as `MarcTest`), exists so CI can
+8081/8444, same machine as `MarcTest`; not always running), exists so CI can
 compile/restart/smoke-test without touching `MarcTest` while someone is
 manually testing against it. Its `openedge.properties` (outside this
 workspace) mirrors `MarcTest`'s: same `Backend/build`/`Backend/src` PROPATH
