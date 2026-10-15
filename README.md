@@ -17,6 +17,7 @@ Backend/
 │       │   ├── BestelorderHandler.cls Read-only for `order` (GET /web/bestelorder[/{ordnr}]), plus nested read-only `ordlijn` (.../{ordnr}/lijn)
 │       │   ├── DevUsersHandler.cls    DEV/DEBUG ONLY - read-only flat list of `gebruiker` (GET /web/dev-users), Password never returned - do not extend/wire into auth
 │       │   ├── LeverancierHandler.cls CRUD for `lever` (GET/POST/PUT/DELETE /web/leverancier[/{levnr}])
+│       │   ├── PlaatsingHandler.cls   Read-only for `plaatsing` (GET /web/plaatsing[/{planr}]) - see Luna.BusinessLogic.PlaatsingBE
 │       │   ├── LoginHandler.cls       Auth-MVP login (POST /web/login) - see "Auth-MVP (login/logout)" section below
 │       │   ├── LogoutHandler.cls      Auth-MVP logout (POST /web/logout, X-Auth-Token header) - see "Auth-MVP (login/logout)" section below
 │       │   ├── AiSearchHandler.cls    AI-powered natural-language search (POST /web/ai-search) - see "AI Search" section below

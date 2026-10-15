@@ -8,3 +8,7 @@ compile_output.log
 cache/
 scripts/RefreshLakproductieCache.log
 scripts/RefreshOmzetanalyseDealersCache.log
+
+# Python bytecode (mcp/ helper server)
+__pycache__/
+*.pyc

@@ -1,0 +1,23 @@
+meta {
+  name: List
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/plaatsing?pageSize=10
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Read-only list of plaatsing rows, newest planr first. Query params: klnr (exact), planr (prefix), naam (substring on klant/plaatsing name), page, pageSize (max 200).
+}
