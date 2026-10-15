@@ -18,7 +18,7 @@ headers {
 body:json {
   {
     "kode": "ABNA",
-    "password": "Welkom123"
+    "password": "{{testPassword}}"
   }
 }
 
@@ -32,8 +32,9 @@ script:post-response {
 }
 
 docs {
-  Logs in with a seeded test account (see Backend/scripts/SeedTestPasswords.ps1
-  and docs/handleidingen/login.md for the shared test password). Returns
+  Logs in with a seeded test account (see Backend/scripts/SeedTestPasswords.ps1;
+  the password is the secret environment variable {{testPassword}} - set it
+  in the Bruno environment, it is not stored in the repo). Returns
   {token, kode, naam, niveau, everyoneAdminActive, expiresAt}. The
   post-response script stores the token into the {{authToken}} runtime
   variable so "Logout" can use it - run this request first.

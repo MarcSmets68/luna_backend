@@ -1,4 +1,5 @@
-# Seeds a single shared test password (Welkom123) onto EVERY gebruiker row.
+# Seeds a single shared test password onto EVERY gebruiker row.
+# The password is a mandatory -TestPassword parameter - never hardcode it here.
 # Auth-MVP testing only - NEVER run this against a real/production database.
 # Runs SeedTestPasswords.p as a standalone ABL batch client (same _progres -b
 # pattern as compile.ps1/RefreshLakproductieCache.ps1), connecting to the same
@@ -10,7 +11,10 @@
 # -param CONFIRM gate inside SeedTestPasswords.p itself - two independent
 # guards against an accidental run).
 param(
-    [switch]$Confirm
+    [switch]$Confirm,
+    [Parameter(Mandatory = $true)]
+    [ValidateNotNullOrEmpty()]
+    [string]$TestPassword
 )
 
 if (-not $Confirm) {
@@ -26,7 +30,7 @@ $env:DLC = $dlc
 
 Write-Host "Seeding test passwords on LunaNew (lhdc01:4500)..."
 
-$output = & "$dlc\bin\_progres.exe" -b -p "$PSScriptRoot\SeedTestPasswords.p" -param "CONFIRM" -db LunaNew -H lhdc01 -S 4500 -N TCP 2>&1
+$output = & "$dlc\bin\_progres.exe" -b -p "$PSScriptRoot\SeedTestPasswords.p" -param "CONFIRM|$TestPassword" -db LunaNew -H lhdc01 -S 4500 -N TCP 2>&1
 $output | Write-Output
 
 if ($LASTEXITCODE -ne 0) {

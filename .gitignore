@@ -12,3 +12,7 @@ scripts/RefreshOmzetanalyseDealersCache.log
 # Python bytecode (mcp/ helper server)
 __pycache__/
 *.pyc
+
+# Raw API output / compile logs - may contain real customer data
+scripts/out*.json
+compile_out*.log

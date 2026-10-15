@@ -81,12 +81,14 @@ This backend runs against the existing PASOE instance `MarcTest`
 has been extended with:
 - `[AppServer.Agent.MarcTest] PROPATH` — includes `Backend/build` (compiled
   r-code, checked first) and `Backend/src` (source, PASOE dev-mode fallback).
-- `[AppServer.SessMgr.MarcTest] agentStartupParam` — adds
-  `-db LunaNew -H lhdc01 -S 4500 -N TCP -U ABNA` so every agent connects to
-  the shared LunaNew test database on `lhdc01` (user `ABNA`, no password) on
-  startup. This is the same broker the legacy frontend UI tests against -
+- `[AppServer.SessMgr.MarcTest] agentStartupParam` — adds the `-db LunaNew
+  -H <host> -S <port> -N TCP -U <user>` connection parameters so every agent
+  connects to the shared LunaNew test database on startup. The actual host,
+  port and database user are deliberately not documented in this repo: they
+  live in the instance's `openedge.properties` (outside git) - ask the
+  owner. This is the same broker the legacy frontend UI tests against -
   **never start, stop, or reconfigure the broker itself, and never touch
-  anything else on lhdc01**; this backend only ever connects to it as an
+  anything else on the database host**; this backend only ever connects to it as an
   ordinary network client, same as any other Progress client. As of the
   codepage fix below, this same line also carries `-cpinternal UTF-8
   -cpstream UTF-8`.
@@ -220,7 +222,7 @@ required.
 - `handler31=Luna.Web.NPPBoxOverzichtHandler: /npp/boxoverzicht` — maps
   `GET /web/npp/boxoverzicht?scan=<rawScanValue>` to the NPP
   "Boxoverzicht" scan-lookup WebHandler (1:1 port of the read-side logic
-  in `\\LHDC01\TESTLUNA$\LunaV12\NPP\NPPBoxView.w` — see
+  in `\<legacy share>\LunaV12\NPP\NPPBoxView.w` — see
   `Luna.BusinessLogic.NPPBoxOverzichtBE`). Given a raw scanned box label
   (e.g. `B12345-1` or `12345-1`), returns the bon header
   (bonnr/groepnr/klant), a status remark (opmerking), and the aggregated
@@ -242,7 +244,7 @@ required.
 - `handler32=Luna.Web.NPPArtikelScanHandler: /npp/artikelscan` — maps
   `GET /web/npp/artikelscan?scan=<rawScanValue>&expectedArtnr=<optional>`
   to the NPP "Artikelscan" lookup WebHandler (1:1 port of the read-side
-  logic in `\\LHDC01\TESTLUNA$\LunaV12\CheckBarcode.p` — see
+  logic in `\<legacy share>\LunaV12\CheckBarcode.p` — see
   `Luna.BusinessLogic.NPPArtikelScanBE`). Resolves a scanned value to a
   single article: direct `artikel.artnr` match, else the
   "`<nummer>-<milliAantal>`" dash form (splits on the FIRST dash only,
@@ -293,15 +295,15 @@ $env:DLC = "C:\Progress\OpenEdge"
 
 ## MarcDev instance (CI/CD target)
 A second PASOE instance, `MarcDev` (`C:\OpenEdge\WRK\MarcDev`, Tomcat ports
-8081/8444, same host `PC-MICHEL-17` as `MarcTest`), exists so CI can
+8081/8444, same host as `MarcTest`), exists so CI can
 compile/restart/smoke-test without touching `MarcTest` while someone is
 manually testing against it. Its `openedge.properties` (outside this
 workspace) mirrors `MarcTest`'s: same `Backend/build`/`Backend/src` PROPATH
 entries, the same `agentStartupParam` pointing at the shared `LunaNew`
-database on `lhdc01:4500` (user `ABNA`, `-cpinternal`/`-cpstream UTF-8`), and
+database (connection values: see "Database" below; `-cpinternal`/`-cpstream UTF-8`), and
 the same `handler1..handler25` mappings under `[MarcDev.ROOT.WEB]`.
 
-**MarcDev intentionally shares the same `lhdc01` database as `MarcTest`** —
+**MarcDev intentionally shares the same database as `MarcTest`** —
 this was a deliberate choice over an isolated local copy, so CI exercises
 the real shared test data. This means a CI run and a manual `MarcTest`
 session can in principle race on the same rows (e.g. `bonnr` allocation);
@@ -311,7 +313,7 @@ no isolation has been added for that. Whenever `MarcTest`'s
 
 CI (`Backend/.github/workflows/ci.yml`) requires a **self-hosted GitHub
 Actions runner** registered with the label `pasoe-windows` on a machine with
-OpenEdge installed (currently `PC-MICHEL-17`, the same machine both
+OpenEdge installed (currently the same machine both
 instances run on) — GitHub-hosted runners can't compile/run ABL. On every
 PR/push it runs `scripts/compile.ps1`; on push to `main`/`development` it
 also restarts `MarcDev` (`scripts/RestartMarcDev.ps1`) and smoke-tests it
@@ -323,20 +325,23 @@ Definition of Done — it does not replace backend-tester's contract-level
 verification.
 
 ## Database
-PASOE agents connect to the shared `LunaNew` test database on `lhdc01:4500`
-(client/server, `-N TCP`, user `ABNA`, no password) — the same broker the
-legacy frontend UI uses to test against. That broker is owned and operated
-on lhdc01; **this backend only ever connects to it as a client and must
-never start, stop, or change any configuration on lhdc01.** There's nothing
-to start locally for this — just confirm the port is reachable:
+PASOE agents connect to the shared `LunaNew` test database (client/server,
+`-N TCP`) — the same broker the legacy frontend UI uses to test against.
+Host, port and database user are configuration that is **not stored in git**:
+they are set in the PASOE instance's `openedge.properties` (`agentStartupParam`)
+and in local environment/config on each developer machine - ask the owner for
+the values. That broker is owned and operated on the database host; **this
+backend only ever connects to it as a client and must never start, stop, or
+change any configuration there.** There's nothing to start locally for this —
+just confirm the port is reachable:
 ```powershell
-Test-NetConnection -ComputerName lhdc01 -Port 4500
+Test-NetConnection -ComputerName <db-host> -Port <db-port>
 ```
 
 ### Local fallback copy (optional, dev-only)
 A local copy of the database lives in `Databases/` and can be run as its
 own broker on `localhost:3050` for offline development. It is **not** used
-by default — `agentStartupParam` above points at lhdc01, so switching to
+by default — `agentStartupParam` above points at the shared database host, so switching to
 this fallback also requires pointing `agentStartupParam` back at
 `-H localhost -S 3050` and restarting PASOE.
 ```powershell
@@ -993,8 +998,9 @@ in that doc's §1.4 and §1.5 - the `X-Auth-Token` header instead of
   separate scheduled cleanup job.
 - **Seed script (`scripts/SeedTestPasswords.p`/`.ps1`)**: sets
   `gebruiker.Password` to a single shared test password on every existing
-  `gebruiker` row (~32). Test-only - the actual password value is
-  documented in `docs/handleidingen/login.md` (docs-writer), not here.
+  `gebruiker` row (~32). Test-only - the password is NOT stored in the repo:
+  it is a mandatory parameter (`-TestPassword` on the wrapper) that you
+  choose when running the script.
   Deliberately **not** wired into `compile.ps1` or any scheduled task -
   it's a manual, one-off operational script with two independent guards
   against an accidental run against a real database: the `.ps1` wrapper
@@ -1002,7 +1008,7 @@ in that doc's §1.4 and §1.5 - the `X-Auth-Token` header instead of
   script itself refuses to touch the database without the exact `-param
   CONFIRM` flag. Run it like:
   ```powershell
-  powershell -File "Backend\scripts\SeedTestPasswords.ps1" -Confirm
+  powershell -File "Backend\scripts\SeedTestPasswords.ps1" -Confirm -TestPassword "<choose-a-test-password>"
   ```
 - **Seed script (`scripts/SeedTestNiveaus.p`/`.ps1`)**: sets
   `gebruiker.niveau` on a small, explicit, NAMED list of test users only —
@@ -1134,7 +1140,7 @@ any other table. 1:1 port of the legacy `Include/Prijs.i` procedures
 confirmed against 4 independent legacy call sites. See
 `Luna.BusinessLogic.PricingEngineBE`'s class header for the full
 orchestration, the exact legacy source verified against
-(`\\LHDC01\TESTLUNA$\LunaV12\Include\Prijs.i`), and the documented,
+(`\<legacy share>\LunaV12\Include\Prijs.i`), and the documented,
 deliberate simplifications vs. the legacy procedures (sw-uitverkoop
 always TRUE, iplGroep always FALSE, sw-LedConfig replaced by "does an
 art_profiel record exist", and the `kortingLocked` simplification).
