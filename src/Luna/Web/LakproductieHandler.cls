@@ -52,6 +52,7 @@ USING Progress.Json.ObjectModel.JsonArray.
 USING Progress.Json.ObjectModel.ObjectModelParser.
 USING Luna.BusinessLogic.LakproductieCacheService.
 USING Luna.BusinessLogic.LakproductieBestellingBE.
+USING Luna.BusinessLogic.AuthGuard.
 
 BLOCK-LEVEL ON ERROR UNDO, THROW.
 
@@ -216,6 +217,9 @@ CLASS Luna.Web.LakproductieHandler INHERITS WebHandler:
         DEFINE VARIABLE oCacheService AS LakproductieCacheService NO-UNDO.
         DEFINE VARIABLE oBody         AS JsonObject               NO-UNDO.
 
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
+
         oCacheService = NEW LakproductieCacheService().
         oBody         = oCacheService:GetItems().
 
@@ -248,6 +252,9 @@ CLASS Luna.Web.LakproductieHandler INHERITS WebHandler:
         DEFINE VARIABLE oHeaderRes    AS JsonObject                NO-UNDO.
         DEFINE VARIABLE oLinesRes     AS JsonObject                NO-UNDO.
         DEFINE VARIABLE oOrderJson    AS JsonObject                NO-UNDO.
+
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
 
         cRemainder = GetPathRemainder(poRequest).
 

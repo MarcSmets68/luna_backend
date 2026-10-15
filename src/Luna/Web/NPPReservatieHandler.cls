@@ -26,6 +26,7 @@ USING OpenEdge.Web.IWebRequest.
 USING Progress.Json.ObjectModel.JsonObject.
 USING Luna.BusinessLogic.NPPReservatieBE.
 USING Luna.Web.Util.QueryParamHelper.
+USING Luna.BusinessLogic.AuthGuard.
 
 BLOCK-LEVEL ON ERROR UNDO, THROW.
 
@@ -117,6 +118,9 @@ CLASS Luna.Web.NPPReservatieHandler INHERITS WebHandler:
         DEFINE VARIABLE iBonnr    AS INTEGER         NO-UNDO.
         DEFINE VARIABLE iGroepnr  AS INTEGER         NO-UNDO INITIAL 0.
         DEFINE VARIABLE oService  AS NPPReservatieBE NO-UNDO.
+
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
 
         cRest = GetPathRemainder(poRequest).
         oService = NEW NPPReservatieBE().

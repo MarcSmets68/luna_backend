@@ -20,6 +20,7 @@ USING Progress.Json.ObjectModel.JsonObject.
 USING Progress.Json.ObjectModel.JsonArray.
 USING Progress.Json.ObjectModel.ObjectModelParser.
 USING Luna.BusinessLogic.PlaatsingBE.
+USING Luna.BusinessLogic.AuthGuard.
 
 BLOCK-LEVEL ON ERROR UNDO, THROW.
 
@@ -109,6 +110,9 @@ CLASS Luna.Web.PlaatsingHandler INHERITS WebHandler:
         DEFINE VARIABLE iPage      AS INTEGER     NO-UNDO.
         DEFINE VARIABLE iPageSize  AS INTEGER     NO-UNDO.
         DEFINE VARIABLE lHasMore   AS LOGICAL     NO-UNDO.
+
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
 
         oService   = NEW PlaatsingBE().
         cRemainder = GetPathRemainder(poRequest).

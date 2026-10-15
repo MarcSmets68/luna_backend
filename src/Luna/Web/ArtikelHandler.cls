@@ -71,6 +71,7 @@ USING Luna.BusinessLogic.ArtikelBE.
 USING Luna.BusinessLogic.StockAvailabilityBE.
 USING Luna.BusinessLogic.ArtlogBE.
 USING Luna.Web.Util.QueryParamHelper.
+USING Luna.BusinessLogic.AuthGuard.
 
 BLOCK-LEVEL ON ERROR UNDO, THROW.
 
@@ -319,6 +320,9 @@ CLASS Luna.Web.ArtikelHandler INHERITS WebHandler:
         DEFINE VARIABLE iPageSize     AS INTEGER     NO-UNDO.
         DEFINE VARIABLE lHasMore      AS LOGICAL     NO-UNDO.
 
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
+
         cRemainder = GetPathRemainder(poRequest).
         iSegCount  = SegmentCount(cRemainder).
 
@@ -527,6 +531,9 @@ CLASS Luna.Web.ArtikelHandler INHERITS WebHandler:
         DEFINE VARIABLE oBody    AS JsonObject NO-UNDO.
         DEFINE VARIABLE oItems   AS JsonArray  NO-UNDO.
 
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
+
         oService = NEW ArtikelBE().
         oReqBody = GetJsonBody(poRequest).
 
@@ -556,6 +563,9 @@ CLASS Luna.Web.ArtikelHandler INHERITS WebHandler:
         DEFINE VARIABLE hResult  AS HANDLE     NO-UNDO.
         DEFINE VARIABLE oBody    AS JsonObject NO-UNDO.
         DEFINE VARIABLE oItems   AS JsonArray  NO-UNDO.
+
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
 
         cArtnr = GetArtnrFromPathOrQuery(poRequest).
 
@@ -594,6 +604,9 @@ CLASS Luna.Web.ArtikelHandler INHERITS WebHandler:
         DEFINE VARIABLE oService AS ArtikelBE  NO-UNDO.
         DEFINE VARIABLE cArtnr   AS CHARACTER  NO-UNDO.
         DEFINE VARIABLE oBody    AS JsonObject NO-UNDO.
+
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
 
         cArtnr = GetArtnrFromPathOrQuery(poRequest).
 

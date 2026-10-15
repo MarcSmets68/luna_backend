@@ -24,6 +24,7 @@ USING Progress.Json.ObjectModel.JsonObject.
 USING Progress.Json.ObjectModel.JsonArray.
 USING Progress.Json.ObjectModel.ObjectModelParser.
 USING Luna.BusinessLogic.LedNCSBE.
+USING Luna.BusinessLogic.AuthGuard.
 
 BLOCK-LEVEL ON ERROR UNDO, THROW.
 
@@ -121,6 +122,9 @@ CLASS Luna.Web.LedNCSHandler INHERITS WebHandler:
         DEFINE VARIABLE cOmschrijvingPrefix AS CHARACTER  NO-UNDO.
         DEFINE VARIABLE lHasMore            AS LOGICAL    NO-UNDO.
 
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
+
         oService = NEW LedNCSBE().
         cNcs     = GetKeyFromPath(poRequest).
 
@@ -172,16 +176,25 @@ CLASS Luna.Web.LedNCSHandler INHERITS WebHandler:
                  operations, they always return 405.
     ------------------------------------------------------------------------------*/
     METHOD OVERRIDE PROTECTED INTEGER HandlePost( INPUT poRequest AS IWebRequest ):
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
+
         WriteErrorResponse(INTEGER(StatusCodeEnum:MethodNotAllowed), "led_NCS is read-only - POST is not supported on /led-ncs":u).
         RETURN 0.
     END METHOD.
 
     METHOD OVERRIDE PROTECTED INTEGER HandlePut( INPUT poRequest AS IWebRequest ):
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
+
         WriteErrorResponse(INTEGER(StatusCodeEnum:MethodNotAllowed), "led_NCS is read-only - PUT is not supported on /led-ncs":u).
         RETURN 0.
     END METHOD.
 
     METHOD OVERRIDE PROTECTED INTEGER HandleDelete( INPUT poRequest AS IWebRequest ):
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
+
         WriteErrorResponse(INTEGER(StatusCodeEnum:MethodNotAllowed), "led_NCS is read-only - DELETE is not supported on /led-ncs":u).
         RETURN 0.
     END METHOD.

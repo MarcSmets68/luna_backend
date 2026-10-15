@@ -46,6 +46,7 @@ USING Progress.Json.ObjectModel.ObjectModelParser.
 USING Luna.BusinessLogic.OfferteBE.
 USING Luna.BusinessLogic.OfflijnBE.
 USING Luna.BusinessLogic.OfferteConversieBE.
+USING Luna.BusinessLogic.AuthGuard.
 
 BLOCK-LEVEL ON ERROR UNDO, THROW.
 
@@ -293,6 +294,9 @@ CLASS Luna.Web.OfferteHandler INHERITS WebHandler:
         DEFINE VARIABLE iPageSize       AS INTEGER     NO-UNDO.
         DEFINE VARIABLE lHasMore        AS LOGICAL     NO-UNDO.
 
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
+
         cRemainder = GetPathRemainder(poRequest).
         iSegCount  = SegmentCount(cRemainder).
 
@@ -426,6 +430,9 @@ CLASS Luna.Web.OfferteHandler INHERITS WebHandler:
         DEFINE VARIABLE oBody           AS JsonObject NO-UNDO.
         DEFINE VARIABLE oItems          AS JsonArray  NO-UNDO.
 
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
+
         cRemainder = GetPathRemainder(poRequest).
         iSegCount  = SegmentCount(cRemainder).
         oReqBody   = GetJsonBody(poRequest).
@@ -535,6 +542,9 @@ CLASS Luna.Web.OfferteHandler INHERITS WebHandler:
         DEFINE VARIABLE oBody           AS JsonObject NO-UNDO.
         DEFINE VARIABLE oItems          AS JsonArray  NO-UNDO.
 
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
+
         cRemainder = GetPathRemainder(poRequest).
         iSegCount  = SegmentCount(cRemainder).
 
@@ -597,6 +607,9 @@ CLASS Luna.Web.OfferteHandler INHERITS WebHandler:
         DEFINE VARIABLE iVersie         AS INTEGER    NO-UNDO.
         DEFINE VARIABLE iLijnnr         AS INTEGER    NO-UNDO.
         DEFINE VARIABLE oBody           AS JsonObject NO-UNDO.
+
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
 
         cRemainder = GetPathRemainder(poRequest).
         iSegCount  = SegmentCount(cRemainder).
