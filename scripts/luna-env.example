@@ -1,0 +1,17 @@
+# Copy to scripts\luna-env.local (gitignored) and fill in. Read by
+# Load-LunaEnv.ps1 from RestartPasoe.ps1, RestartMarcDev.ps1 and
+# start-luna-env.ps1. A PASOE restart is needed for changes to apply.
+
+# Token guard (Luna.BusinessLogic.AuthGuard): false = only log a warning,
+# true = answer 401 without a valid X-Auth-Token. Default when unset: false.
+AUTH_ENFORCE=false
+
+# GET /web/dev-users is only reachable when this is true. Default when unset:
+# false (404). Keep false anywhere except a dev machine.
+DEV_ENDPOINTS_ENABLED=false
+
+# "Iedereen admin" override (see AuthBE). Default when unset: false.
+# AUTH_EVERYONE_ADMIN=false
+
+# Needed for POST /web/ai-search (sent in the x-goog-api-key header).
+# GEMINI_API_KEY=
