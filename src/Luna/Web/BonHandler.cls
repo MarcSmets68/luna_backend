@@ -62,6 +62,7 @@ USING Luna.BusinessLogic.BonHerstelBE.
 USING Luna.BusinessLogic.BonLijnReserveringBE.
 USING Luna.BusinessLogic.BonLijnReserveringBevestigingBE.
 USING Luna.BusinessLogic.PakLijnBE.
+USING Luna.BusinessLogic.AuthGuard.
  
 BLOCK-LEVEL ON ERROR UNDO, THROW. 
  
@@ -333,6 +334,9 @@ CLASS Luna.Web.BonHandler INHERITS WebHandler:
         DEFINE VARIABLE oHerstelBE AS BonHerstelBE       NO-UNDO.
         DEFINE VARIABLE oPakLijnBE AS PakLijnBE          NO-UNDO.
  
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
+
         cRemainder = GetPathRemainder(poRequest).
         iSegCount  = SegmentCount(cRemainder).
 
@@ -654,6 +658,9 @@ CLASS Luna.Web.BonHandler INHERITS WebHandler:
         DEFINE VARIABLE oBevestigBE  AS BonLijnReserveringBevestigingBE NO-UNDO.
         DEFINE VARIABLE dDelta       AS DECIMAL                NO-UNDO.
 
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
+
         cRemainder = GetPathRemainder(poRequest).
         iSegCount  = SegmentCount(cRemainder).
 
@@ -886,6 +893,9 @@ CLASS Luna.Web.BonHandler INHERITS WebHandler:
         DEFINE VARIABLE oLedQcBE    AS BonLedQcBE         NO-UNDO.
         DEFINE VARIABLE oHerstelBE  AS BonHerstelBE       NO-UNDO.
 
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
+
         cRemainder = GetPathRemainder(poRequest).
         iSegCount  = SegmentCount(cRemainder).
 
@@ -1039,6 +1049,9 @@ CLASS Luna.Web.BonHandler INHERITS WebHandler:
         DEFINE VARIABLE oProdBE     AS BonLijnProductieBE NO-UNDO.
         DEFINE VARIABLE oLedBE      AS BonLedBE           NO-UNDO.
         DEFINE VARIABLE oLedQcBE    AS BonLedQcBE         NO-UNDO.
+
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
 
         cRemainder = GetPathRemainder(poRequest).
         iSegCount  = SegmentCount(cRemainder).

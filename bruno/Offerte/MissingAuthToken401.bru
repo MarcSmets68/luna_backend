@@ -1,0 +1,28 @@
+meta {
+  name: MissingAuthToken401
+  type: http
+  seq: 900
+}
+
+get {
+  url: {{baseUrl}}/web/offerte
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 401
+  res.body.error.message: eq Ongeldige of verlopen sessie
+  res.body.error.code: eq 401
+}
+
+docs {
+  No X-Auth-Token header. Luna.BusinessLogic.AuthGuard answers 401 BEFORE
+  the handler does any work. Only valid when the PASOE agent runs with
+  AUTH_ENFORCE=true; with AUTH_ENFORCE=false (default) the request is let
+  through and a warning is written to the agent log instead.
+}

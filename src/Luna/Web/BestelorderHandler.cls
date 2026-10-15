@@ -37,6 +37,7 @@ USING Progress.Json.ObjectModel.JsonArray.
 USING Progress.Json.ObjectModel.ObjectModelParser.
 USING Luna.BusinessLogic.BestelorderBE.
 USING Luna.BusinessLogic.OrdlijnBE.
+USING Luna.BusinessLogic.AuthGuard.
 
 BLOCK-LEVEL ON ERROR UNDO, THROW.
 
@@ -215,6 +216,9 @@ CLASS Luna.Web.BestelorderHandler INHERITS WebHandler:
         DEFINE VARIABLE iPage      AS INTEGER        NO-UNDO.
         DEFINE VARIABLE iPageSize  AS INTEGER        NO-UNDO.
         DEFINE VARIABLE lHasMore   AS LOGICAL        NO-UNDO.
+
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
 
         oService   = NEW BestelorderBE().
         cRemainder = GetPathRemainder(poRequest).

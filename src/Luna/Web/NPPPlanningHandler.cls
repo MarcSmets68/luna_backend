@@ -16,6 +16,7 @@ USING OpenEdge.Web.WebHandler.
 USING OpenEdge.Web.IWebRequest.
 USING Progress.Json.ObjectModel.JsonObject.
 USING Luna.BusinessLogic.NPPPlanningBE.
+USING Luna.BusinessLogic.AuthGuard.
 
 BLOCK-LEVEL ON ERROR UNDO, THROW.
 
@@ -86,6 +87,9 @@ CLASS Luna.Web.NPPPlanningHandler INHERITS WebHandler:
 
         DEFINE VARIABLE oService AS NPPPlanningBE NO-UNDO.
         DEFINE VARIABLE oBody    AS JsonObject    NO-UNDO.
+
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
 
         oService = NEW NPPPlanningBE().
         oBody    = oService:GetQueue().

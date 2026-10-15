@@ -54,4 +54,20 @@ CLASS Luna.BusinessLogic.DevUsersBE:
  
     END METHOD. 
  
+    /* The dev endpoints are only reachable when the DEV_ENDPOINTS_ENABLED
+       OS-environment variable is exactly "true" (case-insensitive); read fresh
+       on every call, anything else (incl. unset) is FALSE. */
+    METHOD PUBLIC STATIC LOGICAL IsEnabled():
+
+        DEFINE VARIABLE cFlag AS CHARACTER NO-UNDO.
+
+        cFlag = OS-GETENV("DEV_ENDPOINTS_ENABLED":u).
+
+        IF cFlag EQ ? THEN
+            RETURN FALSE.
+
+        RETURN UPPER(TRIM(cFlag)) EQ "TRUE":u.
+
+    END METHOD.
+
 END CLASS. 

@@ -37,6 +37,7 @@ USING Progress.Json.ObjectModel.JsonArray.
 USING Progress.Json.ObjectModel.ObjectModelParser.
 USING Luna.BusinessLogic.PakbonBE.
 USING Luna.BusinessLogic.PakLijnBE.
+USING Luna.BusinessLogic.AuthGuard.
 
 BLOCK-LEVEL ON ERROR UNDO, THROW.
 
@@ -219,6 +220,9 @@ CLASS Luna.Web.PakbonHandler INHERITS WebHandler:
         DEFINE VARIABLE oBody        AS JsonObject NO-UNDO.
         DEFINE VARIABLE lHasMore     AS LOGICAL    NO-UNDO.
 
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
+
         cRemainder = GetPathRemainder(poRequest).
         iSegCount  = SegmentCount(cRemainder).
 
@@ -369,6 +373,9 @@ CLASS Luna.Web.PakbonHandler INHERITS WebHandler:
         DEFINE VARIABLE oItems      AS JsonArray  NO-UNDO.
         DEFINE VARIABLE cAfgehaaldId AS CHARACTER NO-UNDO.
 
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
+
         cRemainder = GetPathRemainder(poRequest).
         iSegCount  = SegmentCount(cRemainder).
         oReqBody   = GetJsonBody(poRequest).
@@ -448,6 +455,9 @@ CLASS Luna.Web.PakbonHandler INHERITS WebHandler:
         DEFINE VARIABLE oBody       AS JsonObject NO-UNDO.
         DEFINE VARIABLE oItems      AS JsonArray  NO-UNDO.
 
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
+
         cRemainder = GetPathRemainder(poRequest).
         iSegCount  = SegmentCount(cRemainder).
 
@@ -509,6 +519,9 @@ CLASS Luna.Web.PakbonHandler INHERITS WebHandler:
         DEFINE VARIABLE iPaknr      AS INTEGER    NO-UNDO.
         DEFINE VARIABLE iLijnnr     AS INTEGER    NO-UNDO.
         DEFINE VARIABLE oBody       AS JsonObject NO-UNDO.
+
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
 
         cRemainder = GetPathRemainder(poRequest).
         iSegCount  = SegmentCount(cRemainder).

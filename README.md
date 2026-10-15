@@ -359,6 +359,25 @@ Shut down with:
 & "$env:DLC\bin\proshut.bat" "C:\LunaWEB - workspace\Databases\LunaNew" -by
 ```
 
+## Token guard (AuthGuard, `AUTH_ENFORCE`)
+`Luna.BusinessLogic.AuthGuard:Check(poRequest)` is called at the top of every
+`HandleGet/HandlePost/HandlePut/HandleDelete` of all handlers except
+`LoginHandler` and `TestHandler` (`LogoutHandler`, `NPPStockBewegingHandler`
+and `NPPKwaliteitscontroleHandler` already validate the token themselves and
+always enforce it). It reads the `X-Auth-Token` header, calls
+`AuthBE:ValidateToken` and, controlled by the OS environment variable
+`AUTH_ENFORCE` (default `false`, only `true` enables it; read on every call):
+- `false`: a missing/invalid token only writes a warning to the PASOE agent
+  log (subsystem `AuthGuard`, never the token itself) and the request goes on.
+- `true`: 401 `{"error": {"message": "Ongeldige of verlopen sessie", "code": 401}}`.
+
+CORS preflight (`OPTIONS`) is never guarded. The guard result is NOT used for
+authorization per niveau (separate follow-up). `GET /web/dev-users` answers
+404 unless the OS environment variable `DEV_ENDPOINTS_ENABLED` is `true`.
+Bruno: every request sends `X-Auth-Token: {{authToken}}` (run `Auth/Login`
+first); each handler group has a `MissingAuthToken401` request that only
+passes with `AUTH_ENFORCE=true`.
+
 ## Compiling (CLI workflow — no PDSOE/Eclipse)
 ```powershell
 $env:DLC = "C:\Progress\OpenEdge"

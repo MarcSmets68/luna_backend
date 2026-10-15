@@ -25,6 +25,7 @@ USING Progress.Json.ObjectModel.JsonObject.
 USING Progress.Json.ObjectModel.JsonArray.
 USING Progress.Json.ObjectModel.ObjectModelParser.
 USING Luna.BusinessLogic.LedKleurafwerkingBE.
+USING Luna.BusinessLogic.AuthGuard.
 
 BLOCK-LEVEL ON ERROR UNDO, THROW.
 
@@ -180,6 +181,9 @@ CLASS Luna.Web.LedKleurafwerkingHandler INHERITS WebHandler:
         DEFINE VARIABLE cStandaardFilter  AS CHARACTER  NO-UNDO.
         DEFINE VARIABLE lHasMore          AS LOGICAL    NO-UNDO.
 
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
+
         oService   = NEW LedKleurafwerkingBE().
         cRemainder = GetPathRemainder(poRequest).
 
@@ -243,6 +247,9 @@ CLASS Luna.Web.LedKleurafwerkingHandler INHERITS WebHandler:
         DEFINE VARIABLE cKleursoort AS CHARACTER  NO-UNDO.
         DEFINE VARIABLE cKode       AS CHARACTER  NO-UNDO.
 
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
+
         oService = NEW LedKleurafwerkingBE().
         oReqBody = GetJsonBody(poRequest).
 
@@ -287,6 +294,9 @@ CLASS Luna.Web.LedKleurafwerkingHandler INHERITS WebHandler:
         DEFINE VARIABLE oBody       AS JsonObject NO-UNDO.
         DEFINE VARIABLE oItems      AS JsonArray  NO-UNDO.
 
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
+
         IF NOT ParseKey(poRequest, OUTPUT cKleursoort, OUTPUT cKode) THEN
             RETURN 0.
 
@@ -314,6 +324,9 @@ CLASS Luna.Web.LedKleurafwerkingHandler INHERITS WebHandler:
         DEFINE VARIABLE cKleursoort AS CHARACTER  NO-UNDO.
         DEFINE VARIABLE cKode       AS CHARACTER  NO-UNDO.
         DEFINE VARIABLE oBody       AS JsonObject NO-UNDO.
+
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
 
         IF NOT ParseKey(poRequest, OUTPUT cKleursoort, OUTPUT cKode) THEN
             RETURN 0.

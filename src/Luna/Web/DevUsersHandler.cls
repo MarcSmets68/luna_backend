@@ -20,6 +20,7 @@ USING OpenEdge.Web.IWebRequest.
 USING Progress.Json.ObjectModel.JsonObject. 
 USING Progress.Json.ObjectModel.ObjectModelParser. 
 USING Luna.BusinessLogic.DevUsersBE. 
+USING Luna.BusinessLogic.AuthGuard.
  
 BLOCK-LEVEL ON ERROR UNDO, THROW. 
  
@@ -93,6 +94,15 @@ CLASS Luna.Web.DevUsersHandler INHERITS WebHandler:
         DEFINE VARIABLE hUsers   AS HANDLE     NO-UNDO. 
         DEFINE VARIABLE oBody    AS JsonObject NO-UNDO. 
  
+        IF NOT DevUsersBE:IsEnabled() THEN
+        DO:
+            WriteErrorResponse(INTEGER(StatusCodeEnum:NotFound), "Niet gevonden":u).
+            RETURN 0.
+        END.
+
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
+
         oService = NEW DevUsersBE(). 
         hUsers   = oService:GetUsers(). 
  

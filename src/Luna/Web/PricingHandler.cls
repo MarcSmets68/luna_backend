@@ -38,6 +38,7 @@ USING Progress.Json.ObjectModel.JsonObject.
 USING Progress.Json.ObjectModel.JsonArray.
 USING Progress.Json.ObjectModel.ObjectModelParser.
 USING Luna.BusinessLogic.PricingEngineBE.
+USING Luna.BusinessLogic.AuthGuard.
 
 BLOCK-LEVEL ON ERROR UNDO, THROW.
 
@@ -246,6 +247,9 @@ CLASS Luna.Web.PricingHandler INHERITS WebHandler:
         DEFINE VARIABLE hResult          AS HANDLE       NO-UNDO.
         DEFINE VARIABLE oBody            AS JsonObject   NO-UNDO.
         DEFINE VARIABLE oItems           AS JsonArray    NO-UNDO.
+
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
 
         cRemainder = GetPathRemainder(poRequest).
 

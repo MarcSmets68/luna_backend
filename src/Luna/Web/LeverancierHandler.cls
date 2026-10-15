@@ -25,6 +25,7 @@ USING Progress.Json.ObjectModel.JsonObject.
 USING Progress.Json.ObjectModel.JsonArray.
 USING Progress.Json.ObjectModel.ObjectModelParser.
 USING Luna.BusinessLogic.LeverancierBE.
+USING Luna.BusinessLogic.AuthGuard.
 
 BLOCK-LEVEL ON ERROR UNDO, THROW.
 
@@ -189,6 +190,9 @@ CLASS Luna.Web.LeverancierHandler INHERITS WebHandler:
         DEFINE VARIABLE cNaam     AS CHARACTER   NO-UNDO.
         DEFINE VARIABLE lHasMore  AS LOGICAL     NO-UNDO.
 
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
+
         oService = NEW LeverancierBE().
         cLevnr   = GetLevnrFromPath(poRequest).
 
@@ -260,6 +264,9 @@ CLASS Luna.Web.LeverancierHandler INHERITS WebHandler:
         DEFINE VARIABLE oBody    AS JsonObject NO-UNDO.
         DEFINE VARIABLE oItems   AS JsonArray  NO-UNDO.
 
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
+
         oService = NEW LeverancierBE().
         oReqBody = GetJsonBody(poRequest).
 
@@ -290,6 +297,9 @@ CLASS Luna.Web.LeverancierHandler INHERITS WebHandler:
         DEFINE VARIABLE hResult  AS HANDLE     NO-UNDO.
         DEFINE VARIABLE oBody    AS JsonObject NO-UNDO.
         DEFINE VARIABLE oItems   AS JsonArray  NO-UNDO.
+
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
 
         cLevnr = GetLevnrFromPath(poRequest).
 
@@ -333,6 +343,9 @@ CLASS Luna.Web.LeverancierHandler INHERITS WebHandler:
         DEFINE VARIABLE cLevnr   AS CHARACTER  NO-UNDO.
         DEFINE VARIABLE iLevnr   AS INTEGER    NO-UNDO.
         DEFINE VARIABLE oBody    AS JsonObject NO-UNDO.
+
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
 
         cLevnr = GetLevnrFromPath(poRequest).
 

@@ -20,6 +20,7 @@ USING Progress.Json.ObjectModel.JsonObject.
 USING Progress.Json.ObjectModel.JsonArray.
 USING Progress.Json.ObjectModel.ObjectModelParser.
 USING Luna.BusinessLogic.DashboardBE.
+USING Luna.BusinessLogic.AuthGuard.
 
 BLOCK-LEVEL ON ERROR UNDO, THROW.
 
@@ -101,6 +102,9 @@ CLASS Luna.Web.DashboardHandler INHERITS WebHandler:
         DEFINE VARIABLE oProductionBody AS JsonObject  NO-UNDO.
         DEFINE VARIABLE oOmzetTrendBody AS JsonObject  NO-UNDO.
         DEFINE VARIABLE oBody           AS JsonObject  NO-UNDO.
+
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
 
         oService = NEW DashboardBE().
 

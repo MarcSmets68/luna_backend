@@ -36,6 +36,7 @@ USING Progress.Json.ObjectModel.JsonObject.
 USING Progress.Json.ObjectModel.JsonArray.
 USING Progress.Json.ObjectModel.ObjectModelParser.
 USING Luna.BusinessLogic.AiSearchBE.
+USING Luna.BusinessLogic.AuthGuard.
 
 BLOCK-LEVEL ON ERROR UNDO, THROW.
 
@@ -186,6 +187,9 @@ CLASS Luna.Web.AiSearchHandler INHERITS WebHandler:
         DEFINE VARIABLE oParser    AS ObjectModelParser NO-UNDO.
         DEFINE VARIABLE cIntentRaw AS CHARACTER   NO-UNDO.
         DEFINE VARIABLE oIntent    AS Progress.Lang.Object NO-UNDO.
+
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
 
         oReqBody = GetJsonBody(poRequest).
 

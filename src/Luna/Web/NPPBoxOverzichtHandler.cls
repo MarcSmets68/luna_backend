@@ -27,6 +27,7 @@ USING OpenEdge.Web.IWebRequest.
 USING Progress.Json.ObjectModel.JsonObject.
 USING Luna.BusinessLogic.NPPBoxOverzichtBE.
 USING Luna.Web.Util.QueryParamHelper.
+USING Luna.BusinessLogic.AuthGuard.
 
 BLOCK-LEVEL ON ERROR UNDO, THROW.
 
@@ -102,6 +103,9 @@ CLASS Luna.Web.NPPBoxOverzichtHandler INHERITS WebHandler:
         DEFINE VARIABLE cScan   AS CHARACTER          NO-UNDO.
         DEFINE VARIABLE oService AS NPPBoxOverzichtBE NO-UNDO.
         DEFINE VARIABLE oBody    AS JsonObject        NO-UNDO.
+
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
 
         cScan = QueryParamHelper:GetQueryValue(poRequest, "scan":u).
 

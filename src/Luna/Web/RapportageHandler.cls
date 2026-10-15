@@ -30,6 +30,7 @@ USING Luna.BusinessLogic.VerkoopFurBE.
 USING Luna.BusinessLogic.OmzetanalyseDealersBE.
 USING Luna.BusinessLogic.OmzetanalyseDealersCacheService.
 USING Luna.Web.Util.QueryParamHelper.
+USING Luna.BusinessLogic.AuthGuard.
 
 BLOCK-LEVEL ON ERROR UNDO, THROW.
 
@@ -465,6 +466,9 @@ CLASS Luna.Web.RapportageHandler INHERITS WebHandler:
         DEFINE VARIABLE oBody      AS JsonObject NO-UNDO.
         DEFINE VARIABLE dPeriodeVan AS DATE      NO-UNDO.
         DEFINE VARIABLE dPeriodeTot AS DATE      NO-UNDO.
+
+        IF NOT AuthGuard:Check(poRequest) THEN
+            RETURN 0.
 
         cRemainder = GetPathRemainder(poRequest).
         iSegCount  = SegmentCount(cRemainder).
