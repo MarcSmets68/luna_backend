@@ -17,6 +17,10 @@ headers {
 
 assert {
   res.status: eq 200
+  res.body.topKlanten: isArray
+  res.body.topKlantenError: isBoolean
+  res.body.topArtikelen: isArray
+  res.body.topArtikelenError: isBoolean
 }
 
 docs {
@@ -39,8 +43,17 @@ docs {
     },
     "recentActivity": [ { "text": "...", "datum": "YYYY-MM-DD", "type": "offerte" | "bon" | "factuur" } ],
     "productionThisWeek": [ { "bonnr": n, "klant": "...", "leverdatum": "YYYY-MM-DD", "bedrag": n, "geparkeerd": bool } ],
-    "omzetTrend": [ { "month": n, "year": n, "label": "mmm YYYY", "total": n, "isPartial": bool } ]
+    "omzetTrend": [ { "month": n, "year": n, "label": "mmm YYYY", "total": n, "isPartial": bool } ],
+    "topKlanten": [ { "rang": n, "klnr": n, "naam": "...", "omzet": n, "aantalFacturen": n, "aandeelPct": n, "omzetVorigeMaand": n, "vsVorigeMaandPct": n | null } ],
+    "topKlantenError": bool,
+    "topArtikelen": [ { "rang": n, "artnr": "...", "omschrijving": "...", "omzet": n, "aantal": n, "aandeelPct": n, "omzetVorigeMaand": n, "vsVorigeMaandPct": n | null } ],
+    "topArtikelenError": bool
   }
+
+  topKlanten/topArtikelen: max 5 rows, net omzet excl. BTW this month (credit
+  notes netted, voorschot excluded), compared with the same day-range last
+  month. Empty array is valid; *Error = true only when that widget's query
+  failed (the rest of the response is unaffected).
 
   Notes:
   - "openOffertesCount"/"openOffertesBedragPotentieel" are latest versie per
