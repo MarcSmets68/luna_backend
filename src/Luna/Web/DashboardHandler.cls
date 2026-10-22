@@ -97,6 +97,10 @@ CLASS Luna.Web.DashboardHandler INHERITS WebHandler:
         DEFINE VARIABLE hActivity       AS HANDLE      NO-UNDO.
         DEFINE VARIABLE hProduction     AS HANDLE      NO-UNDO.
         DEFINE VARIABLE hOmzetTrend     AS HANDLE      NO-UNDO.
+        DEFINE VARIABLE hTopKlanten     AS HANDLE      NO-UNDO.
+        DEFINE VARIABLE hTopArtikelen   AS HANDLE      NO-UNDO.
+        DEFINE VARIABLE oTopKlantenBody   AS JsonObject NO-UNDO.
+        DEFINE VARIABLE oTopArtikelenBody AS JsonObject NO-UNDO.
         DEFINE VARIABLE oStatCardsBody  AS JsonObject  NO-UNDO.
         DEFINE VARIABLE oActivityBody   AS JsonObject  NO-UNDO.
         DEFINE VARIABLE oProductionBody AS JsonObject  NO-UNDO.
@@ -112,17 +116,26 @@ CLASS Luna.Web.DashboardHandler INHERITS WebHandler:
         hActivity   = oService:GetRecentActivity(5).
         hProduction = oService:GetProductionThisWeek().
         hOmzetTrend = oService:GetOmzetTrend().
+        /* Both Get... calls must run before the Failed properties are read. */
+        hTopKlanten   = oService:GetTopKlanten().
+        hTopArtikelen = oService:GetTopArtikelen().
 
         oStatCardsBody  = ResultHandleToJson(hStatCards).
         oActivityBody   = ResultHandleToJson(hActivity).
         oProductionBody = ResultHandleToJson(hProduction).
         oOmzetTrendBody = ResultHandleToJson(hOmzetTrend).
+        oTopKlantenBody   = ResultHandleToJson(hTopKlanten).
+        oTopArtikelenBody = ResultHandleToJson(hTopArtikelen).
 
         oBody = NEW JsonObject().
         oBody:Add("statCards":u, oStatCardsBody:GetJsonArray("items":u):GetJsonObject(1)).
         oBody:Add("recentActivity":u, oActivityBody:GetJsonArray("recentActivity":u)).
         oBody:Add("productionThisWeek":u, oProductionBody:GetJsonArray("productionThisWeek":u)).
         oBody:Add("omzetTrend":u, oOmzetTrendBody:GetJsonArray("omzetTrend":u)).
+        oBody:Add("topKlanten":u, oTopKlantenBody:GetJsonArray("topKlanten":u)).
+        oBody:Add("topKlantenError":u, oService:TopKlantenFailed).
+        oBody:Add("topArtikelen":u, oTopArtikelenBody:GetJsonArray("topArtikelen":u)).
+        oBody:Add("topArtikelenError":u, oService:TopArtikelenFailed).
 
         WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oBody).
 
