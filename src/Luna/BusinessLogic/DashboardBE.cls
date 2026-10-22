@@ -92,6 +92,27 @@
                     aantal by -1 (line's own sign preserved, so corrections
                     net out correctly). Types verified: klant.klnr,
                     factuur.klnr INTEGER; faclijn.aantal DECIMAL.
+                  - "Voorraadbewegingen" (artlog, month-to-date): window = 1st
+                    of current month through TODAY on artlog.datum (index
+                    artlog-x2, leading component datum - verified live
+                    2026-10). aantalIn / aantalUit = number of artlog BOOKINGS
+                    (not quantity sums) with aantal > 0 / < 0; aantal = 0
+                    rows ignored. Both counters INCLUDE beweging = "S"
+                    (stocktelling) rows; aantalArtikelen = unique artnr with
+                    at least one non-zero booking (incl. S-only articles).
+                    topDalers (max 5): per artnr SUM(aantal) EXCLUDING
+                    beweging = "S", only netto < 0 ranked (ties: netto asc,
+                    aantalBewegingen desc, artnr asc). aantalBewegingen counts
+                    only the non-S rows behind netto - deliberately NOT the
+                    same number as the IN/UIT counters. Post-filter, after
+                    ranking, one artikel lookup per negative candidate:
+                    articles without an artikel row, with stock = FALSE or
+                    blokkeren = TRUE are skipped and the walk continues until
+                    5 winners. SIGN RULE (verified live): artlog.aantal is
+                    always the exact signed stock delta (stock(n) = stock(n-1)
+                    + aantal(n)), so direction is derived purely from the sign
+                    of aantal - no beweging-specific sign logic. Failures are
+                    isolated via VoorraadBewegingenFailed.
     Syntax      : Called from Luna.Web.DashboardHandler (GET /web/dashboard)
     Description : Owns all DB access for this feature - no direct DB access
                   is allowed from the WebHandler layer. NO-LOCK reads only.
@@ -193,7 +214,31 @@ CLASS Luna.BusinessLogic.DashboardBE:
         FIELD gKorting AS DECIMAL
         INDEX idxGroep IS PRIMARY UNIQUE groepnr.
 
+    /* Voorraadbewegingen widget - public, serialized (summary is always exactly 1 row). */
+    DEFINE TEMP-TABLE ttVoorraadSamenvatting NO-UNDO SERIALIZE-NAME "voorraadSamenvatting":u
+        FIELD aantalIn        AS INTEGER SERIALIZE-NAME "aantalIn":u
+        FIELD aantalUit       AS INTEGER SERIALIZE-NAME "aantalUit":u
+        FIELD aantalArtikelen AS INTEGER SERIALIZE-NAME "aantalArtikelen":u.
+
+    DEFINE TEMP-TABLE ttVoorraadDalers NO-UNDO SERIALIZE-NAME "voorraadDalers":u
+        FIELD rang             AS INTEGER   SERIALIZE-NAME "rang":u
+        FIELD artnr            AS CHARACTER SERIALIZE-NAME "artnr":u
+        FIELD omschrijving     AS CHARACTER SERIALIZE-NAME "omschrijving":u
+        FIELD netto            AS DECIMAL   SERIALIZE-NAME "netto":u
+        FIELD aantalBewegingen AS INTEGER   SERIALIZE-NAME "aantalBewegingen":u
+        FIELD huidigeVoorraad  AS DECIMAL   SERIALIZE-NAME "huidigeVoorraad":u
+        FIELD voorraadMin      AS DECIMAL   SERIALIZE-NAME "voorraadMin":u.
+
+    /* Private working table - never serialized. */
+    DEFINE PRIVATE TEMP-TABLE ttVoorraadAgg NO-UNDO
+        FIELD artnr       AS CHARACTER
+        FIELD omschrSnap  AS CHARACTER
+        FIELD nettoRank   AS DECIMAL INITIAL 0
+        FIELD aantalRank  AS INTEGER INITIAL 0
+        INDEX idxArtnr IS PRIMARY UNIQUE artnr.
+
     DEFINE PUBLIC PROPERTY TopKlantenFailed   AS LOGICAL NO-UNDO INITIAL FALSE GET. PRIVATE SET.
+    DEFINE PUBLIC PROPERTY VoorraadBewegingenFailed AS LOGICAL NO-UNDO INITIAL FALSE GET. PRIVATE SET.
     DEFINE PUBLIC PROPERTY TopArtikelenFailed AS LOGICAL NO-UNDO INITIAL FALSE GET. PRIVATE SET.
 
     /*------------------------------------------------------------------------------
@@ -819,6 +864,116 @@ CLASS Luna.BusinessLogic.DashboardBE:
         END.
 
         RETURN TEMP-TABLE ttTopArtikelen:HANDLE.
+
+    END METHOD.
+
+    /*------------------------------------------------------------------------------
+        Purpose: Voorraadbewegingen widget (see class header). Returns the handle
+                 of ttVoorraadDalers; phSamenvatting receives the handle of the
+                 always-one-row ttVoorraadSamenvatting. Failures are isolated via
+                 VoorraadBewegingenFailed (zero summary + empty list).
+    ------------------------------------------------------------------------------*/
+    METHOD PUBLIC HANDLE GetVoorraadBewegingen( OUTPUT phSamenvatting AS HANDLE ):
+
+        DEFINE VARIABLE dNuVan    AS DATE      NO-UNDO.
+        DEFINE VARIABLE dNuTot    AS DATE      NO-UNDO.
+        DEFINE VARIABLE dVorigVan AS DATE      NO-UNDO.
+        DEFINE VARIABLE dVorigTot AS DATE      NO-UNDO.
+        DEFINE VARIABLE iRang     AS INTEGER   NO-UNDO.
+
+        VoorraadBewegingenFailed = FALSE.
+        EMPTY TEMP-TABLE ttVoorraadDalers.
+        EMPTY TEMP-TABLE ttVoorraadSamenvatting.
+        EMPTY TEMP-TABLE ttVoorraadAgg.
+
+        CREATE ttVoorraadSamenvatting.
+        ASSIGN
+            ttVoorraadSamenvatting.aantalIn        = 0
+            ttVoorraadSamenvatting.aantalUit       = 0
+            ttVoorraadSamenvatting.aantalArtikelen = 0.
+
+        DO ON ERROR UNDO, THROW:
+
+            /* Only dNuVan/dNuTot are used; no previous-month comparison in v1. */
+            GetVergelijkPeriodes(OUTPUT dNuVan, OUTPUT dNuTot, OUTPUT dVorigVan, OUTPUT dVorigTot).
+
+            /* Pass 1: single scan over the month-to-date window (artlog-x2 = datum). */
+            FOR EACH artlog NO-LOCK USE-INDEX artlog-x2
+                WHERE artlog.datum GE dNuVan
+                  AND artlog.datum LE dNuTot:
+
+                IF artlog.aantal EQ 0 THEN NEXT.
+
+                IF artlog.aantal GT 0 THEN
+                    ttVoorraadSamenvatting.aantalIn = ttVoorraadSamenvatting.aantalIn + 1.
+                ELSE
+                    ttVoorraadSamenvatting.aantalUit = ttVoorraadSamenvatting.aantalUit + 1.
+
+                FIND ttVoorraadAgg WHERE ttVoorraadAgg.artnr EQ artlog.artnr NO-ERROR.
+                IF NOT AVAILABLE ttVoorraadAgg THEN
+                DO:
+                    CREATE ttVoorraadAgg.
+                    ASSIGN
+                        ttVoorraadAgg.artnr = artlog.artnr
+                        ttVoorraadSamenvatting.aantalArtikelen = ttVoorraadSamenvatting.aantalArtikelen + 1.
+                END.
+
+                IF artlog.beweging NE "S":u THEN
+                DO:
+                    ASSIGN
+                        ttVoorraadAgg.nettoRank  = ttVoorraadAgg.nettoRank + artlog.aantal
+                        ttVoorraadAgg.aantalRank = ttVoorraadAgg.aantalRank + 1.
+                    IF ttVoorraadAgg.omschrSnap EQ "" OR ttVoorraadAgg.omschrSnap EQ ? THEN
+                        ttVoorraadAgg.omschrSnap = artlog.omschr.
+                END.
+            END.
+
+            /* Pass 2: bounded candidate walk - only net decliners, post-filtered
+               on artikel (one indexed lookup per candidate). */
+            iRang = 0.
+            FOR EACH ttVoorraadAgg WHERE ttVoorraadAgg.nettoRank LT 0
+                BY ttVoorraadAgg.nettoRank BY ttVoorraadAgg.aantalRank DESCENDING BY ttVoorraadAgg.artnr:
+
+                FIND FIRST artikel NO-LOCK WHERE artikel.artnr EQ ttVoorraadAgg.artnr NO-ERROR.
+                IF NOT AVAILABLE artikel OR NOT artikel.stock OR artikel.blokkeren THEN NEXT.
+
+                iRang = iRang + 1.
+
+                CREATE ttVoorraadDalers.
+                ASSIGN
+                    ttVoorraadDalers.rang             = iRang
+                    ttVoorraadDalers.artnr            = ttVoorraadAgg.artnr
+                    ttVoorraadDalers.netto            = ROUND(ttVoorraadAgg.nettoRank, 2)
+                    ttVoorraadDalers.aantalBewegingen = ttVoorraadAgg.aantalRank
+                    ttVoorraadDalers.huidigeVoorraad  = artikel.aantal
+                    ttVoorraadDalers.voorraadMin      = artikel.minv
+                    .
+
+                IF TRIM(artikel.omschr-n) NE "" THEN
+                    ttVoorraadDalers.omschrijving = TRIM(artikel.omschr-n).
+                ELSE IF TRIM(ttVoorraadAgg.omschrSnap) NE "" THEN
+                    ttVoorraadDalers.omschrijving = TRIM(ttVoorraadAgg.omschrSnap).
+                ELSE
+                    ttVoorraadDalers.omschrijving = ttVoorraadAgg.artnr.
+
+                IF iRang GE 5 THEN LEAVE.
+            END.
+
+            CATCH eErr AS Progress.Lang.Error:
+                EMPTY TEMP-TABLE ttVoorraadDalers.
+                EMPTY TEMP-TABLE ttVoorraadSamenvatting.
+                CREATE ttVoorraadSamenvatting.
+                ASSIGN
+                    ttVoorraadSamenvatting.aantalIn        = 0
+                    ttVoorraadSamenvatting.aantalUit       = 0
+                    ttVoorraadSamenvatting.aantalArtikelen = 0.
+                VoorraadBewegingenFailed = TRUE.
+                LOG-MANAGER:WRITE-MESSAGE(SUBSTITUTE("DashboardBE:GetVoorraadBewegingen failed: &1":u, eErr:GetMessage(1)), "DashboardBE":u).
+            END CATCH.
+        END.
+
+        phSamenvatting = TEMP-TABLE ttVoorraadSamenvatting:HANDLE.
+        RETURN TEMP-TABLE ttVoorraadDalers:HANDLE.
 
     END METHOD.
 

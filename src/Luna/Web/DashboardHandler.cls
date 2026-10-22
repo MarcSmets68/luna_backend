@@ -1,7 +1,8 @@
 /*------------------------------------------------------------------------
     File        : DashboardHandler.cls
     Purpose     : WebHandler exposing the dashboard summary (stat cards,
-                  recent activity, production this week) shown on the
+                  recent activity, production this week, top klanten/
+                  artikelen, voorraadbewegingen) shown on the
                   Luna homepage.
     Syntax      : GET /web/dashboard
     Description : Thin WebHandler only - routing, response assembly and
@@ -88,7 +89,9 @@ CLASS Luna.Web.DashboardHandler INHERITS WebHandler:
     /*------------------------------------------------------------------------------
         Purpose: GET /dashboard - assembles statCards (single object),
                  recentActivity (array) and productionThisWeek (array) into
-                 one response body.
+                 one response body, plus topKlanten/topArtikelen and the
+                 voorraadBewegingen object (summary counters + topDalers
+                 array) with per-widget error flags.
     ------------------------------------------------------------------------------*/
     METHOD OVERRIDE PROTECTED INTEGER HandleGet( INPUT poRequest AS IWebRequest ):
 
@@ -99,6 +102,11 @@ CLASS Luna.Web.DashboardHandler INHERITS WebHandler:
         DEFINE VARIABLE hOmzetTrend     AS HANDLE      NO-UNDO.
         DEFINE VARIABLE hTopKlanten     AS HANDLE      NO-UNDO.
         DEFINE VARIABLE hTopArtikelen   AS HANDLE      NO-UNDO.
+        DEFINE VARIABLE hVoorraad           AS HANDLE     NO-UNDO.
+        DEFINE VARIABLE hVoorraadSamenvatting AS HANDLE   NO-UNDO.
+        DEFINE VARIABLE oVoorraadSamenvattingBody AS JsonObject NO-UNDO.
+        DEFINE VARIABLE oVoorraadDalersBody       AS JsonObject NO-UNDO.
+        DEFINE VARIABLE oVoorraadBody             AS JsonObject NO-UNDO.
         DEFINE VARIABLE oTopKlantenBody   AS JsonObject NO-UNDO.
         DEFINE VARIABLE oTopArtikelenBody AS JsonObject NO-UNDO.
         DEFINE VARIABLE oStatCardsBody  AS JsonObject  NO-UNDO.
@@ -119,6 +127,7 @@ CLASS Luna.Web.DashboardHandler INHERITS WebHandler:
         /* Both Get... calls must run before the Failed properties are read. */
         hTopKlanten   = oService:GetTopKlanten().
         hTopArtikelen = oService:GetTopArtikelen().
+        hVoorraad     = oService:GetVoorraadBewegingen(OUTPUT hVoorraadSamenvatting).
 
         oStatCardsBody  = ResultHandleToJson(hStatCards).
         oActivityBody   = ResultHandleToJson(hActivity).
@@ -126,6 +135,8 @@ CLASS Luna.Web.DashboardHandler INHERITS WebHandler:
         oOmzetTrendBody = ResultHandleToJson(hOmzetTrend).
         oTopKlantenBody   = ResultHandleToJson(hTopKlanten).
         oTopArtikelenBody = ResultHandleToJson(hTopArtikelen).
+        oVoorraadSamenvattingBody = ResultHandleToJson(hVoorraadSamenvatting).
+        oVoorraadDalersBody       = ResultHandleToJson(hVoorraad).
 
         oBody = NEW JsonObject().
         oBody:Add("statCards":u, oStatCardsBody:GetJsonArray("items":u):GetJsonObject(1)).
@@ -136,6 +147,11 @@ CLASS Luna.Web.DashboardHandler INHERITS WebHandler:
         oBody:Add("topKlantenError":u, oService:TopKlantenFailed).
         oBody:Add("topArtikelen":u, oTopArtikelenBody:GetJsonArray("topArtikelen":u)).
         oBody:Add("topArtikelenError":u, oService:TopArtikelenFailed).
+
+        oVoorraadBody = oVoorraadSamenvattingBody:GetJsonArray("voorraadSamenvatting":u):GetJsonObject(1).
+        oVoorraadBody:Add("topDalers":u, oVoorraadDalersBody:GetJsonArray("voorraadDalers":u)).
+        oBody:Add("voorraadBewegingen":u, oVoorraadBody).
+        oBody:Add("voorraadBewegingenError":u, oService:VoorraadBewegingenFailed).
 
         WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oBody).
 

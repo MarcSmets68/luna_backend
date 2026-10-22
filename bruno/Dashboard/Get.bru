@@ -21,6 +21,11 @@ assert {
   res.body.topKlantenError: isBoolean
   res.body.topArtikelen: isArray
   res.body.topArtikelenError: isBoolean
+  res.body.voorraadBewegingen.aantalIn: isNumber
+  res.body.voorraadBewegingen.aantalUit: isNumber
+  res.body.voorraadBewegingen.aantalArtikelen: isNumber
+  res.body.voorraadBewegingen.topDalers: isArray
+  res.body.voorraadBewegingenError: isBoolean
 }
 
 docs {
@@ -47,8 +52,20 @@ docs {
     "topKlanten": [ { "rang": n, "klnr": n, "naam": "...", "omzet": n, "aantalFacturen": n, "aandeelPct": n, "omzetVorigeMaand": n, "vsVorigeMaandPct": n | null } ],
     "topKlantenError": bool,
     "topArtikelen": [ { "rang": n, "artnr": "...", "omschrijving": "...", "omzet": n, "aantal": n, "aandeelPct": n, "omzetVorigeMaand": n, "vsVorigeMaandPct": n | null } ],
-    "topArtikelenError": bool
+    "topArtikelenError": bool,
+    "voorraadBewegingen": {
+      "aantalIn": n, "aantalUit": n, "aantalArtikelen": n,
+      "topDalers": [ { "rang": n, "artnr": "...", "omschrijving": "...", "netto": n (<0), "aantalBewegingen": n, "huidigeVoorraad": n, "voorraadMin": n } ]
+    },
+    "voorraadBewegingenError": bool
   }
+
+  voorraadBewegingen: artlog bookings 1st of month through today.
+  aantalIn/aantalUit count bookings (aantal > 0 / < 0, incl. beweging "S");
+  aantalArtikelen = unique artnr with a non-zero booking. topDalers: max 5
+  artikelen with the largest net decrease (excl. beweging "S", excl.
+  blokkeren = TRUE / stock = FALSE). Zero summary + empty topDalers with
+  voorraadBewegingenError = true when that widget failed.
 
   topKlanten/topArtikelen: max 5 rows, net omzet excl. BTW this month (credit
   notes netted, voorschot excluded), compared with the same day-range last
