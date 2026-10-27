@@ -27,14 +27,14 @@
       1. groepnr/subgroepnr dense renumbering is precomputed ONCE, in a
          single pass over every transferable offlijn in offerte-lijnnr
          order (both subtotaal and non-subtotaal lines together) - see
-         BuildGroepMapping/ttGroepMap/ttSubgroepMap/ttGroepExpansion/
-         ttLedGroepMap - rather than being computed separately/
+         BuildGroepMapping/ttGroepMap/ttSubgroepMap/ttGroepExpansion -
+         rather than being computed separately/
          incrementally inside Pass 1 and Pass 2. This guarantees the same
          original groepnr always maps to the same new groepnr regardless
          of which pass encounters it first (Pass 1 only sees subtotaal
          lines, Pass 2 sees everything else, and a group's subtotaal line
          is not always first in offerte-lijnnr order within its group).
-         A default (non-split) ttGroepExpansion/ttLedGroepMap entry
+         A default (non-split) ttGroepExpansion entry
          (copyIndex 1) is seeded for every nonzero groepnr right away, so
          Pass 2 never has to special-case a group with no subtotaal line
          at all.
@@ -100,6 +100,13 @@
          doc-lijnnr guard at all), and the sibling bonlijn's
          lev-dat/bestel-dat/btw-kode are now also copied onto the new
          deadline bonlijn.
+      9. LED-copy per groep-copy: CopyLedLijnen walks ttGroepExpansion
+         (every physical copy of a split subtotaal-blok) instead of only
+         the first copy, so every split LVB gets its own full bon_led set
+         (deadline, maat bevestigd, profiel, ...) - before, copies 2..n
+         had no bon_led rows at all and were invisible to NPP
+         Reservaties/Planning/QC. ttLijnnrMap is keyed per copyIndex so
+         bon_led.doc-lijnnr points to the bonlijn of the same copy.
 
     Author(s)   : Devin
     Created     : 2026-10-04
@@ -146,15 +153,13 @@ CLASS Luna.BusinessLogic.OfferteConversieBE:
         FIELD newGroepnr AS INTEGER
         INDEX idx-pk IS UNIQUE oldGroepnr copyIndex.
 
+    /* copyIndex: physical groep-copy (subtotaal-blok-splitsing); always 1
+       for groepnr = 0 lines and non-split groups. */
     DEFINE PRIVATE TEMP-TABLE ttLijnnrMap NO-UNDO
         FIELD offLijnnr AS INTEGER
+        FIELD copyIndex AS INTEGER
         FIELD bonLijnnr AS INTEGER
-        INDEX idx-pk IS UNIQUE offLijnnr.
-
-    DEFINE PRIVATE TEMP-TABLE ttLedGroepMap NO-UNDO
-        FIELD offGroepnr AS INTEGER
-        FIELD bonGroepnr AS INTEGER
-        INDEX idx-pk IS UNIQUE offGroepnr.
+        INDEX idx-pk IS UNIQUE offLijnnr copyIndex.
 
     DEFINE PRIVATE VARIABLE iStapLijnnr                 AS INTEGER   NO-UNDO INITIAL 5000.
     DEFINE PRIVATE VARIABLE iLijnnrCounter              AS INTEGER   NO-UNDO.
@@ -250,7 +255,6 @@ CLASS Luna.BusinessLogic.OfferteConversieBE:
         EMPTY TEMP-TABLE ttSubgroepMap.
         EMPTY TEMP-TABLE ttGroepExpansion.
         EMPTY TEMP-TABLE ttLijnnrMap.
-        EMPTY TEMP-TABLE ttLedGroepMap.
         ASSIGN
             iLijnnrCounter              = 0
             iGroepnrCounter             = 0
@@ -316,7 +320,7 @@ CLASS Luna.BusinessLogic.OfferteConversieBE:
                  offlijn under this offerte, in offerte-lijnnr order,
                  assigning a new dense number the first time a nonzero old
                  groepnr/subgroepnr value is seen. Also seeds a default
-                 (non-split) ttGroepExpansion/ttLedGroepMap entry for every
+                 (non-split) ttGroepExpansion entry for every
                  nonzero groepnr right away.
     ------------------------------------------------------------------------------*/
     METHOD PRIVATE VOID BuildGroepMapping( BUFFER pbOfferte FOR offerte ):
@@ -341,12 +345,6 @@ CLASS Luna.BusinessLogic.OfferteConversieBE:
                     ttGroepExpansion.oldGroepnr = bOfflijn.groepnr
                     ttGroepExpansion.copyIndex  = 1
                     ttGroepExpansion.newGroepnr = iGroepnrCounter
-                    .
-
-                CREATE ttLedGroepMap.
-                ASSIGN
-                    ttLedGroepMap.offGroepnr = bOfflijn.groepnr
-                    ttLedGroepMap.bonGroepnr = iGroepnrCounter
                     .
             END.
 
@@ -750,11 +748,13 @@ CLASS Luna.BusinessLogic.OfferteConversieBE:
 
         hResult = NEW BonLijnBE():CreateBonLijnInternal( iBonnr, oBody, piLijnnr ).
 
-        IF piCopyIndex EQ 1 AND NOT CAN-FIND(FIRST ttLijnnrMap WHERE ttLijnnrMap.offLijnnr EQ pbSubtotaalLijn.lijnnr) THEN
+        IF NOT CAN-FIND(FIRST ttLijnnrMap WHERE ttLijnnrMap.offLijnnr EQ pbSubtotaalLijn.lijnnr
+                                            AND ttLijnnrMap.copyIndex EQ piCopyIndex) THEN
         DO:
             CREATE ttLijnnrMap.
             ASSIGN
                 ttLijnnrMap.offLijnnr = pbSubtotaalLijn.lijnnr
+                ttLijnnrMap.copyIndex = piCopyIndex
                 ttLijnnrMap.bonLijnnr = piLijnnr
                 .
         END.
@@ -876,11 +876,13 @@ CLASS Luna.BusinessLogic.OfferteConversieBE:
 
         hResult = NEW BonLijnBE():CreateBonLijnInternal( iBonnr, oBody, iNewLijnnr ).
 
-        IF piCopyIndex EQ 1 AND NOT CAN-FIND(FIRST ttLijnnrMap WHERE ttLijnnrMap.offLijnnr EQ pbOfflijn.lijnnr) THEN
+        IF NOT CAN-FIND(FIRST ttLijnnrMap WHERE ttLijnnrMap.offLijnnr EQ pbOfflijn.lijnnr
+                                            AND ttLijnnrMap.copyIndex EQ piCopyIndex) THEN
         DO:
             CREATE ttLijnnrMap.
             ASSIGN
                 ttLijnnrMap.offLijnnr = pbOfflijn.lijnnr
+                ttLijnnrMap.copyIndex = piCopyIndex
                 ttLijnnrMap.bonLijnnr = iNewLijnnr
                 .
         END.
@@ -985,6 +987,7 @@ CLASS Luna.BusinessLogic.OfferteConversieBE:
         CREATE ttLijnnrMap.
         ASSIGN
             ttLijnnrMap.offLijnnr = pbOfflijn.lijnnr
+            ttLijnnrMap.copyIndex = 1
             ttLijnnrMap.bonLijnnr = iNewLijnnr
             .
 
@@ -993,11 +996,13 @@ CLASS Luna.BusinessLogic.OfferteConversieBE:
     END METHOD.
 
     /*------------------------------------------------------------------------------
-        Purpose: LED-copy (design doc step 8). For every offerte groepnr
-                 recorded in ttLedGroepMap, copies every off_led row under
-                 that groepnr to a new bon_led row under the corresponding
-                 new bon groepnr, relinking the generic doc-lijnnr via
-                 ttLijnnrMap and recalculating prijs/montage-prijs from the
+        Purpose: LED-copy (design doc step 8). For every physical groep-copy
+                 in ttGroepExpansion (class header, decision 9), copies
+                 every off_led row under the offerte groepnr to a new
+                 bon_led row under that copy's bon groepnr, relinking the
+                 generic doc-lijnnr via ttLijnnrMap (same copyIndex, falling
+                 back to copyIndex 1 for groepnr = 0 lines) and
+                 recalculating prijs/montage-prijs from the
                  linked artikel's current vprijs/montage-prijs (unchanged
                  mechanism - not touched by this bugfix).
 
@@ -1034,7 +1039,8 @@ CLASS Luna.BusinessLogic.OfferteConversieBE:
         DEFINE VARIABLE dGewoneLedBestelDat         AS DATE       NO-UNDO.
         DEFINE VARIABLE cGewoneLedBtwKode           AS CHARACTER  NO-UNDO.
 
-        FOR EACH ttLedGroepMap:
+        FOR EACH ttGroepExpansion NO-LOCK
+            BY ttGroepExpansion.oldGroepnr BY ttGroepExpansion.copyIndex:
 
             ASSIGN
                 iVorigeLijnnrGewoneLedRegel = 0
@@ -1046,13 +1052,19 @@ CLASS Luna.BusinessLogic.OfferteConversieBE:
             FOR EACH bOffLed NO-LOCK
                 WHERE bOffLed.offnr   EQ pbOfferte.offnr
                   AND bOffLed.versie  EQ pbOfferte.versie
-                  AND bOffLed.groepnr EQ ttLedGroepMap.offGroepnr
+                  AND bOffLed.groepnr EQ ttGroepExpansion.oldGroepnr
                 BY bOffLed.led_lijn BY bOffLed.lijnnr:
 
                 iDocLijnnr = 0.
                 IF bOffLed.doc-lijnnr NE 0 THEN
                 DO:
-                    FIND FIRST ttLijnnrMap WHERE ttLijnnrMap.offLijnnr EQ bOffLed.doc-lijnnr NO-ERROR.
+                    FIND FIRST ttLijnnrMap
+                        WHERE ttLijnnrMap.offLijnnr EQ bOffLed.doc-lijnnr
+                          AND ttLijnnrMap.copyIndex EQ ttGroepExpansion.copyIndex NO-ERROR.
+                    IF NOT AVAILABLE ttLijnnrMap THEN
+                        FIND FIRST ttLijnnrMap
+                            WHERE ttLijnnrMap.offLijnnr EQ bOffLed.doc-lijnnr
+                              AND ttLijnnrMap.copyIndex EQ 1 NO-ERROR.
                     IF AVAILABLE ttLijnnrMap THEN
                         iDocLijnnr = ttLijnnrMap.bonLijnnr.
                 END.
@@ -1060,7 +1072,7 @@ CLASS Luna.BusinessLogic.OfferteConversieBE:
                 CREATE bon_led.
                 ASSIGN
                     bon_led.bonnr              = iBonnr
-                    bon_led.groepnr            = ttLedGroepMap.bonGroepnr
+                    bon_led.groepnr            = ttGroepExpansion.newGroepnr
                     bon_led.led_lijn           = bOffLed.led_lijn
                     bon_led.lijnnr             = bOffLed.lijnnr
                     bon_led.artnr              = bOffLed.artnr
@@ -1113,7 +1125,7 @@ CLASS Luna.BusinessLogic.OfferteConversieBE:
                        exact zoals legacy Offerte.w regel 12144-12156. */
                     FIND FIRST bGewoneLedBonlijn NO-LOCK
                         WHERE bGewoneLedBonlijn.bonnr   EQ iBonnr
-                          AND bGewoneLedBonlijn.groepnr EQ ttLedGroepMap.bonGroepnr
+                          AND bGewoneLedBonlijn.groepnr EQ ttGroepExpansion.newGroepnr
                           AND bGewoneLedBonlijn.omschr  EQ bOffLed.opm NO-ERROR.
                     IF AVAILABLE bGewoneLedBonlijn THEN
                         ASSIGN
