@@ -456,7 +456,7 @@ file instead of waiting on the live query.
   `RefreshLakproductieCache.ps1` every 5 minutes. Import it on the machine
   that runs PASOE:
   ```powershell
-  schtasks /create /xml "C:\LunaWEB - workspace\Backend\scripts\Luna-RefreshLakproductieCache-task.xml" /tn "Luna-RefreshLakproductieCache"
+  schtasks /create /xml "C:\LunaWEB - Workspace\luna_backend\scripts\Luna-RefreshLakproductieCache-task.xml" /tn "Luna-RefreshLakproductieCache"
   ```
   (or import via the Task Scheduler UI: Action → Import Task...). This is
   a machine-level change, not something a repo checkout does for you.
