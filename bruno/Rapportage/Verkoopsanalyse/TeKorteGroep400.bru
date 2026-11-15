@@ -1,0 +1,25 @@
+meta {
+  name: TeKorteGroep400
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/web/rapportage/verkoopsanalyse?artikelen=N*
+  body: none
+  auth: none
+}
+
+headers {
+  X-Auth-Token: {{authToken}}
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.code: eq 400
+}
+
+docs {
+  A group needs at least 2 characters before the * (a bare "*" would scan every bonlijn).
+}

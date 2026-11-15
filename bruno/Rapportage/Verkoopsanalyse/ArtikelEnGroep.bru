@@ -1,0 +1,31 @@
+meta {
+  name: ArtikelEnGroep
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/web/rapportage/verkoopsanalyse?artikelen=NOMALED.FUR%7CNOMALED.NC.C*
+  body: none
+  auth: none
+}
+
+headers {
+  X-Auth-Token: {{authToken}}
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.rijen.length: eq 2
+  res.body.rijen[0].swBegins: eq false
+  res.body.rijen[1].swBegins: eq true
+  res.body.rijen[1].artnr: eq NOMALED.NC.C
+  res.body.rijen[1].omschrijving: isNull
+  res.body.rijen[0].maanden.length: eq 12
+  res.body.totaal.length: eq 12
+}
+
+docs {
+  One exact artnr and one artikelgroep (trailing * = BEGINS, "|" encoded as %7C). Rows come back in request order; a group row has omschrijving null and artnr without the *. An unknown exact artnr is not an error: its row is all zeros.
+}

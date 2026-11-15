@@ -1,0 +1,30 @@
+meta {
+  name: AlleDealersAlleArtikelen
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/rapportage/verkoopsanalyse
+  body: none
+  auth: none
+}
+
+headers {
+  X-Auth-Token: {{authToken}}
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.periodeVan: isDefined
+  res.body.vorigePeriodeTot: isDefined
+  res.body.rijen.length: eq 0
+  res.body.totaal.length: eq 12
+  res.body.dealers.length: gt 0
+  res.body.generatedAt: isDefined
+}
+
+docs {
+  No filters: all Nomaled dealers (klant.swNomaled = TRUE), all articles together. rijen is empty, totaal has exactly 12 months (oldest first), each with aantal/omzet and the same month one year earlier. Heaviest call (bon-datum range scan over 24 months).
+}

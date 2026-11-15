@@ -1,0 +1,25 @@
+meta {
+  name: OnbekendeKlant400
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/web/rapportage/verkoopsanalyse?klnr=999999999
+  body: none
+  auth: none
+}
+
+headers {
+  X-Auth-Token: {{authToken}}
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.code: eq 400
+}
+
+docs {
+  A klnr that does not exist -> 400 "Onbekende klant".
+}

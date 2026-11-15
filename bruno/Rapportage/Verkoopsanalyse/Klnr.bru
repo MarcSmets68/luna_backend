@@ -1,0 +1,26 @@
+meta {
+  name: Klnr
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/web/rapportage/verkoopsanalyse?klnr=1&artikelen=NOMALED.FUR*
+  body: none
+  auth: none
+}
+
+headers {
+  X-Auth-Token: {{authToken}}
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.dealers.length: eq 1
+  res.body.dealers[0].klnr: eq 1
+}
+
+docs {
+  Explicit dealer list (comma-separated). Adjust klnr to an existing klant in your database. dealers echoes the dealers the analysis covers.
+}

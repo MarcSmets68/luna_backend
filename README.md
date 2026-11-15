@@ -21,7 +21,7 @@ Backend/
 │       │   ├── LoginHandler.cls       Auth-MVP login (POST /web/login) - see "Auth-MVP (login/logout)" section below
 │       │   ├── LogoutHandler.cls      Auth-MVP logout (POST /web/logout, X-Auth-Token header) - see "Auth-MVP (login/logout)" section below
 │       │   ├── AiSearchHandler.cls    AI-powered natural-language search (POST /web/ai-search) - see "AI Search" section below
-│       │   ├── RapportageHandler.cls  Rapportage section (GET /web/rapportage/verkoop-fur - Verkoop FUR dealer overview), see Luna.BusinessLogic.VerkoopFurBE
+│       │   ├── RapportageHandler.cls  Rapportage section (GET /web/rapportage/verkoop-fur - Verkoop FUR dealer overview), see Luna.BusinessLogic.VerkoopFurBE, GET /web/rapportage/omzetanalyse-dealers and GET /web/rapportage/verkoopsanalyse (see "Verkoopsanalyse" section below)
 │       │   ├── PricingHandler.cls     Iteratie A pricing engine (POST /web/pricing/bereken) - see "Pricing engine (Iteratie A, K1-K5)" section below
 │       │   ├── BtwHandler.cls         Iteratie B BTW/VAT calculation engine (POST /web/btw/bereken) - see "BTW/VAT engine (Iteratie B)" section below
 │       │   ├── LedRALHandler.cls      Read-only for led_RAL (GET /web/led-ral[/{ral}]) - see docs/backend/coating-reference-data.md
@@ -52,6 +52,7 @@ Backend/
 │           ├── AiSearchBE.cls         AI-search orchestration + hardcoded entity/field/operator whitelist - see "AI Search" section below
 │           ├── GeminiGateway.cls      Thin wrapper around the Google Gemini REST API, used only by AiSearchBE - see "AI Search" section below
 │           ├── VerkoopFurBE.cls       DB access for the Verkoop FUR rapportage overview (read-only, NO-LOCK) - Nomaled dealers who ordered a NOMALED.FUR* article in the rolling 12 months
+│           ├── VerkoopsanalyseBE.cls  DB access for the Verkoopsanalyse rapportage (read-only, NO-LOCK) - omzet/aantal per month for selected dealers and articles, last 12 closed months vs one year earlier
 │           ├── PricingEngineBE.cls    Iteratie A pure read-only pricing engine (K1-K5) - 1:1 port of legacy Include/Prijs.i - see "Pricing engine (Iteratie A, K1-K5)" section below
 │           ├── BtwBerekeningBE.cls    Iteratie B pure read-only BTW/VAT calculation engine (max 2 btw-kode groups, K3/K5 document discount) - see "BTW/VAT engine (Iteratie B)" section below
 │           ├── LedRALBE.cls           Read-only DB access for led_RAL (216 rows, RAL color reference) - see docs/backend/coating-reference-data.md
@@ -476,6 +477,27 @@ file instead of waiting on the live query.
 - **Staleness**: data can be up to ~5 minutes old (longer only if a
   scheduled refresh fails) — an accepted tradeoff for this feature, not a
   bug.
+
+## Verkoopsanalyse
+`GET /web/rapportage/verkoopsanalyse?klnr=1,2&artikelen=A|B*` (frontend:
+Rapportage > Verkoopsanalyse) returns omzet and aantallen per month for the
+12 last closed months, each next to the same month one year earlier.
+
+- `klnr`: comma-separated klnrs; empty = every klant with `swNomaled = TRUE`
+  (the same set as the frontend dealer picker). Unknown klnr -> 400.
+- `artikelen`: `|`-separated artnrs (send `|` as `%7C`); a trailing `*` is an
+  artikelgroep (BEGINS, min. 2 characters). One result row per entry, in
+  request order. Empty = all articles together (only `totaal`).
+- Omzet uses exactly the revenue rule of `OmzetanalyseDealersBE` (stempel
+  <> "O", NOMALED. articles, line/subtotaal/bon korting), so both reports agree.
+- `rijen[].maanden` and `totaal` always hold 12 months, oldest first, never null.
+- No server-side cache: the frontend caches each response for 5 minutes.
+  Without articles the call scans 24 months of `bonlijn` via `bonlijn-x17`
+  and is the slowest variant.
+- Contract and examples: `bruno/Rapportage/Verkoopsanalyse`.
+
+No `openedge.properties` change needed: it is routed through the existing
+`handler15` `/rapportage` mapping.
 
 ## Omzetanalyse dealers cache
 `GET /web/rapportage/omzetanalyse-dealers` recomputes the full analysis

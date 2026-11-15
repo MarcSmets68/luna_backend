@@ -8,10 +8,11 @@
                   overview (see Luna.BusinessLogic.VerkoopFurBE).
     Description : Thin WebHandler only - routing/parsing/response shaping.
                   The path after /rapportage/ must be a known literal report
-                  route: "verkoop-fur", "omzetanalyse-dealers" or
-                  "omzetanalyse-dealers/soorten". Unknown -> 400. All
-                  business logic and DB access lives in
-                  Luna.BusinessLogic.VerkoopFurBE / OmzetanalyseDealersBE. See
+                  route: "verkoop-fur", "omzetanalyse-dealers",
+                  "omzetanalyse-dealers/soorten" or "verkoopsanalyse".
+                  Unknown -> 400. All business logic and DB access lives in
+                  Luna.BusinessLogic.VerkoopFurBE / OmzetanalyseDealersBE /
+                  VerkoopsanalyseBE. See
                   docs/architecture/verkoop-fur-ontwerp.md for the full
                   design.
     Author(s)   : Devin
@@ -29,6 +30,7 @@ USING Progress.Json.ObjectModel.ObjectModelParser.
 USING Luna.BusinessLogic.VerkoopFurBE.
 USING Luna.BusinessLogic.OmzetanalyseDealersBE.
 USING Luna.BusinessLogic.OmzetanalyseDealersCacheService.
+USING Luna.BusinessLogic.VerkoopsanalyseBE.
 USING Luna.Web.Util.QueryParamHelper.
 USING Luna.BusinessLogic.AuthGuard.
 
@@ -46,6 +48,13 @@ CLASS Luna.Web.RapportageHandler INHERITS WebHandler:
     DEFINE PRIVATE VARIABLE cVerkoopFurSegment AS CHARACTER NO-UNDO INITIAL "verkoop-fur":u.
     DEFINE PRIVATE VARIABLE cOmzetSegment        AS CHARACTER NO-UNDO INITIAL "omzetanalyse-dealers":u.
     DEFINE PRIVATE VARIABLE cOmzetSoortenSegment AS CHARACTER NO-UNDO INITIAL "omzetanalyse-dealers/soorten":u.
+    DEFINE PRIVATE VARIABLE cVerkoopsanalyseSegment AS CHARACTER NO-UNDO INITIAL "verkoopsanalyse":u.
+
+    /* Request-size guards for the verkoopsanalyse lists. */
+    DEFINE PRIVATE VARIABLE iMaxKlnrs     AS INTEGER NO-UNDO INITIAL 500.
+    DEFINE PRIVATE VARIABLE iMaxArtikelen AS INTEGER NO-UNDO INITIAL 50.
+    DEFINE PRIVATE VARIABLE iMaxArtnrLen  AS INTEGER NO-UNDO INITIAL 60.
+    DEFINE PRIVATE VARIABLE iMinGroepLen  AS INTEGER NO-UNDO INITIAL 2.
 
     /*------------------------------------------------------------------------------
         Purpose: Extracts the path segment(s) (if any) after the mount
@@ -451,10 +460,128 @@ CLASS Luna.Web.RapportageHandler INHERITS WebHandler:
     END METHOD.
 
     /*------------------------------------------------------------------------------
+        Purpose: Response shaping for the Verkoopsanalyse ProDataSet JSON:
+                 unwraps dataset/root table and guarantees empty arrays
+                 (WRITE-JSON omits empty nested child tables).
+    ------------------------------------------------------------------------------*/
+    METHOD PRIVATE JsonObject ShapeVerkoopsanalyse( INPUT poRaw AS JsonObject ):
+
+        DEFINE VARIABLE oDs    AS JsonObject NO-UNDO.
+        DEFINE VARIABLE oRoot  AS JsonObject NO-UNDO.
+        DEFINE VARIABLE aRijen AS JsonArray  NO-UNDO.
+        DEFINE VARIABLE cNames AS CHARACTER  NO-UNDO EXTENT.
+        DEFINE VARIABLE iRij   AS INTEGER    NO-UNDO.
+
+        cNames = poRaw:GetNames().
+        oDs    = poRaw:GetJsonObject(cNames[1]).
+        oRoot  = oDs:GetJsonArray("analyse":u):GetJsonObject(1).
+
+        EnsureArray(oRoot, "dealers":u).
+        EnsureArray(oRoot, "rijen":u).
+        EnsureArray(oRoot, "totaal":u).
+
+        aRijen = oRoot:GetJsonArray("rijen":u).
+        DO iRij = 1 TO aRijen:Length:
+            EnsureArray(aRijen:GetJsonObject(iRij), "maanden":u).
+        END.
+
+        RETURN oRoot.
+
+    END METHOD.
+
+    /*------------------------------------------------------------------------------
+        Purpose: GET /rapportage/verkoopsanalyse?klnr=1,2&artikelen=A|B* -
+                 validates the list formats (existence checks live in the BE),
+                 calls VerkoopsanalyseBE, shapes the response.
+                 klnr      : comma-separated positive integers, "" = all Nomaled dealers
+                 artikelen : "|"-separated artnrs, trailing "*" = artikelgroep
+                             (BEGINS, at least iMinGroepLen characters), "" = all
+    ------------------------------------------------------------------------------*/
+    METHOD PRIVATE VOID HandleVerkoopsanalyse( INPUT poRequest AS IWebRequest ):
+
+        DEFINE VARIABLE oService   AS VerkoopsanalyseBE NO-UNDO.
+        DEFINE VARIABLE hResult    AS HANDLE     NO-UNDO.
+        DEFINE VARIABLE oBody      AS JsonObject NO-UNDO.
+        DEFINE VARIABLE cKlnrRaw   AS CHARACTER  NO-UNDO.
+        DEFINE VARIABLE cArtRaw    AS CHARACTER  NO-UNDO.
+        DEFINE VARIABLE cKlnrs     AS CHARACTER  NO-UNDO.
+        DEFINE VARIABLE cArtikelen AS CHARACTER  NO-UNDO.
+        DEFINE VARIABLE cEntry     AS CHARACTER  NO-UNDO.
+        DEFINE VARIABLE cBase      AS CHARACTER  NO-UNDO.
+        DEFINE VARIABLE iCount     AS INTEGER    NO-UNDO.
+        DEFINE VARIABLE i          AS INTEGER    NO-UNDO.
+
+        ASSIGN
+            cKlnrRaw = TRIM(QueryParamHelper:GetQueryValue(poRequest, "klnr":u))
+            cArtRaw  = TRIM(QueryParamHelper:GetQueryValue(poRequest, "artikelen":u)).
+
+        /* klnr list. */
+        IF cKlnrRaw NE "":u THEN
+        DO i = 1 TO NUM-ENTRIES(cKlnrRaw):
+            cEntry = TRIM(ENTRY(i, cKlnrRaw)).
+            IF cEntry EQ "":u THEN NEXT.
+            IF LENGTH(cEntry) GT 9 OR NOT IsDigits(cEntry) OR INTEGER(cEntry) LE 0 THEN
+            DO:
+                WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest),
+                    "Ongeldige klnr - verwacht positieve gehele getallen, gescheiden door komma's":u).
+                RETURN.
+            END.
+            IF LOOKUP(STRING(INTEGER(cEntry)), cKlnrs) GT 0 THEN NEXT.
+            ASSIGN
+                iCount = iCount + 1
+                cKlnrs = cKlnrs + (IF cKlnrs EQ "":u THEN "":u ELSE ",":u) + STRING(INTEGER(cEntry)).
+        END.
+        IF iCount GT iMaxKlnrs THEN
+        DO:
+            WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest),
+                SUBSTITUTE("Te veel dealers - maximum &1":u, iMaxKlnrs)).
+            RETURN.
+        END.
+
+        /* artikelen list. */
+        iCount = 0.
+        IF cArtRaw NE "":u THEN
+        DO i = 1 TO NUM-ENTRIES(cArtRaw, "|":u):
+            cEntry = TRIM(ENTRY(i, cArtRaw, "|":u)).
+            IF cEntry EQ "":u THEN NEXT.
+            cBase = RIGHT-TRIM(cEntry, "*":u).
+            IF LENGTH(cEntry) GT iMaxArtnrLen
+               OR cBase EQ "":u
+               OR (cBase NE cEntry AND LENGTH(cBase) LT iMinGroepLen) THEN
+            DO:
+                WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest),
+                    SUBSTITUTE("Ongeldig artikel '&1' - een groep (eindigend op *) heeft minstens &2 tekens nodig":u,
+                        cEntry, iMinGroepLen)).
+                RETURN.
+            END.
+            ASSIGN
+                iCount     = iCount + 1
+                cArtikelen = cArtikelen + (IF cArtikelen EQ "":u THEN "":u ELSE "|":u)
+                           + cBase + (IF cBase NE cEntry THEN "*":u ELSE "":u).
+        END.
+        IF iCount GT iMaxArtikelen THEN
+        DO:
+            WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest),
+                SUBSTITUTE("Te veel artikelen - maximum &1":u, iMaxArtikelen)).
+            RETURN.
+        END.
+
+        oService = NEW VerkoopsanalyseBE().
+        hResult  = oService:GetAnalyse(cKlnrs, cArtikelen).
+
+        oBody = ShapeVerkoopsanalyse(ResultHandleToJson(hResult)).
+        oBody:Add("generatedAt":u, ISO-DATE(NOW)).
+
+        WriteJsonResponse(INTEGER(StatusCodeEnum:OK), oBody).
+
+    END METHOD.
+
+    /*------------------------------------------------------------------------------
         Purpose: Routes GET /rapportage/<report>. Route table:
                    verkoop-fur                     -> VerkoopFurBE
                    omzetanalyse-dealers            -> OmzetanalyseDealersBE:GetAnalyse
                    omzetanalyse-dealers/soorten    -> OmzetanalyseDealersBE:GetSoorten
+                   verkoopsanalyse                 -> VerkoopsanalyseBE:GetAnalyse
                  Anything else -> 400.
     ------------------------------------------------------------------------------*/
     METHOD OVERRIDE PROTECTED INTEGER HandleGet( INPUT poRequest AS IWebRequest ):
@@ -480,11 +607,17 @@ CLASS Luna.Web.RapportageHandler INHERITS WebHandler:
             RETURN 0.
         END.
 
+        IF iSegCount EQ 1 AND cRemainder EQ cVerkoopsanalyseSegment THEN
+        DO:
+            HandleVerkoopsanalyse(poRequest).
+            RETURN 0.
+        END.
+
         IF iSegCount NE 1 OR cRemainder NE cVerkoopFurSegment THEN
         DO:
             WriteErrorResponse(INTEGER(StatusCodeEnum:BadRequest),
-                SUBSTITUTE("Unknown report /rapportage/&1 - expected /rapportage/&2, /rapportage/&3 or /rapportage/&4":u,
-                    cRemainder, cVerkoopFurSegment, cOmzetSegment, cOmzetSoortenSegment)).
+                SUBSTITUTE("Unknown report /rapportage/&1 - expected /rapportage/&2, /rapportage/&3, /rapportage/&4 or /rapportage/&5":u,
+                    cRemainder, cVerkoopFurSegment, cOmzetSegment, cOmzetSoortenSegment, cVerkoopsanalyseSegment)).
             RETURN 0.
         END.
 

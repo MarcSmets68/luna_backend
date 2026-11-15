@@ -1,0 +1,25 @@
+meta {
+  name: OngeldigeKlnr400
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/web/rapportage/verkoopsanalyse?klnr=12,abc
+  body: none
+  auth: none
+}
+
+headers {
+  X-Auth-Token: {{authToken}}
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 400
+  res.body.error.code: eq 400
+}
+
+docs {
+  Non-numeric klnr entry -> 400.
+}
