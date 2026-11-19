@@ -1,0 +1,39 @@
+meta {
+  name: List
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/web/npp/productietijd
+  body: none
+  auth: none
+}
+
+headers {
+  X-Auth-Token: {{authToken}}
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.from: isString
+  res.body.count: isNumber
+  res.body.items: isArray
+}
+
+docs {
+  GET /web/npp/productietijd - raw dump of the "productietijd" rows (legacy
+  NPP TijdRegistratie.p: one row per Start/Pauze/Herstart/Stop/Afgewerkt
+  click) of the last 12 months, ordered by datum/uur/artnr/volgnr. Can be
+  several MB / tens of thousands of rows - there is no paging.
+
+  Item: artnr, volgnr, datum (yyyy-mm-dd), uur (HH:MM:SS), bonnr, groepnr,
+  programma, actie, id, plus the montage article of the bon/groep:
+  montageArtnr / montageAantal / montageLijnen (first bonlijn with
+  montage AND swLed for bonnr+groepnr; "" / 0 / 0 when there is none).
+
+  Read-only - backed by Luna/Web/NPPProductieTijdHandler.cls +
+  Luna/BusinessLogic/NPPProductieTijdBE.cls. Durations are computed offline
+  by scripts/AnalyseProductietijd.py.
+}

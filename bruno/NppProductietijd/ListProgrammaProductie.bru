@@ -1,0 +1,26 @@
+meta {
+  name: ListProgrammaProductie
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/web/npp/productietijd?programma=PRODUCTIE
+  body: none
+  auth: none
+}
+
+headers {
+  X-Auth-Token: {{authToken}}
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.items: isArray
+}
+
+docs {
+  Same as List, filtered on productietijd.programma = "PRODUCTIE" (exact
+  match; other values: RESERVATIE, VERPAKKING, QC, "PRODUCTIE SIKTA", ...).
+}

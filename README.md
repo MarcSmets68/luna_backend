@@ -71,9 +71,11 @@ Backend/
 └── bruno/                Bruno collection - import this folder directly in Bruno
 ```
 
-Follow the architecture rule from the root `AGENTS.md`: WebHandlers stay thin
+Follow the architecture rule from [`AGENTS.md`](AGENTS.md): WebHandlers stay thin
 (routing/parsing/response shaping only); all business logic and DB access
-belongs in Business Entities via ProDataSets.
+belongs in Business Entities (JsonObject, temp-tables or ProDataSets - see
+[ADR-0003](docs/adr/0003-be-response-vorm.md)). Writes must respect
+[docs/coexistentie.md](docs/coexistentie.md) because LunaV12 writes to the same DB.
 
 ## PASOE instance
 This backend runs against the existing PASOE instance `MarcTest`
