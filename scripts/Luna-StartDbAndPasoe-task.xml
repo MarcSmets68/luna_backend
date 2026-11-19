@@ -41,7 +41,7 @@
   <Actions Context="Author">
     <Exec>
       <Command>powershell.exe</Command>
-      <Arguments>-NoProfile -ExecutionPolicy Bypass -File "C:\LunaWEB - workspace\Backend\scripts\start-luna-env.ps1"</Arguments>
+      <Arguments>-NoProfile -ExecutionPolicy Bypass -File "C:\LunaWEB - Workspace\luna_backend\scripts\start-luna-env.ps1"</Arguments>
     </Exec>
   </Actions>
 </Task>
